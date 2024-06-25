@@ -1,0 +1,10 @@
+.env
+*.log
+*.png
+*.txt
+*.pdf
+*__pycache__
+*.pyc
+flexml.egg-info
+flexml/catboost_info
+setup.py
