@@ -9,6 +9,7 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 
 from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS
 from flexml.logger.logger import get_logger
+from flexml._model_tuner import ModelTuner
 
 
 class SupervisedBase:
@@ -66,6 +67,9 @@ class SupervisedBase:
         self.__validate_data()
         self.__prepare_models()
         self.__train_test_split()
+
+        # Model Tuning Helper
+        self.model_optimizer = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test)
 
     def __validate_data(self):
         """
@@ -378,3 +382,137 @@ class SupervisedBase:
         sorted_model_stats_df = self.__sort_models(eval_metric)
 
         print(sorted_model_stats_df.head(len(self.ML_MODELS)))
+
+    def tune_model(self, 
+                   model: Optional[object] = None,
+                   tuning_method: Optional[str] = 'randomized_search',
+                   eval_metric: Optional[str] = None,
+                   param_grid: Optional[dict] = None,
+                   n_trials: int = 10,
+                   cv: int = 3,
+                   n_jobs: int = -1):
+        """
+        Tunes the model based on the given parameter grid and evaluation metric.
+
+        Parameters
+        ----------
+        model : object (default = None)
+            The machine learning model to tune. If It's none, flexml retrieves the best model found in the experiment
+        
+        tuning_method: str (default = 'random_search')
+            The tuning method to use for model tuning
+
+            * 'grid_search' for GridSearchCV (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html)
+                Note that GridSearch optimization may take too long to finish since It tries all the possible combinations of the parameters
+
+            * 'randomized_search' for RandomizedSearchCV (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html)
+            
+            * 'optuna' for Optuna (https://optuna.readthedocs.io/en/stable/)
+
+        eval_metric : str (default='r2' for regression, 'accuracy' for classification)
+            The evaluation metric to use for model evaluation
+        
+            * r2, mae, mse, rmse for Regression tasks
+
+            * accuracy, precision, recall, f1_score for Classification tasks
+
+        param_grid : dict (default = defined custom param dict in flexml/config/tune_model_config.py)
+            The parameter set to use for model tuning.
+
+            Example param_grid for XGBoost
+            
+            >>>      {
+            >>>       'n_estimators': [100, 200, 300],
+            >>>       'max_depth': [3, 4, 5],
+            >>>       'learning_rate': [0.01, 0.05, 0.1]
+            >>>      }
+
+        n_trials : int (default = 10)
+            The number of trials to run in the tuning process (Only for RandomizedSearchCV and Optuna)
+            
+        cv : int (default = 3)
+            The number of cross-validation folds to use for the tuning process (Only for GridSearchCV and RandomizedSearchCV)
+        
+        n_jobs: int
+            The number of jobs to run in parallel for the tuning process. -1 means using all threads in the CPU
+
+        Returns
+        -------
+        tuned_model: object
+            The tuned model object
+        """
+
+        def _show_tuning_report(tuning_report: dict):
+            """
+            Shows the tuning report of the model tuning process
+            """
+            self.tuned_model = tuning_report['tuned_model']
+            self.tuned_model_score = tuning_report['tuned_model_score']
+
+        eval_metric = self.__eval_metric_checker(eval_metric)
+
+        # Get the best model If the user doesn't pass any model object
+        if model is None:
+            model = self.get_best_models()
+        
+        trained_models = [model_pack.get(list(model_pack.keys())[0]).get("model_stats")['model_name'] for model_pack in self.model_training_info]
+        
+        if model.__class__.__name__ not in trained_models and not isinstance(model, str):
+            error_msg = f"{model} is not found in the trained models, expected one of the following:\n{trained_models}{15*'-'}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        # Get the model's param_grid from the config file If It's not passed from the user
+        if param_grid is None:
+            try:
+                param_grid = [ml_model for ml_model in self.ML_MODELS if ml_model['name'] == model.__class__.__name__][0]['tuning_param_grid']
+                
+            except AttributeError:
+                error_msg = f"{model}'s tuning config is not found in the config, please pass it manually via 'param_grid' parameter"
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+        if cv < 2 or not isinstance(cv, int):
+            error_msg = f"cv parameter should be minimum 2, got {cv}\nChanged it to 2 for the tuning process"
+            cv = 2
+            self.logger.info(error_msg)
+
+        self.logger.info("[PROCESS] Model Tuning process is started")
+        match tuning_method.lower():
+            case "grid_search":
+                tuning_result = self.model_optimizer.grid_search(
+                    model=model,
+                    param_grid=param_grid,
+                    eval_metric=eval_metric,
+                    cv=cv,
+                    n_jobs=n_jobs
+                )
+                _show_tuning_report(tuning_result)
+            
+            case "randomized_search":
+                tuning_result = self.model_optimizer.random_search(
+                    model=model,
+                    param_grid=param_grid,
+                    eval_metric=eval_metric,
+                    n_trials=n_trials,
+                    cv=cv,
+                    n_jobs=n_jobs
+                )
+                _show_tuning_report(tuning_result)
+                
+            case "optuna":
+                tuning_result = self.model_optimizer.optuna_search(
+                    model=model,
+                    param_grid=param_grid,
+                    eval_metric=eval_metric,
+                    n_trials=n_trials,
+                    n_jobs=n_jobs
+                )
+                _show_tuning_report(tuning_result)
+            
+            case _:
+                error_msg = f"Unsupported tuning method: {tuning_method}, expected one of the following: 'grid_search', 'randomized_search', 'optuna'"
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
+            
+        self.logger.info("[PROCESS] Model Tuning process is finished")
