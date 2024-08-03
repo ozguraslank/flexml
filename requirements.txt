@@ -4,3 +4,5 @@ scikit-learn==1.4.0
 xgboost==2.0.3
 lightgbm==4.5.0
 catboost==1.2.5
+tqdm==4.66.4
+optuna==3.6.1
