@@ -386,6 +386,7 @@ class SupervisedBase:
     def tune_model(self, 
                    model: Optional[object] = None,
                    tuning_method: Optional[str] = 'randomized_search',
+                   tuning_size: Optional[str] = 'wide',
                    eval_metric: Optional[str] = None,
                    param_grid: Optional[dict] = None,
                    n_trials: int = 10,
@@ -408,6 +409,14 @@ class SupervisedBase:
             * 'randomized_search' for RandomizedSearchCV (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html)
             
             * 'optuna' for Optuna (https://optuna.readthedocs.io/en/stable/)
+
+        tuning_size: str (default = 'wide')
+            The size of the tuning process. It can be 'quick' or 'wide'
+
+            * If 'quick' is selected, number of params or number of values in the each params will be decrased.
+                -> For detailed information, visit flexml/_model_tuner.py/_param_grid_validator() function's doc
+
+            * If 'wide' is selected, param_grid will stay same
 
         eval_metric : str (default='r2' for regression, 'accuracy' for classification)
             The evaluation metric to use for model evaluation
@@ -482,6 +491,7 @@ class SupervisedBase:
             case "grid_search":
                 tuning_result = self.model_optimizer.grid_search(
                     model=model,
+                    tuning_size=tuning_size,
                     param_grid=param_grid,
                     eval_metric=eval_metric,
                     cv=cv,
@@ -492,6 +502,7 @@ class SupervisedBase:
             case "randomized_search":
                 tuning_result = self.model_optimizer.random_search(
                     model=model,
+                    tuning_size=tuning_size,
                     param_grid=param_grid,
                     eval_metric=eval_metric,
                     n_trials=n_trials,
@@ -503,6 +514,7 @@ class SupervisedBase:
             case "optuna":
                 tuning_result = self.model_optimizer.optuna_search(
                     model=model,
+                    tuning_size=tuning_size,
                     param_grid=param_grid,
                     eval_metric=eval_metric,
                     n_trials=n_trials,
