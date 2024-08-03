@@ -1,12 +1,10 @@
-from typing import Union, Optional
+from typing import Optional
 import numpy as np
 import pandas as pd
 import optuna
-
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-
 from flexml.logger.logger import get_logger
 
 
@@ -131,7 +129,7 @@ class ModelTuner:
                         param_grid[param] = new_param_values
             else:
                 param_amount_to_keep = int(param_amount / 2 if param_amount % 2 == 0 else param_amount - (param_amount - 1) / 2)
-                # NOTE: No need to remove some of the values in the param_grid since number of params will be decrased by half almost here
+                # No need to remove some of the values in the param_grid since number of params will be decrased by half almost here
                 new_param_grid = {}
                 for _ in range(int(param_amount_to_keep)):
                     random_param = np.random.choice(list(param_grid.keys()))
@@ -334,7 +332,6 @@ class ModelTuner:
         n_jobs : int, optional (default=-1)
             The number of parallel jobs to run. The default is -1.
 
-        # TODO
         optimization_size : str, optional (default="quick")
             The size of the optimization. It can be 'quick' or 'wide'. The default is "quick".
 
@@ -508,8 +505,6 @@ class ModelTuner:
             
             test_model = type(model)()
             test_model.set_params(**params)
-            
-            # Train the model
             test_model.fit(self.X_train, self.y_train)
             
             score = self._model_evaluator(test_model, eval_metric)
