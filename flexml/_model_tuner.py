@@ -61,14 +61,15 @@ class ModelTuner:
         self.logger = get_logger(__name__, logging_to_file)
 
     def _param_grid_validator(self,
-                        param_grid: dict):
+                              model_available_params: dict,
+                              param_grid: dict) -> dict:
         """
         This method is used to validate the param_grid dictionary for the model. Also It changes the size of the param_grid If the user wants to have a quick optimization.
 
         Parameters
         ----------
-        model : object
-            The model object that will be tuned.
+        model_available_params : dict
+            All params that model has
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values.
@@ -85,7 +86,14 @@ class ModelTuner:
                 
                 -> Also, half of the param_grid will be selected randomly, so the results may change in each run
         """
-        # IN PROGRESS
+        # Check if all params that param_grid has are available in the model's params
+        for param_name in param_grid.keys():
+            if param_name not in model_available_params:
+                error_msg = f"Error while validating the param_grid for the model. The '{param_name}' parameter is not available in the model's available params.\n \
+                    Available params: {list(model_available_params)}"
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
+            
         return param_grid
     
     def _model_evaluator(self,
@@ -196,6 +204,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
+        param_grid = self._param_grid_validator(model.get_params(), param_grid)
         model_stats = {
             "tuning_method": "GridSearchCV",
             "tuning_param_grid": param_grid,
@@ -293,6 +302,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
+        param_grid = self._param_grid_validator(model.get_params(), param_grid)
         model_stats = {
             "tuning_method": "RandomizedSearchCV",
             "tuning_param_grid": param_grid,
@@ -303,10 +313,8 @@ class ModelTuner:
             "tuned_model_evaluation_metric": None
         }
         
-        param_grid = self._param_grid_validator(param_grid)
-        
         try:
-            search_result = RandomizedSearchCV(model, param_grid, n_iter=n_trials, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X, self.y)
+            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_trials, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X, self.y)
 
             model_stats['tuned_model'] = search_result.best_estimator_
             model_stats['tuned_model_score'] = self._model_evaluator(search_result.best_estimator_, eval_metric)
@@ -380,6 +388,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
+        param_grid = self._param_grid_validator(model.get_params(), param_grid)
         model_stats = {
             "tuning_method": "Optuna",
             "tuning_param_grid": param_grid,
@@ -421,7 +430,8 @@ class ModelTuner:
 
                 # TODO: Other types can be added too, e.g. suggest_loguniform, suggest_uniform, suggest_discrete_uniform
                 else:
-                    info_msg = f"Unsupported data type for Optuna tuning, Please use one of the following data types: 'str', 'bool', 'int', 'float', but found {type(first_element)}"
+                    info_msg = f"{param_name} parameter is not added to tuning process since It's data type is not supported for Optuna tuning\n \
+                                Please use one of the following data types in your params: 'str', 'bool', 'int', 'float'. Instead of {type(first_element)}"
                     self.logger(info_msg)
             
             test_model = type(model)()
