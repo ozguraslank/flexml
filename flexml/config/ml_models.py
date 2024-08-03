@@ -142,7 +142,7 @@ WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
             "max_depth": [None, 10, 50, 100],
             "min_samples_split": [2, 5, 10],
             "min_samples_leaf": [1, 2, 4],
-            "max_features": ['auto', 'sqrt', 'log2']
+            "max_features": ['sqrt', 'log2']
         }
     },
     {
@@ -283,7 +283,7 @@ WIDE_CLASSIFICATION_MODELS = QUICK_CLASSIFICATION_MODELS + [
             "max_depth": [None, 10, 50, 100],
             "min_samples_split": [2, 5, 10],
             "min_samples_leaf": [1, 2, 4],
-            "max_features": ['auto', 'sqrt', 'log2']
+            "max_features": ['sqrt', 'log2']
         }
     },
     {
