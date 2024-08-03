@@ -46,8 +46,7 @@ QUICK_REGRESSION_MODELS = [
         "name": LINEAR_REGRESSION.__class__.__name__,
         "model": LINEAR_REGRESSION,
         "tuning_param_grid": {
-            'fit_intercept': [True, False],
-            'normalize': [True, False]
+            'fit_intercept': [True, False]
         }
     },
     {
@@ -56,7 +55,6 @@ QUICK_REGRESSION_MODELS = [
         "tuning_param_grid": {
             "alpha": [0.1, 1, 10],
             "fit_intercept": [True, False],
-            "normalize": [True, False],
             "solver": ['auto', 'svd', 'cholesky', 'lsqr', 'sparse_cg', 'sag', 'saga']
         }
     },
@@ -66,7 +64,6 @@ QUICK_REGRESSION_MODELS = [
         "tuning_param_grid": {
             "alpha": [0.1, 1, 10],
             "fit_intercept": [True, False],
-            "normalize": [True, False],
             "selection": ['cyclic', 'random']
         }
     },
@@ -77,7 +74,6 @@ QUICK_REGRESSION_MODELS = [
             "alpha": [0.1, 1, 10],
             "l1_ratio": [0.1, 0.5, 0.9],
             "fit_intercept": [True, False],
-            "normalize": [True, False],
             "selection": ['cyclic', 'random']
         }
     },
@@ -200,7 +196,6 @@ QUICK_CLASSIFICATION_MODELS = [
         "tuning_param_grid": {
             "alpha": [0.1, 1, 10],
             "fit_intercept": [True, False],
-            "normalize": [True, False],
             "solver": ['auto', 'svd', 'cholesky', 'lsqr', 'sparse_cg', 'sag', 'saga']
         }
     },
@@ -210,7 +205,6 @@ QUICK_CLASSIFICATION_MODELS = [
         "tuning_param_grid": {
             "alpha": [0.1, 1, 10],
             "fit_intercept": [True, False],
-            "normalize": [True, False],
             "selection": ['cyclic', 'random']
         }
     },
@@ -221,7 +215,6 @@ QUICK_CLASSIFICATION_MODELS = [
             "alpha": [0.1, 1, 10],
             "l1_ratio": [0.1, 0.5, 0.9],
             "fit_intercept": [True, False],
-            "normalize": [True, False],
             "selection": ['cyclic', 'random']
         }
     },
