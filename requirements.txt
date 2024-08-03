@@ -6,3 +6,7 @@ lightgbm==4.5.0
 catboost==1.2.5
 tqdm==4.66.4
 optuna==3.6.1
+
+# FOR TESTING (REMOVE THE '#' TO GET TEST LIBRARIES ALSO)
+#pytest==8.3.2
+#parameterized==0.9.0
