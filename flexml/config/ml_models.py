@@ -15,7 +15,7 @@ LASSO = Lasso()
 ELASTIC_NET = ElasticNet()
 XGBOOST_REGRESSION = XGBRegressor()
 LIGHTGBM_REGRESSION = LGBMRegressor(verbose = -1)
-CATBOOST_REGRESSION = CatBoostRegressor(verbose = 0, allow_writing_files = False)
+CATBOOST_REGRESSION = CatBoostRegressor(verbose = 0, allow_writing_files = False, silent=True)
 DECISION_TREE_REGRESSION = DecisionTreeRegressor()
 
 # Wide Regression Models
@@ -31,7 +31,7 @@ LASSO_CLASSIFIER = Lasso()
 ELASTIC_NET_CLASSIFIER = ElasticNet()
 XGBOOST_CLASSIFIER = XGBClassifier()
 LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose = -1)
-CATBOOST_CLASSIFIER = CatBoostClassifier(verbose = 0, allow_writing_files = False)
+CATBOOST_CLASSIFIER = CatBoostClassifier(verbose = 0, allow_writing_files = False, silent=True)
 DECISION_TREE_CLASSIFIER = DecisionTreeClassifier()
 
 # Wide Classification Models

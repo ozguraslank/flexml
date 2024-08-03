@@ -473,9 +473,9 @@ class SupervisedBase:
                 raise ValueError(error_msg)
             
         if cv < 2 or not isinstance(cv, int):
-            error_msg = f"cv parameter should be minimum 2, got {cv}\nChanged it to 2 for the tuning process"
+            info_msg = f"cv parameter should be minimum 2, got {cv}\nChanged it to 2 for the tuning process"
             cv = 2
-            self.logger.info(error_msg)
+            self.logger.info(info_msg)
 
         self.logger.info("[PROCESS] Model Tuning process is started")
         match tuning_method.lower():
