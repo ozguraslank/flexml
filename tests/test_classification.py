@@ -3,7 +3,7 @@ from parameterized import parameterized
 import unittest
 import pandas as pd
 
-from flexml.logger import get_logger
+from flexml.logger.logger import get_logger
 
 class TestClassification(unittest.TestCase):
     df = pd.read_csv("tests/test_data/diabetes_classification.csv")
@@ -46,17 +46,20 @@ class TestClassification(unittest.TestCase):
             raise Exception(error_msg)
         
         try:
-            classification_exp.tune_model()
+            tuning_methods = ["grid_search", "randomized_search", "optuna"]
 
-            if classification_exp.tuned_model is None:
-                error_msg = f"An error occured while tuning the model in {exp_size} classification, tuned model is None"
-                self.logger.error(error_msg)
-                raise Exception(error_msg)
-                        
-            if classification_exp.tuned_model_score is None:
-                error_msg = f"An error occured while calculating the tuned model's score in {exp_size} classification, tuned model score is None"
-                self.logger.error(error_msg)
-                raise Exception(error_msg)
+            for method in tuning_methods:
+                classification_exp.tune_model(n_trials=3, cv = 2, tuning_size=exp_size)
+
+                if classification_exp.tuned_model is None:
+                    error_msg = f"An error occured while tuning the model with {method} in {exp_size} classification, tuned model is None"
+                    self.logger.error(error_msg)
+                    raise Exception(error_msg)
+                            
+                if classification_exp.tuned_model_score is None:
+                    error_msg = f"An error occured while calculating the tuned model's score with {method} in {exp_size} classification, tuned model score is None"
+                    self.logger.error(error_msg)
+                    raise Exception(error_msg)
         
         except Exception as e:
             error_msg = f"An error occured while tuning the model in {exp_size} classification, Error: {e}"

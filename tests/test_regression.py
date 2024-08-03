@@ -47,17 +47,20 @@ class TestRegression(unittest.TestCase):
             raise Exception(error_msg)
         
         try:
-            reg_exp.tune_model(n_trials=3, cv = 2)
+            tuning_methods = ["grid_search", "randomized_search", "optuna"]
 
-            if reg_exp.tuned_model is None:
-                error_msg = f"An error occured while tuning the model in {exp_size} regression, tuned model is None"
-                self.logger.error(error_msg)
-                raise Exception(error_msg)
-                        
-            if reg_exp.tuned_model_score is None:
-                error_msg = f"An error occured while calculating the tuned model's score in {exp_size} regression, tuned model score is None"
-                self.logger.error(error_msg)
-                raise Exception(error_msg)
+            for method in tuning_methods:
+                reg_exp.tune_model(n_trials=3, cv = 2, tuning_size=exp_size)
+
+                if reg_exp.tuned_model is None:
+                    error_msg = f"An error occured while tuning the model with {method} in {exp_size} regression, tuned model is None"
+                    self.logger.error(error_msg)
+                    raise Exception(error_msg)
+                            
+                if reg_exp.tuned_model_score is None:
+                    error_msg = f"An error occured while calculating the tuned model's score with {method} in {exp_size} regression, tuned model score is None"
+                    self.logger.error(error_msg)
+                    raise Exception(error_msg)
                     
         except Exception as e:
             error_msg = f"An error occured while tuning the model in {exp_size} regression, Error: {e}"
