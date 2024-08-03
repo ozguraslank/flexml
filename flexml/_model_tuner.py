@@ -118,7 +118,7 @@ class ModelTuner:
                         new_param_values = [current_param_values.pop(0)]
                         new_param_values.append(current_param_values.pop(-1))
 
-                        if number_of_values <= 5:
+                        if len(current_param_values) != 0 and number_of_values <= 5:
                             new_param_values.append(np.random.choice(current_param_values))
                         else:
                             number_of_values_left = len(current_param_values)
