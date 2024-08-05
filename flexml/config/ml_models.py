@@ -1,44 +1,43 @@
-# LinearRegression, Ridge, Lasso, XGBoost, LightGBM, CatBoost
-from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, RidgeClassifier, Lasso, ElasticNet
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, AdaBoostRegressor, AdaBoostClassifier
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, AdaBoostRegressor, AdaBoostClassifier, GradientBoostingRegressor, GradientBoostingClassifier, ExtraTreesRegressor, ExtraTreesClassifier
 from sklearn.svm import SVR, SVC
 from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
+from sklearn.naive_bayes import GaussianNB
 from xgboost import XGBRegressor, XGBClassifier
 from lightgbm import LGBMRegressor, LGBMClassifier
 from catboost import CatBoostRegressor, CatBoostClassifier
 
 # Quick Regression Models
 LINEAR_REGRESSION = LinearRegression()
-RIDGE = Ridge()
-LASSO = Lasso()
-ELASTIC_NET = ElasticNet()
-XGBOOST_REGRESSION = XGBRegressor()
+XGBOOST_REGRESSION = XGBRegressor(verbose = -1)
 LIGHTGBM_REGRESSION = LGBMRegressor(verbose = -1)
-CATBOOST_REGRESSION = CatBoostRegressor(verbose = 0, allow_writing_files = False, silent=True)
+CATBOOST_REGRESSION = CatBoostRegressor(allow_writing_files = False, silent=True)
 DECISION_TREE_REGRESSION = DecisionTreeRegressor()
+RANDOM_FOREST_REGRESSION = RandomForestRegressor()
 
 # Wide Regression Models
-RANDOM_FOREST_REGRESSION = RandomForestRegressor()
 SVR_REGRESSION = SVR()
 KNN = KNeighborsRegressor()
 ADA_BOOST = AdaBoostRegressor()
+GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor()
+EXTRA_TREES_REGRESSION = ExtraTreesRegressor()
 
 # Quick Classification Models
 LOGISTIC_REGRESSION = LogisticRegression()
-RIDGE_CLASSIFIER = RidgeClassifier()
-LASSO_CLASSIFIER = Lasso()
-ELASTIC_NET_CLASSIFIER = ElasticNet()
-XGBOOST_CLASSIFIER = XGBClassifier()
+XGBOOST_CLASSIFIER = XGBClassifier(verbose = -1)
 LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose = -1)
-CATBOOST_CLASSIFIER = CatBoostClassifier(verbose = 0, allow_writing_files = False, silent=True)
+CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files = False, silent=True)
 DECISION_TREE_CLASSIFIER = DecisionTreeClassifier()
+RANDOM_FOREST_CLASSIFIER = RandomForestClassifier()
 
 # Wide Classification Models
-RANDOM_FOREST_CLASSIFIER = RandomForestClassifier()
 SVM_CLASSIFIER = SVC()
 KNN_CLASSIFIER = KNeighborsClassifier()
 ADA_BOOST_CLASSIFIER = AdaBoostClassifier()
+GRADIENT_BOOSTING_CLASSIFIER = GradientBoostingClassifier()
+EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier()
+NAIVE_BAYES_CLASSIFIER = GaussianNB()
 
 # Quick Regression Model Configurations
 QUICK_REGRESSION_MODELS = [
@@ -50,45 +49,19 @@ QUICK_REGRESSION_MODELS = [
         }
     },
     {
-        "name": RIDGE.__class__.__name__,
-        "model": RIDGE,
-        "tuning_param_grid": {
-            "alpha": [0.1, 1, 10],
-            "fit_intercept": [True, False],
-            "solver": ['auto', 'svd', 'cholesky', 'lsqr', 'sparse_cg', 'sag', 'saga']
-        }
-    },
-    {
-        "name": LASSO.__class__.__name__,
-        "model": LASSO,
-        "tuning_param_grid": {
-            "alpha": [0.1, 1, 10],
-            "fit_intercept": [True, False],
-            "selection": ['cyclic', 'random']
-        }
-    },
-    {
-        "name": ELASTIC_NET.__class__.__name__,
-        "model": ELASTIC_NET,
-        "tuning_param_grid": {
-            "alpha": [0.1, 1, 10],
-            "l1_ratio": [0.1, 0.5, 0.9],
-            "fit_intercept": [True, False],
-            "selection": ['cyclic', 'random']
-        }
-    },
-    {
         "name": XGBOOST_REGRESSION.__class__.__name__,
         "model": XGBOOST_REGRESSION,
         "tuning_param_grid": {
-            "n_estimators": [100, 500],
-            "max_depth": [3, 5, 10],
+            "n_estimators": [100, 200, 500, 1000],
+            "max_depth": [3, 5, 7, 10],
             "learning_rate": [0.01, 0.1, 0.3],
             "subsample": [0.5, 0.7, 1],
             "colsample_bytree": [0.5, 0.7, 1],
             "gamma": [0, 0.1, 0.2],
             "reg_alpha": [0, 0.1, 0.5],
-            "reg_lambda": [0, 0.1, 0.5]
+            "reg_lambda": [0, 0.1, 0.5],
+            "min_child_weight": [1, 3, 5],
+            "scale_pos_weight": [1, 2, 3]
         }
     },
     {
@@ -96,74 +69,77 @@ QUICK_REGRESSION_MODELS = [
         "model": LIGHTGBM_REGRESSION,
         "tuning_param_grid": {
             "verbose": [-1],
-            "n_estimators": [100, 500],
-            "max_depth": [3, 5, 10],
+            "n_estimators": [100, 200, 500, 1000],
+            "max_depth": [3, 5, 7, 10],
             "learning_rate": [0.01, 0.1, 0.3],
             "subsample": [0.5, 0.7, 1],
             "colsample_bytree": [0.5, 0.7, 1],
             "reg_alpha": [0, 0.1, 0.5],
-            "reg_lambda": [0, 0.1, 0.5]
+            "reg_lambda": [0, 0.1, 0.5],
+            "min_child_weight": [1, 3, 5],
+            "num_leaves": [31, 50, 100]
         }
     },
     {
         "name": CATBOOST_REGRESSION.__class__.__name__,
         "model": CATBOOST_REGRESSION,
         "tuning_param_grid": {
-            "allow_writing_files": [False],
-            "n_estimators": [100, 500],
-            "learning_rate": [0.01, 0.1, 0.3],
-            "depth": [3, 5, 10],
-            "l2_leaf_reg": [1, 3, 5],
-            "border_count": [32, 64, 128]
+            "n_estimators": [100, 300, 500, 1000],
+            "depth": [3, 5, 7, 10],
+            "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
+            "l2_leaf_reg": [0.1, 1, 3, 5, 10],
+            "bagging_temperature": [0, 0.1, 0.5, 1, 2],
+            "border_count": [32, 50, 75, 100, 150],
+            "one_hot_max_size": [2, 5, 10, 15, 20]
         }
     },
     {
         "name": DECISION_TREE_REGRESSION.__class__.__name__,
         "model": DECISION_TREE_REGRESSION,
         "tuning_param_grid": {
-            "criterion": ['mse', 'mae'],
-            "splitter": ['best', 'random'],
-            "max_depth": [None, 10, 50, 100],
-            "min_samples_split": [2, 5, 10],
-            "min_samples_leaf": [1, 2, 4],
-            "max_features": ['auto', 'sqrt', 'log2']
+            "max_depth": [None, 5, 10, 15, 20],
+            "min_samples_split": [2, 5, 10, 15],
+            "min_samples_leaf": [1, 2, 4, 6],
+            "max_features": ["auto", "sqrt", "log2", None],
+            "max_leaf_nodes": [None, 10, 20, 30, 40],
+            "criterion": ["mse", "friedman_mse", "mae", "poisson"]
         }
-    }
+    },
+    {
+        "name": RANDOM_FOREST_REGRESSION.__class__.__name__,
+        "model": RANDOM_FOREST_REGRESSION,
+        "tuning_param_grid": {
+            "n_estimators": [100, 200, 500, 1000],
+            "max_depth": [None, 5, 10, 15, 20],
+            "min_samples_split": [2, 5, 10, 15],
+            "min_samples_leaf": [1, 2, 4, 6],
+            "max_features": ["auto", "sqrt", "log2", None],
+            "bootstrap": [True, False]
+        }
+    },
+
 ]
 
 # Wide Regression Model Configurations
 WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
     {
-        "name": RANDOM_FOREST_REGRESSION.__class__.__name__,
-        "model": RANDOM_FOREST_REGRESSION,
-        "tuning_param_grid": {
-            "n_estimators": [100, 500],
-            "criterion": ['mse', 'mae'],
-            "max_depth": [None, 10, 50, 100],
-            "min_samples_split": [2, 5, 10],
-            "min_samples_leaf": [1, 2, 4],
-            "max_features": ['sqrt', 'log2']
-        }
-    },
-    {
         "name": SVR_REGRESSION.__class__.__name__,
         "model": SVR_REGRESSION,
         "tuning_param_grid": {
-            "kernel": ['linear', 'poly', 'rbf', 'sigmoid'],
-            "degree": [3, 4, 5],
-            "gamma": ['scale', 'auto'],
-            "C": [0.1, 1, 10],
-            "epsilon": [0.1, 0.2, 0.5]
+            "kernel": ["linear", "poly", "rbf", "sigmoid"],
+            "C": [0.1, 1, 10, 100, 1000],
+            "gamma": ["scale", "auto", 0.01, 0.1, 1],
+            "epsilon": [0.1, 0.2, 0.5, 1]
         }
     },
     {
         "name": KNN.__class__.__name__,
         "model": KNN,
         "tuning_param_grid": {
-            "n_neighbors": [3, 5, 10],
-            "weights": ['uniform', 'distance'],
-            "algorithm": ['auto', 'ball_tree', 'kd_tree', 'brute'],
-            "leaf_size": [30, 60, 90],
+            "n_neighbors": [3, 5, 7, 9, 11],
+            "weights": ["uniform", "distance"],
+            "algorithm": ["auto", "ball_tree", "kd_tree", "brute"],
+            "leaf_size": [10, 20, 30, 40, 50],
             "p": [1, 2]
         }
     },
@@ -171,9 +147,32 @@ WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
         "name": ADA_BOOST.__class__.__name__,
         "model": ADA_BOOST,
         "tuning_param_grid": {
-            "n_estimators": [50, 100, 500],
-            "learning_rate": [0.01, 0.1, 1],
-            "loss": ['linear', 'square', 'exponential']
+            "n_estimators": [100, 200, 500, 1000],
+            "learning_rate": [0.01, 0.05, 0.1, 0.5, 1],
+            "loss": ["linear", "square", "exponential"]
+        }
+    },
+    {
+        "name": GRADIENT_BOOSTING_REGRESSION.__class__.__name__,
+        "model": GRADIENT_BOOSTING_REGRESSION,
+        "tuning_param_grid": {
+            'n_estimators': [100, 200, 500, 1000],
+            'learning_rate': [0.01, 0.1, 0.3],
+            'max_depth': [3, 5, 7, 10],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4]
+        }
+    },
+    {
+        "name": EXTRA_TREES_REGRESSION.__class__.__name__,
+        "model": EXTRA_TREES_REGRESSION,
+        "tuning_param_grid": {
+            'n_estimators': [100, 200, 500, 1000],
+            'max_depth': [None, 3, 5, 10],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4],
+            'max_features': ["auto", "sqrt", "log2"],
+            'bootstrap': [True, False]
         }
     }
 ]
@@ -184,127 +183,102 @@ QUICK_CLASSIFICATION_MODELS = [
         "name": LOGISTIC_REGRESSION.__class__.__name__,
         "model": LOGISTIC_REGRESSION,
         "tuning_param_grid": {
-            'penalty': ['l1', 'l2', 'elasticnet', 'none'],
-            'C': [0.1, 1, 10],
-            'solver': ['newton-cg', 'lbfgs', 'liblinear', 'sag', 'saga'],
-            'max_iter': [100, 1000, 10000]
-        }
-    },
-    {
-        "name": RIDGE_CLASSIFIER.__class__.__name__,
-        "model": RIDGE_CLASSIFIER,
-        "tuning_param_grid": {
-            "alpha": [0.1, 1, 10],
-            "fit_intercept": [True, False],
-            "solver": ['auto', 'svd', 'cholesky', 'lsqr', 'sparse_cg', 'sag', 'saga']
-        }
-    },
-    {
-        "name": LASSO_CLASSIFIER.__class__.__name__,
-        "model": LASSO_CLASSIFIER,
-        "tuning_param_grid": {
-            "alpha": [0.1, 1, 10],
-            "fit_intercept": [True, False],
-            "selection": ['cyclic', 'random']
-        }
-    },
-    {
-        "name": ELASTIC_NET_CLASSIFIER.__class__.__name__,
-        "model": ELASTIC_NET_CLASSIFIER,
-        "tuning_param_grid": {
-            "alpha": [0.1, 1, 10],
-            "l1_ratio": [0.1, 0.5, 0.9],
-            "fit_intercept": [True, False],
-            "selection": ['cyclic', 'random']
+            "penalty": ["l1", "l2", "elasticnet", "none"],
+            "C": [0.01, 0.1, 1, 10, 100],
+            "solver": ["newton-cg", "lbfgs", "liblinear", "sag", "saga"],
+            "max_iter": [100, 200, 300, 400, 500]
         }
     },
     {
         "name": XGBOOST_CLASSIFIER.__class__.__name__,
         "model": XGBOOST_CLASSIFIER,
         "tuning_param_grid": {
-            "n_estimators": [100, 500],
-            "max_depth": [3, 5, 10],
-            "learning_rate": [0.01, 0.1, 0.3],
-            "subsample": [0.5, 0.7, 1],
-            "colsample_bytree": [0.5, 0.7, 1],
-            "gamma": [0, 0.1, 0.2],
-            "reg_alpha": [0, 0.1, 0.5],
-            "reg_lambda": [0, 0.1, 0.5]
+            "n_estimators": [100, 300, 500, 1000],
+            "max_depth": [3, 5, 7, 10],
+            "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
+            "subsample": [0.5, 0.7, 0.9, 1],
+            "colsample_bytree": [0.5, 0.7, 0.9, 1],
+            "gamma": [0, 0.1, 0.2, 0.3],
+            "reg_alpha": [0, 0.1, 0.5, 1],
+            "reg_lambda": [0, 0.1, 0.5, 1],
+            "min_child_weight": [1, 3, 5],
+            "scale_pos_weight": [1, 2, 3]
         }
     },
     {
         "name": LIGHTGBM_CLASSIFIER.__class__.__name__,
         "model": LIGHTGBM_CLASSIFIER,
         "tuning_param_grid": {
-            "verbose": [-1],
-            "n_estimators": [100, 500],
-            "max_depth": [3, 5, 10],
-            "learning_rate": [0.01, 0.1, 0.3],
-            "subsample": [0.5, 0.7, 1],
-            "colsample_bytree": [0.5, 0.7, 1],
-            "reg_alpha": [0, 0.1, 0.5],
-            "reg_lambda": [0, 0.1, 0.5]
+            "n_estimators": [100, 300, 500, 700],
+            "max_depth": [3, 5, 7, 10],
+            "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
+            "subsample": [0.5, 0.7, 0.9, 1],
+            "colsample_bytree": [0.5, 0.7, 0.9, 1],
+            "reg_alpha": [0, 0.1, 0.5, 1],
+            "reg_lambda": [0, 0.1, 0.5, 1],
+            "min_child_weight": [1, 3, 5],
+            "num_leaves": [31, 50, 75, 100]
         }
     },
     {
         "name": CATBOOST_CLASSIFIER.__class__.__name__,
         "model": CATBOOST_CLASSIFIER,
         "tuning_param_grid": {
-            "allow_writing_files": [False],
-            "n_estimators": [100, 500],
-            "learning_rate": [0.01, 0.1, 0.3],
-            "depth": [3, 5, 10],
-            "l2_leaf_reg": [1, 3, 5],
-            "border_count": [32, 64, 128]
+            "iterations": [100, 300, 500, 700],
+            "depth": [3, 5, 7, 10],
+            "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
+            "l2_leaf_reg": [0.1, 1, 3, 5, 10],
+            "bagging_temperature": [0, 0.1, 0.5, 1, 2],
+            "border_count": [32, 50, 75, 100, 150],
+            "one_hot_max_size": [2, 5, 10, 15, 20]
         }
     },
     {
         "name": DECISION_TREE_CLASSIFIER.__class__.__name__,
         "model": DECISION_TREE_CLASSIFIER,
         "tuning_param_grid": {
-            "criterion": ['gini', 'entropy'],
-            "splitter": ['best', 'random'],
-            "max_depth": [None, 10, 50, 100],
-            "min_samples_split": [2, 5, 10],
-            "min_samples_leaf": [1, 2, 4],
-            "max_features": ['auto', 'sqrt', 'log2']
+            "max_depth": [None, 5, 10, 15, 20],
+            "min_samples_split": [2, 5, 10, 15],
+            "min_samples_leaf": [1, 2, 4, 6],
+            "max_features": ["auto", "sqrt", "log2", None],
+            "max_leaf_nodes": [None, 10, 20, 30, 40],
+            "criterion": ["gini", "entropy"]
         }
-    }
+    },
+    {
+        "name": RANDOM_FOREST_CLASSIFIER.__class__.__name__,
+        "model": RANDOM_FOREST_CLASSIFIER,
+        "tuning_param_grid": {
+            "n_estimators": [100, 200, 500, 1000],
+            "max_depth": [None, 5, 10, 15, 20],
+            "min_samples_split": [2, 5, 10, 15],
+            "min_samples_leaf": [1, 2, 4, 6],
+            "max_features": ["auto", "sqrt", "log2", None],
+            "bootstrap": [True, False]
+        }
+    },
 ]
 
 # Wide Classification Model Configurations
 WIDE_CLASSIFICATION_MODELS = QUICK_CLASSIFICATION_MODELS + [
     {
-        "name": RANDOM_FOREST_CLASSIFIER.__class__.__name__,
-        "model": RANDOM_FOREST_CLASSIFIER,
-        "tuning_param_grid": {
-            "n_estimators": [100, 500],
-            "criterion": ['gini', 'entropy'],
-            "max_depth": [None, 10, 50, 100],
-            "min_samples_split": [2, 5, 10],
-            "min_samples_leaf": [1, 2, 4],
-            "max_features": ['sqrt', 'log2']
-        }
-    },
-    {
         "name": SVM_CLASSIFIER.__class__.__name__,
         "model": SVM_CLASSIFIER,
         "tuning_param_grid": {
-            "C": [0.1, 1, 10],
-            "kernel": ['linear', 'poly', 'rbf', 'sigmoid'],
-            "degree": [3, 4, 5],
-            "gamma": ['scale', 'auto'],
-            "probability": [True]
+            "kernel": ["linear", "poly", "rbf", "sigmoid"],
+            "C": [0.1, 1, 10, 100, 1000],
+            "gamma": ["scale", "auto", 0.01, 0.1, 1],
+            "degree": [2, 3, 4, 5]
         }
     },
     {
         "name": KNN_CLASSIFIER.__class__.__name__,
         "model": KNN_CLASSIFIER,
         "tuning_param_grid": {
-            "n_neighbors": [3, 5, 10],
-            "weights": ['uniform', 'distance'],
-            "algorithm": ['auto', 'ball_tree', 'kd_tree', 'brute'],
-            "leaf_size": [30, 60, 90],
+            "n_neighbors": [3, 5, 7, 9, 11],
+            "weights": ["uniform", "distance"],
+            "algorithm": ["auto", "ball_tree", "kd_tree", "brute"],
+            "leaf_size": [10, 20, 30, 40, 50],
             "p": [1, 2]
         }
     },
@@ -312,9 +286,39 @@ WIDE_CLASSIFICATION_MODELS = QUICK_CLASSIFICATION_MODELS + [
         "name": ADA_BOOST_CLASSIFIER.__class__.__name__,
         "model": ADA_BOOST_CLASSIFIER,
         "tuning_param_grid": {
-            "n_estimators": [50, 100, 500],
-            "learning_rate": [0.01, 0.1, 1],
-            "algorithm": ['SAMME', 'SAMME.R']
+            "n_estimators": [50, 100, 200, 500],
+            "learning_rate": [0.01, 0.05, 0.1, 0.5, 1],
+            "algorithm": ["SAMME", "SAMME.R"]
+        }
+    },
+    {
+        "name": GRADIENT_BOOSTING_CLASSIFIER.__class__.__name__,
+        "model": GRADIENT_BOOSTING_CLASSIFIER,
+        "tuning_param_grid": {
+            'n_estimators': [100, 200, 500],
+            'learning_rate': [0.01, 0.1, 0.3],
+            'max_depth': [3, 5, 7],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4]
+        }
+    },
+    {
+        "name": EXTRA_TREES_CLASSIFIER.__class__.__name__,
+        "model": EXTRA_TREES_CLASSIFIER,
+        "tuning_param_grid": {
+            'n_estimators': [100, 200, 500],
+            'max_depth': [None, 5, 10],
+            'min_samples_split': [2, 5, 10],
+            'min_samples_leaf': [1, 2, 4],
+            'max_features': ["auto", "sqrt", "log2"],
+            'bootstrap': [True, False]
+        }
+    },
+    {
+        "name": NAIVE_BAYES_CLASSIFIER.__class__.__name__,
+        "model": NAIVE_BAYES_CLASSIFIER,
+        "tuning_param_grid": {
+            "var_smoothing": [1e-5, 1e-6, 1e-7, 1e-8, 1e-9, 1e-10]
         }
     }
 ]
