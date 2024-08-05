@@ -69,7 +69,7 @@ class SupervisedBase:
         self.__train_test_split()
 
         # Model Tuning Helper
-        self.model_optimizer = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test)
+        self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test)
 
     def __validate_data(self):
         """
@@ -489,7 +489,7 @@ class SupervisedBase:
         self.logger.info("[PROCESS] Model Tuning process is started")
         match tuning_method.lower():
             case "grid_search":
-                tuning_result = self.model_optimizer.grid_search(
+                tuning_result = self.model_tuner.grid_search(
                     model=model,
                     tuning_size=tuning_size,
                     param_grid=param_grid,
@@ -500,7 +500,7 @@ class SupervisedBase:
                 _show_tuning_report(tuning_result)
             
             case "randomized_search":
-                tuning_result = self.model_optimizer.random_search(
+                tuning_result = self.model_tuner.random_search(
                     model=model,
                     tuning_size=tuning_size,
                     param_grid=param_grid,
@@ -512,7 +512,7 @@ class SupervisedBase:
                 _show_tuning_report(tuning_result)
                 
             case "optuna":
-                tuning_result = self.model_optimizer.optuna_search(
+                tuning_result = self.model_tuner.optuna_search(
                     model=model,
                     tuning_size=tuning_size,
                     param_grid=param_grid,
