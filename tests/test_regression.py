@@ -1,13 +1,14 @@
-from flexml.regression import Regression
 from parameterized import parameterized
 import unittest
 import pandas as pd
+from sklearn.datasets import load_diabetes
 
+from flexml.regression import Regression
 from flexml.logger.logger import get_logger
 
 class TestRegression(unittest.TestCase):
-    df = pd.read_csv("tests/test_data/wine_regression.csv")
-    logger = get_logger(__name__)
+    df = load_diabetes(as_frame=True)['frame']
+    logger = get_logger(__name__, logging_to_file=False)
     logger.setLevel("DEBUG")
     
     @parameterized.expand(["quick", "wide"])
@@ -15,11 +16,11 @@ class TestRegression(unittest.TestCase):
         try:
             reg_exp = Regression(
                 data = df,
-                target_col = "Customer_Segment",
+                target_col = "target",
                 experiment_size = exp_size,
                 test_size = 0.25,
                 random_state = 42,
-                logging_to_file = True
+                logging_to_file = False
             )
         except Exception as e:
             error_msg = f"An error occured while setting up {exp_size} regression, Error: {e}"
