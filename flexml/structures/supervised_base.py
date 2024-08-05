@@ -69,7 +69,7 @@ class SupervisedBase:
         self.__train_test_split()
 
         # Model Tuning Helper
-        self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test)
+        self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test, self.logging_to_file)
 
     def __validate_data(self):
         """
