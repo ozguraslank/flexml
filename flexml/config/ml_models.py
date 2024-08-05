@@ -10,7 +10,7 @@ from catboost import CatBoostRegressor, CatBoostClassifier
 
 # Quick Regression Models
 LINEAR_REGRESSION = LinearRegression()
-XGBOOST_REGRESSION = XGBRegressor(verbose = -1)
+XGBOOST_REGRESSION = XGBRegressor()
 LIGHTGBM_REGRESSION = LGBMRegressor(verbose = -1)
 CATBOOST_REGRESSION = CatBoostRegressor(allow_writing_files = False, silent=True)
 DECISION_TREE_REGRESSION = DecisionTreeRegressor()
@@ -25,7 +25,7 @@ EXTRA_TREES_REGRESSION = ExtraTreesRegressor()
 
 # Quick Classification Models
 LOGISTIC_REGRESSION = LogisticRegression()
-XGBOOST_CLASSIFIER = XGBClassifier(verbose = -1)
+XGBOOST_CLASSIFIER = XGBClassifier()
 LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose = -1)
 CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files = False, silent=True)
 DECISION_TREE_CLASSIFIER = DecisionTreeClassifier()
@@ -100,7 +100,7 @@ QUICK_REGRESSION_MODELS = [
             "max_depth": [None, 5, 10, 15, 20],
             "min_samples_split": [2, 5, 10, 15],
             "min_samples_leaf": [1, 2, 4, 6],
-            "max_features": ["auto", "sqrt", "log2", None],
+            "max_features": ["sqrt", "log2"],
             "max_leaf_nodes": [None, 10, 20, 30, 40],
             "criterion": ["mse", "friedman_mse", "mae", "poisson"]
         }
@@ -113,7 +113,7 @@ QUICK_REGRESSION_MODELS = [
             "max_depth": [None, 5, 10, 15, 20],
             "min_samples_split": [2, 5, 10, 15],
             "min_samples_leaf": [1, 2, 4, 6],
-            "max_features": ["auto", "sqrt", "log2", None],
+            "max_features": ["sqrt", "log2"],
             "bootstrap": [True, False]
         }
     },
@@ -171,7 +171,7 @@ WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
             'max_depth': [None, 3, 5, 10],
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4],
-            'max_features': ["auto", "sqrt", "log2"],
+            'max_features': ["sqrt", "log2"],
             'bootstrap': [True, False]
         }
     }
@@ -240,7 +240,7 @@ QUICK_CLASSIFICATION_MODELS = [
             "max_depth": [None, 5, 10, 15, 20],
             "min_samples_split": [2, 5, 10, 15],
             "min_samples_leaf": [1, 2, 4, 6],
-            "max_features": ["auto", "sqrt", "log2", None],
+            "max_features": ["sqrt", "log2"],
             "max_leaf_nodes": [None, 10, 20, 30, 40],
             "criterion": ["gini", "entropy"]
         }
@@ -253,7 +253,7 @@ QUICK_CLASSIFICATION_MODELS = [
             "max_depth": [None, 5, 10, 15, 20],
             "min_samples_split": [2, 5, 10, 15],
             "min_samples_leaf": [1, 2, 4, 6],
-            "max_features": ["auto", "sqrt", "log2", None],
+            "max_features": ["sqrt", "log2"],
             "bootstrap": [True, False]
         }
     },
@@ -310,7 +310,7 @@ WIDE_CLASSIFICATION_MODELS = QUICK_CLASSIFICATION_MODELS + [
             'max_depth': [None, 5, 10],
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4],
-            'max_features': ["auto", "sqrt", "log2"],
+            'max_features': ["sqrt", "log2"],
             'bootstrap': [True, False]
         }
     },
