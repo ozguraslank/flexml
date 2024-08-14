@@ -256,7 +256,12 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        param_grid = self._param_grid_validator(model.get_params(), param_grid, tuning_size)
+        model_params = None
+        if "CatBoost" in model.__class__.__name__:
+            model_params = model.get_all_params()
+        else:
+            model_params = model.get_params()
+        param_grid = self._param_grid_validator(model_params, param_grid, tuning_size)
         model_stats = {
             "tuning_method": "GridSearchCV",
             "tuning_param_grid": param_grid,
@@ -362,7 +367,13 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        param_grid = self._param_grid_validator(model.get_params(), param_grid, tuning_size)
+        model_params = None
+
+        if "CatBoost" in model.__class__.__name__:
+            model_params = model.get_all_params()
+        else:
+            model_params = model.get_params()
+        param_grid = self._param_grid_validator(model_params, param_grid, tuning_size)
         model_stats = {
             "tuning_method": "RandomizedSearchCV",
             "tuning_param_grid": param_grid,
@@ -457,7 +468,12 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        param_grid = self._param_grid_validator(model.get_params(), param_grid, tuning_size)
+        model_params = None
+        if "CatBoost" in model.__class__.__name__:
+            model_params = model.get_all_params()
+        else:
+            model_params = model.get_params()
+        param_grid = self._param_grid_validator(model_params, param_grid, tuning_size)
         model_stats = {
             "tuning_method": "Optuna",
             "tuning_param_grid": param_grid,
