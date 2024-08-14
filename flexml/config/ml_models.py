@@ -88,9 +88,7 @@ QUICK_REGRESSION_MODELS = [
             "depth": [3, 5, 7, 10],
             "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
             "l2_leaf_reg": [0.1, 1, 3, 5, 10],
-            "bagging_temperature": [0, 0.1, 0.5, 1, 2],
-            "border_count": [32, 50, 75, 100, 150],
-            "one_hot_max_size": [2, 5, 10, 15, 20]
+            "border_count": [32, 50, 75, 100, 150]
         }
     },
     {
@@ -228,9 +226,7 @@ QUICK_CLASSIFICATION_MODELS = [
             "depth": [3, 5, 7, 10],
             "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
             "l2_leaf_reg": [0.1, 1, 3, 5, 10],
-            "bagging_temperature": [0, 0.1, 0.5, 1, 2],
-            "border_count": [32, 50, 75, 100, 150],
-            "one_hot_max_size": [2, 5, 10, 15, 20]
+            "border_count": [32, 50, 75, 100, 150]
         }
     },
     {
