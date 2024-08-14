@@ -1,13 +1,14 @@
-from flexml.classification import Classification
 from parameterized import parameterized
 import unittest
 import pandas as pd
+from sklearn.datasets import load_breast_cancer
 
+from flexml.classification import Classification
 from flexml.logger.logger import get_logger
 
 class TestClassification(unittest.TestCase):
-    df = pd.read_csv("tests/test_data/diabetes_classification.csv")
-    logger = get_logger(__name__)
+    df = load_breast_cancer(as_frame=True)['frame']
+    logger = get_logger(__name__, logging_to_file=False)
     logger.setLevel("DEBUG")
     
     @parameterized.expand(["quick", "wide"])
@@ -15,10 +16,11 @@ class TestClassification(unittest.TestCase):
         try:
             classification_exp = Classification(
                 data = df,
-                target_col = "Outcome",
+                target_col = "target",
                 experiment_size = exp_size,
                 test_size = 0.25,
-                random_state = 42
+                random_state = 42,
+                logging_to_file = False
             )
         except Exception as e:
             error_msg = f"An error occured while setting up {exp_size} classification, Error: {e}"
