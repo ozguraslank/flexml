@@ -1,7 +1,9 @@
+import sys
 from typing import Union, Optional
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
+from IPython import get_ipython
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
@@ -375,13 +377,44 @@ class SupervisedBase:
             The evaluation metric to use for model evaluation
         
             * r2, mae, mse, rmse for Regression tasks
-
             * accuracy, precision, recall, f1_score for Classification tasks
         """
+        def highlight_best(s: pd.Series) -> list[str]:
+            """
+            Highlights the best value in the DataFrame based on the evaluation metric
+
+            Parameters
+            ----------
+            s : pd.Series
+                The Pandas series to apply the highlighting
+
+            Returns
+            -------
+            list[str]
+                A list of strings containing the green background color for the best value so we can highlight it while showing the model stats
+            """
+            if s.name in ['r2', 'accuracy']:
+                is_best = s == s.max()
+            else:
+                is_best = s == s.min()
+            return ['background-color: green' if v else '' for v in is_best]
+        
         eval_metric = self.__eval_metric_checker(eval_metric)
         sorted_model_stats_df = self.__sort_models(eval_metric)
+        
+        # If the user is not on a interactive kernel such as Jupyter Notebook, the styled DataFrame will not be displayed
+        # Instead, the user will see the raw DataFrame
+        # REASON: The styled DataFrame is only supported in interactive kernels, otherwise raises an error
+        if get_ipython().__class__.__name__ != 'ZMQInteractiveShell':
+            print(20*'-')
+            print(sorted_model_stats_df.head(len(self.ML_MODELS)))
+            print(20*'-')
 
-        print(sorted_model_stats_df.head(len(self.ML_MODELS)))
+        else:
+            # Apply the highlighting to all metric columns and display the dataframe
+            styler = sorted_model_stats_df.style.apply(highlight_best, subset=self.__ALL_EVALUATION_METRICS)
+            display(styler) # display is only supported in interactive kernels such as Jupyter Notebook, for details check the comment block a couple of lines above
+
 
     def tune_model(self, 
                    model: Optional[object] = None,
