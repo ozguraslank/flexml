@@ -8,7 +8,7 @@ from flexml.logger.logger import get_logger
 
 class TestClassification(unittest.TestCase):
     df = load_breast_cancer(as_frame=True)['frame']
-    logger = get_logger(__name__, logging_to_file=False)
+    logger = get_logger(__name__, "TEST", logging_to_file=False)
     logger.setLevel("DEBUG")
     
     @parameterized.expand(["quick", "wide"])

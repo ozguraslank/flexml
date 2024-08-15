@@ -61,7 +61,7 @@ class SupervisedBase:
         self.__ALL_EVALUATION_METRICS = EVALUATION_METRICS[self.__ML_TASK_TYPE]["ALL"]
 
         # Logger to log app activities (Logs are stored in flexml/logs/log.log file)
-        self.logger = get_logger(__name__, self.logging_to_file)
+        self.logger = get_logger(__name__, "PROD", self.logging_to_file)
 
         # Data and ML model preparation stage
         self.__validate_data()
