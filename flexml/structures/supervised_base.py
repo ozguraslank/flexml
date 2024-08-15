@@ -393,10 +393,10 @@ class SupervisedBase:
             list[str]
                 A list of strings containing the green background color for the best value so we can highlight it while showing the model stats
             """
-            if s.name in ['r2', 'accuracy']:
-                is_best = s == s.max()
-            else:
+            if s.name in ['mae', 'mse', 'rmse']:
                 is_best = s == s.min()
+            else:
+                is_best = s == s.max()
             return ['background-color: green' if v else '' for v in is_best]
         
         eval_metric = self.__eval_metric_checker(eval_metric)
