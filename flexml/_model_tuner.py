@@ -276,7 +276,7 @@ class ModelTuner:
             search_result = GridSearchCV(model, param_grid, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X, self.y)
 
             model_stats['tuned_model'] = search_result.best_estimator_
-            model_stats['tuned_model_score'] = self._model_evaluator(search_result.best_estimator_, eval_metric)
+            model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 4)
             model_stats['tuned_model_evaluation_metric'] = eval_metric
             return model_stats
         
@@ -388,7 +388,7 @@ class ModelTuner:
             search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_trials, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X, self.y)
 
             model_stats['tuned_model'] = search_result.best_estimator_
-            model_stats['tuned_model_score'] = self._model_evaluator(search_result.best_estimator_, eval_metric)
+            model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 4)
             model_stats['tuned_model_evaluation_metric'] = eval_metric
             return model_stats
         
@@ -527,7 +527,7 @@ class ModelTuner:
             
             # Update the best score and best hyperparameters If the current score is better than the best one
             if model_stats['tuned_model_score'] is None or score > model_stats['tuned_model_score']:
-                model_stats['tuned_model_score'] = score
+                model_stats['tuned_model_score'] = round(score, 4)
                 model_stats['tuned_model'] = test_model
 
             return score
