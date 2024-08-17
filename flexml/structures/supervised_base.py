@@ -4,6 +4,7 @@ from tqdm import tqdm
 import pandas as pd
 import numpy as np
 from IPython import get_ipython
+import matplotlib.pyplot as plt
 
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
@@ -69,6 +70,7 @@ class SupervisedBase:
         self.__validate_data()
         self.__prepare_models()
         self.__train_test_split()
+        self.feature_names = self.data.drop(columns=[self.target_col]).columns
 
         # Model Tuning Helper
         self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test, self.logging_to_file)
@@ -415,6 +417,48 @@ class SupervisedBase:
             styler = sorted_model_stats_df.style.apply(highlight_best, subset=self.__ALL_EVALUATION_METRICS)
             display(styler) # display is only supported in interactive kernels such as Jupyter Notebook, for details check the comment block a couple of lines above
 
+    def plot_feature_importance(self, model: Optional[object] = None):
+        """
+        Display feature importance for a given model
+
+        Parameters
+        ----------
+        model: object (default = None)
+            Machine learning model to display it's feature importance. If It's set to None, the best model found in the experiment will be used
+        """
+        try:
+            if model is None:
+                model = self.get_best_models()
+            model_name = model.__class__.__name__
+            importance = None
+
+            # Check if the model has 'feature_importances_' attribute (tree-based models)
+            if hasattr(model, 'feature_importances_'):
+                importance = model.feature_importances_
+
+            # Check if the model has coefficients (linear models)
+            elif hasattr(model, 'coef_'):
+                importance = np.abs(model.coef_)
+
+            if importance is not None:
+                indices = np.argsort(importance)[::-1]
+                sorted_importance = importance[indices]
+                sorted_features = np.array(self.feature_names)[indices]
+
+                plt.figure(figsize=(10, 6))
+                plt.barh(range(len(sorted_importance)), sorted_importance, color=plt.cm.viridis(np.linspace(0, 1, len(sorted_importance))))
+                plt.yticks(range(len(sorted_features)), sorted_features)
+                plt.xlabel("Importance")
+                plt.ylabel("Features")
+                plt.title(f"Feature Importance for {model_name}")
+                plt.gca().invert_yaxis()
+                plt.show()
+
+            else:
+                self.logging.info("Feature importance is not available for this model, If you think there is a mistake, please open an issue on GitHub repository")
+
+        except Exception as e:
+            self.logger.error(f"Could not calculate feature importance for the following model: {model}, Error: {e}")
 
     def tune_model(self, 
                    model: Optional[object] = None,
