@@ -71,6 +71,8 @@ class SupervisedBase:
         self.__prepare_models()
         self.__train_test_split()
         self.feature_names = self.data.drop(columns=[self.target_col]).columns
+        self.model_training_info = []
+        self.model_stats_df = None
 
         # Model Tuning Helper
         self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test, self.logging_to_file)
@@ -211,9 +213,6 @@ class SupervisedBase:
         top_n_models : int (default=1)
             The number of top models to select based on the evaluation metric.
         """
-        eval_metric = self.__eval_metric_checker(eval_metric)
-        top_n_models = self.__top_n_models_checker(top_n_models)
-
         def __evaluate_model_perf(y_test, y_pred):
             """
             Evaluates how good are the predictions by comparing them with the actual values, returns regression evaluation scores
@@ -265,7 +264,11 @@ class SupervisedBase:
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
         
-        self.model_training_info = []
+        eval_metric = self.__eval_metric_checker(eval_metric)
+        top_n_models = self.__top_n_models_checker(top_n_models)
+        self.model_training_info = [] # Reset the model training info before starting the experiment
+        self.model_stats_df = None    # Reset the model stats DataFrame before starting the experiment
+
         
         self.logger.info("[PROCESS] Training the ML models")
 
@@ -313,25 +316,30 @@ class SupervisedBase:
         object or list[object]
             Single or a list of top n models based on the evaluation metric.
         """
-        eval_metric = self.__eval_metric_checker(eval_metric)
-        top_n_models = self.__top_n_models_checker(top_n_models)
-
         if len(self.model_training_info) == 0:
             error_msg = "There is no model performance data to sort!"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         
-        model_stats = []
+        top_n_models = self.__top_n_models_checker(top_n_models)
         best_models = []
+            
+        if eval_metric is None and self.model_stats_df is not None: # If the eval_metric is not used, get the last experiment's model stats
+            sorted_model_stats_df = self.model_stats_df
+            
+        else:
+            eval_metric = self.__eval_metric_checker(eval_metric)
+            model_stats = []
+            
+            for model_pack in self.model_training_info:
+                for model_name, model_data in model_pack.items():
+                    model_stats.append(model_data["model_stats"])
         
-        for model_pack in self.model_training_info:
-            for model_name, model_data in model_pack.items():
-                model_stats.append(model_data["model_stats"])
-        
-        self.model_stats_df = pd.DataFrame(model_stats)
-        sorted_model_stats_df = self.__sort_models(eval_metric)
+            self.model_stats_df = pd.DataFrame(model_stats)
+            sorted_model_stats_df = self.__sort_models(eval_metric)
 
         best_model_names = sorted_model_stats_df.head(top_n_models)["model_name"].tolist()
+
         for model_pack in self.model_training_info:
             for model_name, model_data in model_pack.items():
                 if model_name in best_model_names:
@@ -356,12 +364,12 @@ class SupervisedBase:
         pd.DataFrame
             A pandas DataFrame containing the sorted model statistics according to the desired eval_metric.
         """
-        eval_metric = self.__eval_metric_checker(eval_metric)
-
         if len(self.model_stats_df) == 0:
             error_msg = "There is no model performance data to sort!"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
+        
+        eval_metric = self.__eval_metric_checker(eval_metric)
         
         # Since lower is better for mae, mse and rmse in Regression tasks, they should be sorted in ascending order
         if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['mae', 'mse', 'rmse']:
@@ -429,6 +437,7 @@ class SupervisedBase:
         try:
             if model is None:
                 model = self.get_best_models()
+
             model_name = model.__class__.__name__
             importance = None
 
