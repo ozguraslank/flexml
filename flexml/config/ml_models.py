@@ -84,7 +84,7 @@ QUICK_REGRESSION_MODELS = [
         "name": CATBOOST_REGRESSION.__class__.__name__,
         "model": CATBOOST_REGRESSION,
         "tuning_param_grid": {
-            "n_estimators": [100, 300, 500, 1000],
+            "iterations": [100, 300, 500, 1000],
             "depth": [3, 5, 7, 10],
             "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
             "l2_leaf_reg": [0.1, 1, 3, 5, 10],
@@ -100,7 +100,7 @@ QUICK_REGRESSION_MODELS = [
             "min_samples_leaf": [1, 2, 4, 6],
             "max_features": ["sqrt", "log2"],
             "max_leaf_nodes": [None, 10, 20, 30, 40],
-            "criterion": ["mse", "friedman_mse", "mae", "poisson"]
+            "criterion": ["friedman_mse", "poisson", "absolute_error", "squared_error"]
         }
     },
     {
@@ -114,8 +114,7 @@ QUICK_REGRESSION_MODELS = [
             "max_features": ["sqrt", "log2"],
             "bootstrap": [True, False]
         }
-    },
-
+    }
 ]
 
 # Wide Regression Model Configurations
@@ -125,7 +124,7 @@ WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
         "model": SVR_REGRESSION,
         "tuning_param_grid": {
             "kernel": ["linear", "poly", "rbf", "sigmoid"],
-            "C": [0.1, 1, 10, 100, 1000],
+            "C": [0.1, 1, 10, 100],
             "gamma": ["scale", "auto", 0.01, 0.1, 1],
             "epsilon": [0.1, 0.2, 0.5, 1]
         }
@@ -181,7 +180,7 @@ QUICK_CLASSIFICATION_MODELS = [
         "name": LOGISTIC_REGRESSION.__class__.__name__,
         "model": LOGISTIC_REGRESSION,
         "tuning_param_grid": {
-            "penalty": ["l1", "l2", "elasticnet", "none"],
+            "penalty": ["l1", "l2", "elasticnet"],
             "C": [0.01, 0.1, 1, 10, 100],
             "solver": ["newton-cg", "lbfgs", "liblinear", "sag", "saga"],
             "max_iter": [100, 200, 300, 400, 500]
@@ -262,7 +261,7 @@ WIDE_CLASSIFICATION_MODELS = QUICK_CLASSIFICATION_MODELS + [
         "model": SVM_CLASSIFIER,
         "tuning_param_grid": {
             "kernel": ["linear", "poly", "rbf", "sigmoid"],
-            "C": [0.1, 1, 10, 100, 1000],
+            "C": [0.1, 1, 10, 100],
             "gamma": ["scale", "auto", 0.01, 0.1, 1],
             "degree": [2, 3, 4, 5]
         }
