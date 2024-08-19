@@ -6,6 +6,9 @@ from sklearn.datasets import load_diabetes
 from flexml.regression import Regression
 from flexml.logger.logger import get_logger
 
+import warnings
+warnings.filterwarnings("ignore")
+
 class TestRegression(unittest.TestCase):
     df = load_diabetes(as_frame=True)['frame']
     logger = get_logger(__name__, "TEST", logging_to_file=False)

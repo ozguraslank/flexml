@@ -6,6 +6,9 @@ from sklearn.datasets import load_breast_cancer
 from flexml.classification import Classification
 from flexml.logger.logger import get_logger
 
+import warnings
+warnings.filterwarnings("ignore")
+
 class TestClassification(unittest.TestCase):
     df = load_breast_cancer(as_frame=True)['frame']
     logger = get_logger(__name__, "TEST", logging_to_file=False)
