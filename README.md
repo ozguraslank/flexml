@@ -54,3 +54,10 @@ You can also take a look to jupyter notebook files in the 'notebooks' folder in 
    - You can take a look to **tests** folder in the repository to reach the current unittests
 4. **Run tests:** Ensure all existing and new tests pass.
 5. **Submit a pull request:** Open a pull request with a clear description of your changes.
+
+## Roadmap
+- [x] Regression
+- [x] Classification
+- [x] Model Tuning
+- [ ] Automatic Data Labelling & Feature Engineering
+- [ ] Time Series  
