@@ -6,7 +6,7 @@
 </div>
 
 ## Introduction
-FlexML is an easy-to-use and flexible AutoML library for Python that simplifies the process of building machine learning models. It automates model selection and hyperparameter tuning, offering users the flexibility to customize the size of their experiments. Whether you want to train all available models or only a subset for faster results, FlexML adapts to your needs! <br> <br>
+FlexML is an easy-to-use and flexible AutoML library for Python that simplifies the process of building machine learning models. It automates model selection and hyperparameter tuning, offering users the flexibility to customize the size of their experiments by allowing to train all available models in the library or only a subset of them for faster results, FlexML adapts to your needs! <br> <br>
 
 At the moment, FlexML supports only regression and classification tasks and offers two experiment modes; 'quick' and 'wide' allowing users to choose between fitting a few of machine learning models or the full range of models available in the library. This flexibility extends to hyperparameter tuning as well, enabling a balance between speed and thoroughness.
 
@@ -48,7 +48,7 @@ You can also take a look to jupyter notebook files in the 'notebooks' folder in 
 
 ## How to Contribute:
 
-1. **Fork the repository:** Click on the "Fork" button at the top right corner of the GitHub repository page
+1. **Fork the repository:** Click on the 'Fork' button at the top right corner of the GitHub repository page
 2. **Create a new branch:** Name your branch descriptively based on the feature or fix you're working on
 3. **Make your changes:** Write code and tests to add your feature or fix the issue.
    - You can take a look to **tests** folder in the repository to reach the current unittests
