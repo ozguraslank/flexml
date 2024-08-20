@@ -536,7 +536,6 @@ class SupervisedBase:
         tuned_model: object
             The tuned model object
         """
-        #self.logger.info(f"[TEST] tuning started for {model.__class__.__name__} with {tuning_method} with {tuning_size}")
         def _show_tuning_report(tuning_report: dict):
             """
             Shows the tuning report of the model tuning process
