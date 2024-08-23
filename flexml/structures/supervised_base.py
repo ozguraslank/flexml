@@ -572,44 +572,44 @@ class SupervisedBase:
             self.logger.info(info_msg)
 
         self.logger.info("[PROCESS] Model Tuning process is started")
-        match tuning_method.lower():
-            case "grid_search":
-                tuning_result = self.model_tuner.grid_search(
-                    model=model,
-                    tuning_size=tuning_size,
-                    param_grid=param_grid,
-                    eval_metric=eval_metric,
-                    cv=cv,
-                    n_jobs=n_jobs
-                )
-                _show_tuning_report(tuning_result)
+        tuning_method = tuning_method.lower()
+        if tuning_method == "grid_search":
+            tuning_result = self.model_tuner.grid_search(
+                model=model,
+                tuning_size=tuning_size,
+                param_grid=param_grid,
+                eval_metric=eval_metric,
+                cv=cv,
+                n_jobs=n_jobs
+            )
+            _show_tuning_report(tuning_result)
             
-            case "randomized_search":
-                tuning_result = self.model_tuner.random_search(
-                    model=model,
-                    tuning_size=tuning_size,
-                    param_grid=param_grid,
-                    eval_metric=eval_metric,
-                    n_trials=n_trials,
-                    cv=cv,
-                    n_jobs=n_jobs
-                )
-                _show_tuning_report(tuning_result)
+        elif tuning_method == "randomized_search":
+            tuning_result = self.model_tuner.random_search(
+                model=model,
+                tuning_size=tuning_size,
+                param_grid=param_grid,
+                eval_metric=eval_metric,
+                n_trials=n_trials,
+                cv=cv,
+                n_jobs=n_jobs
+            )
+            _show_tuning_report(tuning_result)
                 
-            case "optuna":
-                tuning_result = self.model_tuner.optuna_search(
-                    model=model,
-                    tuning_size=tuning_size,
-                    param_grid=param_grid,
-                    eval_metric=eval_metric,
-                    n_trials=n_trials,
-                    n_jobs=n_jobs
-                )
-                _show_tuning_report(tuning_result)
+        elif tuning_method == "optuna":
+            tuning_result = self.model_tuner.optuna_search(
+                model=model,
+                tuning_size=tuning_size,
+                param_grid=param_grid,
+                eval_metric=eval_metric,
+                n_trials=n_trials,
+                n_jobs=n_jobs
+            )
+            _show_tuning_report(tuning_result)
             
-            case _:
-                error_msg = f"Unsupported tuning method: {tuning_method}, expected one of the following: 'grid_search', 'randomized_search', 'optuna'"
-                self.logger.error(error_msg)
-                raise ValueError(error_msg)
+        else:
+            error_msg = f"Unsupported tuning method: {tuning_method}, expected one of the following: 'grid_search', 'randomized_search', 'optuna'"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
             
         self.logger.info("[PROCESS] Model Tuning process is finished")
