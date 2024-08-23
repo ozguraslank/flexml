@@ -517,7 +517,7 @@ class ModelTuner:
                 else:
                     info_msg = f"{param_name} parameter is not added to tuning process since It's data type is not supported for Optuna tuning\n \
                                 Please use one of the following data types in your params: 'str', 'bool', 'int', 'float'. Instead of {type(first_element)}"
-                    self.logger(info_msg)
+                    self.logger.info(info_msg)
             
             test_model = type(model)()
             test_model.set_params(**params)
