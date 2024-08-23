@@ -325,7 +325,7 @@ class SupervisedBase:
         best_models = []
             
         if eval_metric is None and self.model_stats_df is not None: # If the eval_metric is not used, get the last experiment's model stats
-            sorted_model_stats_df = self.model_stats_df
+            pass
             
         else:
             eval_metric = self.__eval_metric_checker(eval_metric)
@@ -336,9 +336,9 @@ class SupervisedBase:
                     model_stats.append(model_data["model_stats"])
         
             self.model_stats_df = pd.DataFrame(model_stats)
-            sorted_model_stats_df = self.__sort_models(eval_metric)
+            self.sorted_model_stats_df = self.__sort_models(eval_metric)
 
-        best_model_names = sorted_model_stats_df.head(top_n_models)["model_name"].tolist()
+        best_model_names = self.sorted_model_stats_df.head(top_n_models)["model_name"].tolist()
 
         for model_pack in self.model_training_info:
             for model_name, model_data in model_pack.items():
