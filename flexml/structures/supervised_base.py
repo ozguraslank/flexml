@@ -464,7 +464,7 @@ class SupervisedBase:
                 plt.show()
 
             else:
-                self.logging.info("Feature importance is not available for this model, If you think there is a mistake, please open an issue on GitHub repository")
+                self.logger.info("Feature importance is not available for this model, If you think there is a mistake, please open an issue on GitHub repository")
 
         except Exception as e:
             self.logger.error(f"Could not calculate feature importance for the following model: {model}, Error: {e}")
