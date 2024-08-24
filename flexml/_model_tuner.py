@@ -569,7 +569,11 @@ class ModelTuner:
 
             return score
         
-        study = optuna.create_study(direction=study_direction)
-        study.optimize(objective, n_trials=n_trials, timeout=timeout, n_jobs=n_jobs)
+        try:
+            study = optuna.create_study(direction=study_direction)
+            study.optimize(objective, n_trials=n_trials, timeout=timeout, n_jobs=n_jobs)
+            return model_stats
         
-        return model_stats
+        except Exception as e:
+            self.logger.error(f"Error while tuning the model with Optuna, Error: {e}")
+            return None
