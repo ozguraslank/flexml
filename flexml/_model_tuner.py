@@ -167,26 +167,26 @@ class ModelTuner:
             
             * 'f1' for F1 score
         """
+        eval_metric = eval_metric.lower()
         
-        match eval_metric.lower():
-            case 'r2':
-                return r2_score(self.y_test, model.predict(self.X_test))
-            case 'mae':
-                return mean_absolute_error(self.y_test, model.predict(self.X_test))
-            case 'mse':
-                return mean_squared_error(self.y_test, model.predict(self.X_test))
-            case 'accuracy':
-                return accuracy_score(self.y_test, model.predict(self.X_test))
-            case 'precision':
-                return precision_score(self.y_test, model.predict(self.X_test))
-            case 'recall':
-                return recall_score(self.y_test, model.predict(self.X_test))
-            case 'f1':
-                return f1_score(self.y_test, model.predict(self.X_test))
-            case _:
-                error_msg = "Error while evaluating the current model during the model tuning process. The eval_metric should be one of the following: 'r2', 'mae', 'mse', 'accuracy', 'precision', 'recall', 'f1'"
-                self.logger.error(error_msg)
-                raise ValueError(error_msg)
+        if eval_metric == 'r2':
+            return r2_score(self.y_test, model.predict(self.X_test))
+        elif eval_metric == 'mae':
+            return mean_absolute_error(self.y_test, model.predict(self.X_test))
+        elif eval_metric == 'mse':
+            return mean_squared_error(self.y_test, model.predict(self.X_test))
+        elif eval_metric == 'accuracy':
+            return accuracy_score(self.y_test, model.predict(self.X_test))
+        elif eval_metric == 'precision':
+            return precision_score(self.y_test, model.predict(self.X_test))
+        elif eval_metric == 'recall':
+            return recall_score(self.y_test, model.predict(self.X_test))
+        elif eval_metric == 'f1':
+            return f1_score(self.y_test, model.predict(self.X_test))
+        else:
+            error_msg = "Error while evaluating the current model during the model tuning process. The eval_metric should be one of the following: 'r2', 'mae', 'mse', 'accuracy', 'precision', 'recall', 'f1'"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
             
     def grid_search(self,
                     model: object,
