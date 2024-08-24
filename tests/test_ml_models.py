@@ -53,7 +53,7 @@ class TestMLModels(unittest.TestCase):
                 tuning_size='wide',
                 param_grid=model_tuning_params,
                 n_trials=3,
-                cv=2,
+                cv=None,
                 n_jobs=-1
             )
         except Exception as e:
@@ -77,7 +77,7 @@ class TestMLModels(unittest.TestCase):
                 tuning_size='wide',
                 param_grid=model_tuning_params,
                 n_trials=3,
-                cv=2,
+                cv=None,
                 n_jobs=-1
             )
         except Exception as e:
