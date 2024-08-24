@@ -180,9 +180,9 @@ QUICK_CLASSIFICATION_MODELS = [
         "name": LOGISTIC_REGRESSION.__class__.__name__,
         "model": LOGISTIC_REGRESSION,
         "tuning_param_grid": {
-            "penalty": ["l1", "l2", "elasticnet"],
+            "penalty": ["l1", "l2", "elasticnet", None],
             "C": [0.01, 0.1, 1, 10, 100],
-            "solver": ["newton-cg", "lbfgs", "liblinear", "sag", "saga"],
+            "solver": ["lbfgs", "liblinear", "sag", "saga"],
             "max_iter": [100, 200, 300, 400, 500]
         }
     },
