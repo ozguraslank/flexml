@@ -139,6 +139,83 @@ class ModelTuner:
             
         return param_grid
     
+    def _setup_tuning(self,
+                      tuning_method: str,
+                      model: object,
+                      param_grid: dict,
+                      tuning_size: str,
+                      cv: Optional[int] = None,
+                      n_jobs: int = -1):
+        """
+        Sets up the tuning process by creating the model_stats dictionary
+
+        Parameters
+        ----------
+        tuning_method : str
+            The tuning method that will be used for the optimization. It can be one of the following:
+            
+            * 'grid_search' for GridSearchCV (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html)
+            
+            * 'randomized_search' for RandomizedSearchCV (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html)
+            
+            * 'optuna' for Optuna (https://optuna.readthedocs.io/en/stable/)
+
+        model : object
+            The model object that will be tuned.
+
+        tuning_size: str (default = 'wide')
+            The size of the tuning process. It can be 'quick' or 'wide'
+
+            * If 'quick' is selected, number of params or number of values in the each params will be decrased.
+                -> For detailed information, visit flexml/_model_tuner.py/_param_grid_validator() function's doc
+
+            * If 'wide' is selected, param_grid will stay same
+
+        cv : int, optional (default=3)
+            The number of cross-validation splits. The default is 3.
+        
+        n_jobs : int, optional (default=-1)
+            The number of parallel jobs to run. The default is -1.
+
+        Returns
+        -------
+        model_stats: dict
+            Dictionary including tuning information and model:
+
+            * 'tuning_method': The tuning method that is used for the optimization
+            
+            * 'tuning_param_grid': The hyperparameter grid that is used for the optimization
+            
+            * 'cv': The number of cross-validation splits
+            
+            * 'n_jobs': The number of parallel jobs to run
+            
+            * 'tuned_model': The tuned model object
+            
+            * 'tuned_model_score': The evaluation metric score of the tuned model
+            
+            * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
+        """
+        model_params = None
+
+        if "CatBoost" in model.__class__.__name__:
+            model_params = model.get_all_params()
+        else:
+            model_params = model.get_params()
+
+        param_grid = self._param_grid_validator(model_params, param_grid, tuning_size)
+        model_stats = {
+            "tuning_method": tuning_method,
+            "tuning_param_grid": param_grid,
+            "cv": cv,
+            "n_jobs": n_jobs,
+            "tuned_model": None,
+            "tuned_model_score": None,
+            "tuned_model_evaluation_metric": None
+        }
+
+        return model_stats
+    
     def _model_evaluator(self,
                          model: object,
                          eval_metric: str):
@@ -256,21 +333,8 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_params = None
-        if "CatBoost" in model.__class__.__name__:
-            model_params = model.get_all_params()
-        else:
-            model_params = model.get_params()
-        param_grid = self._param_grid_validator(model_params, param_grid, tuning_size)
-        model_stats = {
-            "tuning_method": "GridSearchCV",
-            "tuning_param_grid": param_grid,
-            "cv": cv,
-            "n_jobs": n_jobs,
-            "tuned_model": None,
-            "tuned_model_score": None,
-            "tuned_model_evaluation_metric": None
-        }
+        model_stats = self._setup_tuning("GridSearchCV", model, param_grid, tuning_size, cv, n_jobs)
+        param_grid = model_stats['tuning_param_grid']
         
         try:
             search_result = GridSearchCV(model, param_grid, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X, self.y)
@@ -367,23 +431,9 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_params = None
+        model_stats = self._setup_tuning("randomized_search", model, param_grid, tuning_size, cv, n_jobs)
+        param_grid = model_stats['tuning_param_grid']
 
-        if "CatBoost" in model.__class__.__name__:
-            model_params = model.get_all_params()
-        else:
-            model_params = model.get_params()
-        param_grid = self._param_grid_validator(model_params, param_grid, tuning_size)
-        model_stats = {
-            "tuning_method": "RandomizedSearchCV",
-            "tuning_param_grid": param_grid,
-            "cv": cv,
-            "n_jobs": n_jobs,
-            "tuned_model": None,
-            "tuned_model_score": None,
-            "tuned_model_evaluation_metric": None
-        }
-        
         try:
             search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_trials, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X, self.y)
 
@@ -468,21 +518,8 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_params = None
-        if "CatBoost" in model.__class__.__name__:
-            model_params = model.get_all_params()
-        else:
-            model_params = model.get_params()
-        param_grid = self._param_grid_validator(model_params, param_grid, tuning_size)
-        model_stats = {
-            "tuning_method": "Optuna",
-            "tuning_param_grid": param_grid,
-            "cv": None,
-            "n_jobs": n_jobs,
-            "tuned_model": None,
-            "tuned_model_score": None,
-            "tuned_model_evaluation_metric": None
-        }
+        model_stats = self._setup_tuning("optuna", model, param_grid, tuning_size, n_jobs)
+        param_grid = model_stats['tuning_param_grid']
 
         study_direction = "maximize" if eval_metric in ['r2', 'accuracy', 'precision', 'recall', 'f1'] else "minimize"
 
