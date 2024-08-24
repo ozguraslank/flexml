@@ -264,7 +264,7 @@ class SupervisedBase:
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
         
-        eval_metric = self.__eval_metric_checker(eval_metric)
+        self.eval_metric = self.__eval_metric_checker(eval_metric)
         top_n_models = self.__top_n_models_checker(top_n_models)
         self.model_training_info = [] # Reset the model training info before starting the experiment
         self.model_stats_df = None    # Reset the model stats DataFrame before starting the experiment
@@ -322,28 +322,28 @@ class SupervisedBase:
             raise ValueError(error_msg)
         
         top_n_models = self.__top_n_models_checker(top_n_models)
-        best_models = []
-            
-        if eval_metric is None and self.model_stats_df is not None: # If the eval_metric is not used, get the last experiment's model stats
-            pass
-            
-        else:
+
+        if eval_metric is not None:
             eval_metric = self.__eval_metric_checker(eval_metric)
-            model_stats = []
-            
-            for model_pack in self.model_training_info:
-                for model_name, model_data in model_pack.items():
-                    model_stats.append(model_data["model_stats"])
+        else: # If the user doesn't pass a eval_metric, get the evaluation metric passed to the start_experiment function
+            eval_metric = self.eval_metric
         
-            self.model_stats_df = pd.DataFrame(model_stats)
-            self.sorted_model_stats_df = self.__sort_models(eval_metric)
-
-        best_model_names = self.sorted_model_stats_df.head(top_n_models)["model_name"].tolist()
-
+        model_stats = []
+        best_models = []
+        
         for model_pack in self.model_training_info:
             for model_name, model_data in model_pack.items():
-                if model_name in best_model_names:
-                    best_models.append(model_data.get('model'))
+                model_stats.append(model_data["model_stats"])
+    
+        self.model_stats_df = pd.DataFrame(model_stats)
+        self.sorted_model_stats_df = self.__sort_models(eval_metric)
+
+        for i in range(top_n_models):
+            searched_model_name = self.sorted_model_stats_df.iloc[i]["model_name"]
+            for model_info in self.model_training_info:
+                model_name = list(model_info.keys())[0]
+                if model_name == searched_model_name:
+                    best_models.append(model_info[model_name]["model"])
         
         if len(best_models) == 1:
             return best_models[0]
