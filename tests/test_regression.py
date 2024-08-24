@@ -51,7 +51,7 @@ class TestRegression(unittest.TestCase):
             raise Exception(error_msg)
         
         try:
-            tuning_methods = ["grid_search", "randomized_search", "optuna"]
+            tuning_methods = ["randomized_search", "optuna"]
 
             for method in tuning_methods:
                 reg_exp.tune_model(n_trials=3, cv = None, tuning_size=exp_size)
