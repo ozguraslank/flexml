@@ -1,13 +1,13 @@
-numpy==1.26.0
-pandas==2.1.1
-scikit-learn==1.5.0
-xgboost==2.0.3
-lightgbm==4.5.0
-catboost==1.2.5
-tqdm==4.66.4
-optuna==3.6.1
-ipython==8.26.0
+numpy>=1.19.3
+pandas>=2.2.0
+scikit-learn>=1.5.0
+xgboost>=2.0.0
+lightgbm>=4.0.0
+catboost>=0.24.4
+tqdm>=4.60.0
+optuna>=3.0.0  
+ipython>=8.1.0
 
-# FOR TESTING (REMOVE THE '#' TO GET TEST LIBRARIES ALSO)
-#pytest==8.3.2
-#parameterized==0.9.0
+# IF YOU ARE GOING TO USE THE TESTS
+#pytest>=8.0.0
+#parameterized>=0.7.5
