@@ -82,22 +82,22 @@ class SupervisedBase:
         """
         # Data Overview validation
         if not isinstance(self.data, pd.DataFrame):
-            error_msg = "Dataframe should be a pandas DataFrame"
+            error_msg = f"Dataframe should be a pandas DataFrame, but you've passed {type(self.data)}"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         
         if self.data.select_dtypes(include=[np.number]).shape[1] != self.data.shape[1]:
-            error_msg = "Dataframe should include only numeric values"
+            error_msg = "Dataframe should include only numeric values, did you forget to encode the categorical variables?"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         
         if self.data.shape[0] == 0:
-            error_msg = "Dataframe should include at least one row"
+            error_msg = "Dataframe should include at least one row, is your dataframe empty?"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         
         if self.data.shape[1] <= 1:
-            error_msg = "Dataframe should include at least two columns"
+            error_msg = "Dataframe should include at least two columns, consider taking a look at your dataframe"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
         
@@ -259,7 +259,7 @@ class SupervisedBase:
                 }
             
             else:
-                error_msg = "Unsupported task type"
+                error_msg = f"Unsupported task type, only 'Regression' and 'Classification' tasks are supported, got {self.__ML_TASK_TYPE}"
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
         
