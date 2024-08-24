@@ -144,6 +144,7 @@ class ModelTuner:
                       model: object,
                       param_grid: dict,
                       tuning_size: str,
+                      n_iter: Optional[int] = None,
                       cv: Optional[int] = None,
                       n_jobs: int = -1):
         """
@@ -171,6 +172,9 @@ class ModelTuner:
 
             * If 'wide' is selected, param_grid will stay same
 
+        n_iter : int, optional (default=10)
+            The number of iterations. The default is 10.
+
         cv : int, optional (default=None)
             The number of cross-validation splits. The default is None.
         
@@ -186,6 +190,8 @@ class ModelTuner:
             
             * 'tuning_param_grid': The hyperparameter grid that is used for the optimization
             
+            * 'n_iter': The number of iterations
+
             * 'cv': The number of cross-validation splits
             
             * 'n_jobs': The number of parallel jobs to run
@@ -207,6 +213,7 @@ class ModelTuner:
         model_stats = {
             "tuning_method": tuning_method,
             "tuning_param_grid": param_grid,
+            "n_iter": n_iter,
             "cv": cv,
             "n_jobs": n_jobs,
             "tuned_model": None,
@@ -333,11 +340,11 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("GridSearchCV", model, param_grid, tuning_size, cv, n_jobs)
+        model_stats = self._setup_tuning("GridSearchCV", model, param_grid, tuning_size, n_iter=None, cv=cv, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
         
         try:
-            search_result = GridSearchCV(model, param_grid, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X, self.y)
+            search_result = GridSearchCV(model, param_grid, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X_train, self.y_train)
 
             model_stats['tuned_model'] = search_result.best_estimator_
             model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 4)
@@ -353,7 +360,7 @@ class ModelTuner:
                       tuning_size: str,
                       param_grid: dict,
                       eval_metric: str,
-                      n_trials: int = 10,
+                      n_iter: int = 10,
                       cv: Optional[int] = None,
                       n_jobs: int = -1) -> Optional[dict]:
         """
@@ -392,7 +399,7 @@ class ModelTuner:
             
             * 'f1' for F1 score
 
-        n_trials : int, optional (default=10)
+        n_iter : int, optional (default=10)
             The number of trials. The default is 10.
 
         cv : int, optional (default=None)
@@ -431,11 +438,11 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("randomized_search", model, param_grid, tuning_size, cv, n_jobs)
+        model_stats = self._setup_tuning("randomized_search", model, param_grid, tuning_size, n_iter=n_iter, cv=cv, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
 
         try:
-            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_trials, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X, self.y)
+            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X_train, self.y_train)
 
             model_stats['tuned_model'] = search_result.best_estimator_
             model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 4)
@@ -451,7 +458,7 @@ class ModelTuner:
                tuning_size: str,
                param_grid: dict,
                eval_metric: str,
-               n_trials: int = 10,
+               n_iter: int = 10,
                timeout: Optional[int] = None,
                n_jobs: int = -1) -> Optional[dict]:
         """
@@ -490,7 +497,7 @@ class ModelTuner:
             
             * 'f1' for F1 score
 
-        n_trials : int, optional (default=100)
+        n_iter : int, optional (default=100)
             The number of trials. The default is 100.
 
         timeout : int, optional (default=None)
@@ -518,7 +525,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("optuna", model, param_grid, tuning_size, n_jobs)
+        model_stats = self._setup_tuning("optuna", model, param_grid, tuning_size, n_iter=n_iter, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
 
         study_direction = "maximize" if eval_metric in ['r2', 'accuracy', 'precision', 'recall', 'f1'] else "minimize"
@@ -571,7 +578,7 @@ class ModelTuner:
         
         try:
             study = optuna.create_study(direction=study_direction)
-            study.optimize(objective, n_trials=n_trials, timeout=timeout, n_jobs=n_jobs)
+            study.optimize(objective, n_trials=n_iter, timeout=timeout, n_jobs=n_jobs)
             return model_stats
         
         except Exception as e:

@@ -72,6 +72,7 @@ class SupervisedBase:
         self.feature_names = self.data.drop(columns=[self.target_col]).columns
         self.model_training_info = []
         self.model_stats_df = None
+        self.eval_metric = None
 
         # Model Tuning Helper
         self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test, self.logging_to_file)
@@ -197,6 +198,57 @@ class SupervisedBase:
         
         return top_n_models
     
+    def __evaluate_model_perf(self, y_test, y_pred):
+        """
+        Evaluates how good are the predictions by comparing them with the actual values, returns regression evaluation scores
+
+        Parameters
+        ----------
+        y_test : np.ndarray
+            The actual values of the target column.
+        
+        y_pred : np.ndarray
+            The predicted values of the target column.
+        
+        Returns
+        -------
+        dict
+            A dictionary containing the evaluation metric of the current task
+                
+                * r2, mae, mse, rmse for Regression tasks
+
+                * accuracy, precision, recall, f1_score for Classification tasks
+        """
+
+        if self.__ML_TASK_TYPE == "Regression":
+            r2 = round(r2_score(y_test, y_pred), 4)
+            mae = round(mean_absolute_error(y_test, y_pred), 4)
+            mse = round(mean_squared_error(y_test, y_pred), 4)
+            rmse = round(np.sqrt(mse), 4)
+            return {
+                "r2": r2,
+                "mae": mae,
+                "mse": mse,
+                "rmse": rmse
+            }
+        
+        elif self.__ML_TASK_TYPE == "Classification":
+            accuracy = round(accuracy_score(y_test, y_pred), 4)
+            precision = round(precision_score(y_test, y_pred, average='weighted'), 4)
+            recall = round(recall_score(y_test, y_pred, average='weighted'), 4)
+            f1 = round(f1_score(y_test, y_pred, average='weighted'), 4)
+            return {
+                "accuracy": accuracy,
+                "precision": precision,
+                "recall": recall,
+                "f1_score": f1
+            }
+        
+        else:
+            error_msg = f"Unsupported task type, only 'Regression' and 'Classification' tasks are supported, got {self.__ML_TASK_TYPE}"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+    
     def start_experiment(self,
                      eval_metric: Optional[str] = None,
                      top_n_models: int = 1):
@@ -212,56 +264,6 @@ class SupervisedBase:
         top_n_models : int (default=1)
             The number of top models to select based on the evaluation metric.
         """
-        def __evaluate_model_perf(y_test, y_pred):
-            """
-            Evaluates how good are the predictions by comparing them with the actual values, returns regression evaluation scores
-
-            Parameters
-            ----------
-            y_test : np.ndarray
-                The actual values of the target column.
-            
-            y_pred : np.ndarray
-                The predicted values of the target column.
-            
-            Returns
-            -------
-            dict
-                A dictionary containing the evaluation metric of the current task
-                    
-                    * r2, mae, mse, rmse for Regression tasks
-
-                    * accuracy, precision, recall, f1_score for Classification tasks
-            """
-
-            if self.__ML_TASK_TYPE == "Regression":
-                r2 = round(r2_score(y_test, y_pred), 4)
-                mae = round(mean_absolute_error(y_test, y_pred), 4)
-                mse = round(mean_squared_error(y_test, y_pred), 4)
-                rmse = round(np.sqrt(mse), 4)
-                return {
-                    "r2": r2,
-                    "mae": mae,
-                    "mse": mse,
-                    "rmse": rmse
-                }
-            
-            elif self.__ML_TASK_TYPE == "Classification":
-                accuracy = round(accuracy_score(y_test, y_pred), 4)
-                precision = round(precision_score(y_test, y_pred, average='weighted'), 4)
-                recall = round(recall_score(y_test, y_pred, average='weighted'), 4)
-                f1 = round(f1_score(y_test, y_pred, average='weighted'), 4)
-                return {
-                    "accuracy": accuracy,
-                    "precision": precision,
-                    "recall": recall,
-                    "f1_score": f1
-                }
-            
-            else:
-                error_msg = f"Unsupported task type, only 'Regression' and 'Classification' tasks are supported, got {self.__ML_TASK_TYPE}"
-                self.logger.error(error_msg)
-                raise ValueError(error_msg)
         
         self.eval_metric = self.__eval_metric_checker(eval_metric)
         top_n_models = self.__top_n_models_checker(top_n_models)
@@ -278,7 +280,7 @@ class SupervisedBase:
             try:
                 model.fit(self.X_train, self.y_train)
                 y_pred = model.predict(self.X_test)
-                model_perf = __evaluate_model_perf(self.y_test, y_pred)
+                model_perf = self.__evaluate_model_perf(self.y_test, y_pred)
 
                 self.model_training_info.append({
                     model_name: {
@@ -474,7 +476,7 @@ class SupervisedBase:
                    tuning_size: Optional[str] = 'wide',
                    eval_metric: Optional[str] = None,
                    param_grid: Optional[dict] = None,
-                   n_trials: int = 10,
+                   n_iter: int = 10,
                    cv: Optional[int] = None,
                    n_jobs: int = -1):
         """
@@ -521,7 +523,7 @@ class SupervisedBase:
             >>>       'learning_rate': [0.01, 0.05, 0.1]
             >>>      }
 
-        n_trials : int (default = 10)
+        n_iter : int (default = 10)
             The number of trials to run in the tuning process (Only for RandomizedSearchCV and Optuna)
             
         cv : int (default = None)
@@ -541,6 +543,21 @@ class SupervisedBase:
             """
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
+            tuned_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']}({tuning_size}))_(cv={tuning_report['cv']})_(n_iter={tuning_report['n_iter']})"
+
+            # Add the tuned model and it's score to the model_training_info list
+            model_perf = self.__evaluate_model_perf(self.y_test, self.tuned_model.predict(self.X_test))
+            self.model_training_info.append({
+                tuned_model_name:{
+                    "model": self.tuned_model,
+                    "model_stats": {
+                        "model_name": tuned_model_name,
+                        **model_perf
+                    }
+                }
+            })
+            self.get_best_models() # Update the self.model_stats_df
+            self.show_model_stats()
 
         eval_metric = self.__eval_metric_checker(eval_metric)
 
@@ -590,7 +607,7 @@ class SupervisedBase:
                 tuning_size=tuning_size,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
-                n_trials=n_trials,
+                n_iter=n_iter,
                 cv=cv,
                 n_jobs=n_jobs
             )
@@ -602,7 +619,7 @@ class SupervisedBase:
                 tuning_size=tuning_size,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
-                n_trials=n_trials,
+                n_iter=n_iter,
                 n_jobs=n_jobs
             )
             _show_tuning_report(tuning_result)

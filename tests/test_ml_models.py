@@ -52,7 +52,7 @@ class TestMLModels(unittest.TestCase):
                 tuning_method="randomized_search",
                 tuning_size='wide',
                 param_grid=model_tuning_params,
-                n_trials=3,
+                n_iter=3,
                 cv=None,
                 n_jobs=-1
             )
@@ -76,7 +76,7 @@ class TestMLModels(unittest.TestCase):
                 tuning_method="randomized_search",
                 tuning_size='wide',
                 param_grid=model_tuning_params,
-                n_trials=3,
+                n_iter=3,
                 cv=None,
                 n_jobs=-1
             )
