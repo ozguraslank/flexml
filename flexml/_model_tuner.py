@@ -171,8 +171,8 @@ class ModelTuner:
 
             * If 'wide' is selected, param_grid will stay same
 
-        cv : int, optional (default=3)
-            The number of cross-validation splits. The default is 3.
+        cv : int, optional (default=None)
+            The number of cross-validation splits. The default is None.
         
         n_jobs : int, optional (default=-1)
             The number of parallel jobs to run. The default is -1.
@@ -270,7 +270,7 @@ class ModelTuner:
                     tuning_size: str,
                     param_grid: dict,
                     eval_metric: str,
-                    cv: int = 3,
+                    cv: Optional[int] = None,
                     n_jobs: int = -1) -> Optional[dict]:
         """
         Implements grid search hyperparameter optimization on the giveen machine learning model
@@ -308,8 +308,8 @@ class ModelTuner:
             
             * 'f1' for F1 score
 
-        cv : int, optional (default=3)
-            The number of cross-validation splits. The default is 3.
+        cv : int, optional (default=None)
+            The number of cross-validation splits. The default is None.
 
         n_jobs : int, optional (default=-1)
             The number of parallel jobs to run. The default is -1.
@@ -354,7 +354,7 @@ class ModelTuner:
                       param_grid: dict,
                       eval_metric: str,
                       n_trials: int = 10,
-                      cv: int = 3,
+                      cv: Optional[int] = None,
                       n_jobs: int = -1) -> Optional[dict]:
         """
         Implements random search hyperparameter optimization on the giveen machine learning model
@@ -395,8 +395,8 @@ class ModelTuner:
         n_trials : int, optional (default=10)
             The number of trials. The default is 10.
 
-        cv : int, optional (default=3)
-            The number of cross-validation splits. The default is 3.
+        cv : int, optional (default=None)
+            The number of cross-validation splits. The default is None.
 
         n_jobs : int, optional (default=-1)
             The number of parallel jobs to run. The default is -1.

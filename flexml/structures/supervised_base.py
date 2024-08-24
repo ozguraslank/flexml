@@ -1,4 +1,3 @@
-import sys
 from typing import Union, Optional
 from tqdm import tqdm
 import pandas as pd
@@ -476,7 +475,7 @@ class SupervisedBase:
                    eval_metric: Optional[str] = None,
                    param_grid: Optional[dict] = None,
                    n_trials: int = 10,
-                   cv: int = 3,
+                   cv: Optional[int] = None,
                    n_jobs: int = -1):
         """
         Tunes the model based on the given parameter grid and evaluation metric.
@@ -525,7 +524,7 @@ class SupervisedBase:
         n_trials : int (default = 10)
             The number of trials to run in the tuning process (Only for RandomizedSearchCV and Optuna)
             
-        cv : int (default = 3)
+        cv : int (default = None)
             The number of cross-validation folds to use for the tuning process (Only for GridSearchCV and RandomizedSearchCV)
         
         n_jobs: int
@@ -549,13 +548,14 @@ class SupervisedBase:
         if model is None:
             model = self.get_best_models()
         
+        """
         trained_models = [model_pack.get(list(model_pack.keys())[0]).get("model_stats")['model_name'] for model_pack in self.model_training_info]
         
         if model.__class__.__name__ not in trained_models and not isinstance(model, str):
             error_msg = f"{model} is not found in the trained models, expected one of the following:\n{trained_models}{15*'-'}"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
-        
+        """
         # Get the model's param_grid from the config file If It's not passed from the user
         if param_grid is None:
             try:
@@ -565,8 +565,8 @@ class SupervisedBase:
                 error_msg = f"{model}'s tuning config is not found in the config, please pass it manually via 'param_grid' parameter"
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
-            
-        if cv < 2 or not isinstance(cv, int):
+        
+        if cv != None and (not isinstance(cv, int) or cv < 2):
             info_msg = f"cv parameter should be minimum 2, got {cv}\nChanged it to 2 for the tuning process"
             cv = 2
             self.logger.info(info_msg)
