@@ -1,4 +1,4 @@
-![Python versions](https://img.shields.io/badge/python_3.10+-blue)
+![Python versions](https://img.shields.io/badge/python_3.9+-blue)
 # FlexML
 
 <div align="center">
@@ -21,7 +21,7 @@ pip install flexml
 
 ```python
 # Experiment for a Regression problem for diabates dataset
-from flexml.regression import Regression
+from flexml import Regression
 from sklearn.datasets import load_diabetes
 
 # Load the diabetes dataset
