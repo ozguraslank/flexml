@@ -27,11 +27,11 @@ from sklearn.datasets import load_diabetes
 # Load the diabetes dataset
 df = load_diabetes(as_frame=True)['frame']
 
-# Initialize the regression experiment
-reg_exp = Regression(df, target_col="target")
+# Initialize the regression experiment with 'quick' experiment_size, so less models will be used
+reg_exp = Regression(df, target_col="target", experiment_size="quick")
 
-# Start the experiment with 'quick' experiment size and r2 evaluation metric
-reg_exp.start_experiment(exp_size="quick", eval_metric="r2")
+# Start the experiment with r2 evaluation metric
+reg_exp.start_experiment(eval_metric="r2")
 
 # Get the best model
 best_model = reg_exp.get_best_models(top_n_models=1)

@@ -29,10 +29,12 @@ class SupervisedBase:
     experiment_size : str, (default='quick')
         The size of the experiment to run. It can be 'quick' or 'wide'
         
-        * If It's selected 'quick', quick amount of machine learning models will be used to get quick results
+        * If It's selected 'quick', less amount of machine learning models will be used to get quick results
         
         * If It's selected 'wide', wide range of machine learning models will be used to get more comprehensive results
-    
+
+        You can take a look at the models in the library at config/ml_models.py
+
     test_size : float, (default=0.25)
         The size of the test data in the train-test split process.
     

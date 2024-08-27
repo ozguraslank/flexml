@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="flexml",
-    version="1.0.1",
+    version="1.0.2",
     author="Ozgur Aslan",
     author_email="ozguraslank@gmail.com",
     description="Easy-to-use and flexible AutoML library for Python",
