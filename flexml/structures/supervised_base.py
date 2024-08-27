@@ -41,7 +41,7 @@ class SupervisedBase:
         
         For more info, visit https://scikit-learn.org/stable/glossary.html#term-random_state
 
-    logging_to_file: bool, (default=True)
+    logging_to_file: bool, (default=False)
         If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved.
     """
     def __init__(self,
@@ -50,7 +50,7 @@ class SupervisedBase:
                  experiment_size: str = 'quick',
                  test_size: float = 0.25,
                  random_state: int = 42,
-                 logging_to_file: str = True):
+                 logging_to_file: str = False):
         self.data = data
         self.experiment_size = experiment_size
         self.target_col = target_col
@@ -588,15 +588,7 @@ class SupervisedBase:
         # Get the best model If the user doesn't pass any model object
         if model is None:
             model = self.get_best_models()
-        
-        """
-        trained_models = [model_pack.get(list(model_pack.keys())[0]).get("model_stats")['model_name'] for model_pack in self.model_training_info]
-        
-        if model.__class__.__name__ not in trained_models and not isinstance(model, str):
-            error_msg = f"{model} is not found in the trained models, expected one of the following:\n{trained_models}{15*'-'}"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
-        """
+
         # Get the model's param_grid from the config file If It's not passed from the user
         if param_grid is None:
             try:

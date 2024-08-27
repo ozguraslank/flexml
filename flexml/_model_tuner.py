@@ -39,6 +39,9 @@ class ModelTuner:
 
     y_test : pd.DataFrame
         The test set target values
+
+    logging_to_file: bool, (default=False)
+        If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved
     """
     def __init__(self, 
                  ml_problem_type: str,
@@ -46,7 +49,7 @@ class ModelTuner:
                  X_test: pd.DataFrame, 
                  y_train: pd.DataFrame, 
                  y_test: pd.DataFrame,
-                 logging_to_file: bool = True):
+                 logging_to_file: bool = False):
         self.ml_problem_type = ml_problem_type.lower().capitalize() # Fix ml_problem_type's format in just case, It should be in the following format: 'Example'
         self.X_train = X_train
         self.X_test = X_test
