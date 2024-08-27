@@ -22,7 +22,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "numpy>=1.19.3,<=1.26.4",
-        "pandas>=2.2.0",
+        "pandas>=2.0.1",
         "scikit-learn>=1.5.0",
         "xgboost>=2.0.0",
         "lightgbm>=4.0.0",
