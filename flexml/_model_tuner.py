@@ -53,9 +53,6 @@ class ModelTuner:
         self.y_train = y_train
         self.y_test = y_test
 
-        self.X = pd.concat([self.X_train, self.X_test], axis=0)
-        self.y = pd.concat([self.y_train, self.y_test], axis=0)
-
         self.logger = get_logger(__name__, "PROD", logging_to_file)
 
     def _param_grid_validator(self,
