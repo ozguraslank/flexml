@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="FlexML",
+    name="flexml",
     version="0.1.0",
     author="Ozgur Aslan",
     author_email="ozguraslank@gmail.com",
