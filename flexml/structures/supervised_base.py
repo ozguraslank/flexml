@@ -298,6 +298,30 @@ class SupervisedBase:
         self.get_best_models(eval_metric, top_n_models)
         self.show_model_stats(eval_metric)
 
+    def get_model_by_name(self, model_name: str) -> object:
+        """
+        Returns the model object by the given model name
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to retrieve.
+
+        Returns
+        -------
+        object
+            The model object with the given model name
+        """
+
+        for model_info in self.model_training_info:
+            if model_name in model_info.keys():
+                return model_info[model_name]["model"]
+        
+        error_msg = f"{model_name} is not found in the trained models, expected one of the following:\n{[list(model_info.keys())[0] for model_info in self.model_training_info]}"
+        self.logger.error(error_msg)
+        raise ValueError(error_msg)
+
+
     def get_best_models(self, eval_metric: Optional[str] = None, top_n_models: int = 1) -> Union[object, list[object]]:
         """
         Returns the top n models based on the evaluation metric.
