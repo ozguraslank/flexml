@@ -29,7 +29,7 @@ setup(
         "catboost>=0.24.4",
         "tqdm>=4.60.0",
         "optuna>=3.0.0",
-        "ipython>=8.1.0",
+        "ipython>=7.11.0",
         "jinja2>=3.1.0"
     ],
     python_requires='>=3.9',
