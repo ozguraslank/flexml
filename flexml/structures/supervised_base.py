@@ -251,28 +251,20 @@ class SupervisedBase:
             self.logger.error(error_msg)
             raise ValueError(error_msg)
     
-    def start_experiment(self,
-                     eval_metric: Optional[str] = None,
-                     top_n_models: int = 1):
+    def start_experiment(self, eval_metric: Optional[str] = None):
         """
-        Trains machine learning algorithms and evaluates them based on the specified evaluation metric.
-        Returns the top n models based on the evaluation metric.
+        Trains machine learning algorithms and evaluates them based on the specified evaluation metric
         
         Parameters
         ----------
         eval_metric : str (default='r2' for Regression, 'accuracy' for Classification)
             The evaluation metric to use for model evaluation.
-        
-        top_n_models : int (default=1)
-            The number of top models to select based on the evaluation metric.
         """
         
         self.eval_metric = self.__eval_metric_checker(eval_metric)
-        top_n_models = self.__top_n_models_checker(top_n_models)
         self.model_training_info = [] # Reset the model training info before starting the experiment
         self.model_stats_df = None    # Reset the model stats DataFrame before starting the experiment
 
-        
         self.logger.info("[PROCESS] Training the ML models")
 
         for model_idx in tqdm(range(len(self.ML_MODELS))):
@@ -297,7 +289,7 @@ class SupervisedBase:
                 self.logger.error(f"An error occured while training {model_name}: {str(e)}")
 
         self.logger.info("[PROCESS] Model training is finished!")
-        self.get_best_models(eval_metric, top_n_models)
+        self.get_best_models(eval_metric)
         self.show_model_stats(eval_metric)
 
     def get_model_by_name(self, model_name: str) -> object:

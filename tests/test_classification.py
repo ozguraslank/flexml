@@ -31,7 +31,7 @@ class TestClassification(unittest.TestCase):
             raise Exception(error_msg)
         
         try:
-            classification_exp.start_experiment(top_n_models = 1)
+            classification_exp.start_experiment()
         except Exception as e:
             error_msg = f"An error occured while running {exp_size} classification experiment, Error: {e}"
             self.logger.error(error_msg)
