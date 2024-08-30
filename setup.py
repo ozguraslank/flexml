@@ -1,5 +1,9 @@
 from setuptools import setup, find_packages
 
+def parse_requirements(filename: str):
+    with open(filename, 'r') as file:
+        return file.read().splitlines()
+
 setup(
     name="flexml",
     version="1.0.2",
@@ -20,18 +24,7 @@ setup(
     ],
     keywords=["AutoML", "Machine Learning", "Data Science", "Flexibility"],
     packages=find_packages(),
-    install_requires=[
-        "numpy>=1.19.3,<=1.26.4",
-        "pandas>=2.0.1",
-        "scikit-learn>=1.5.0",
-        "xgboost>=2.0.0",
-        "lightgbm>=4.0.0",
-        "catboost>=0.24.4",
-        "tqdm>=4.60.0",
-        "optuna>=3.0.0",
-        "ipython>=7.11.0",
-        "jinja2>=3.1.0"
-    ],
+    install_requires=parse_requirements("requirements.txt"),
     python_requires='>=3.9',
     include_package_data=False,  # Set to True if you want to include non-code files
 )
