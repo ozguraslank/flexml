@@ -125,7 +125,7 @@ class ModelTuner:
                             number_of_values_to_append = int(number_of_values_left / 2 if number_of_values_left % 2 == 0 else number_of_values_left - (number_of_values_left - 1) / 2)
                             for _ in range(number_of_values_to_append):
                                 new_param_values.append(current_param_values.pop(np.random.randint(0, len(current_param_values))))                        
-                        new_param_values.sort() # Sort the values to keep the order 
+                        new_param_values.sort(key=lambda x: (x is not None, x)) # Sort the values to keep the param order, [None, 5, 3] -> [None, 3, 5]
                         param_grid[param] = new_param_values
             else:
                 param_amount_to_keep = int(param_amount / 2 if param_amount % 2 == 0 else param_amount - (param_amount - 1) / 2)
