@@ -4,7 +4,7 @@ import logging
 __LOG_DIR_PATH = "logs"
 __LOG_FILE_PATH = os.path.join(__LOG_DIR_PATH, "flexml_logs.log")
 
-def _logger_configuration(log_level: str, logging_to_file: bool = True):
+def _logger_configuration(log_level: str, logging_to_file: bool = False):
     """
     Configures the logger to save logs to a file or not.
     
@@ -13,7 +13,7 @@ def _logger_configuration(log_level: str, logging_to_file: bool = True):
     log_level: str,
         The log level to set for the logger. It can be either "TEST" or "PROD"
     
-    logging_to_file : bool, (default=True)
+    logging_to_file : bool, (default=False)
         If True, logs are saved to /logs/flexml_logs.log. Otherwise, logs are not saved to a file.
     """
     handlers = [logging.StreamHandler()]
@@ -37,7 +37,7 @@ def _logger_configuration(log_level: str, logging_to_file: bool = True):
         handlers=handlers
     )
 
-def get_logger(name: str, log_level: str, logging_to_file: bool = True) -> logging.Logger:
+def get_logger(name: str, log_level: str, logging_to_file: bool = False) -> logging.Logger:
     """
     Returns a logger object with the given name
 
@@ -59,7 +59,7 @@ def get_logger(name: str, log_level: str, logging_to_file: bool = True) -> loggi
         >>> logger.info("This is a test message")
         >>> 2021-07-07 12:00:00 | This is a test message
 
-    logging_to_file : bool, (default=True)
+    logging_to_file : bool, (default=False)
         If True, logs are saved to /logs/flexml_logs.log. Otherwise, logs are not saved to a file
 
     Returns

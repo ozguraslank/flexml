@@ -26,7 +26,7 @@ class Regression(SupervisedBase):
         The random state value for the train-test split process
         For more info, visit https://scikit-learn.org/stable/glossary.html#term-random_state
 
-    logging_to_file: bool, (default=True)
+    logging_to_file: bool, (default=False)
         If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved.
 
     Example
@@ -57,5 +57,5 @@ class Regression(SupervisedBase):
                  experiment_size: str = 'quick',
                  test_size: float = 0.25,
                  random_state: int = 42,
-                 logging_to_file: str = True):
+                 logging_to_file: str = False):
         super().__init__(data, target_col, experiment_size, test_size, random_state, logging_to_file)
