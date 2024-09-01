@@ -145,7 +145,7 @@ class ModelTuner:
                       param_grid: dict,
                       tuning_size: str,
                       n_iter: Optional[int] = None,
-                      cv: Optional[int] = None,
+                      cv: int = 3,
                       n_jobs: int = -1):
         """
         Sets up the tuning process by creating the model_stats dictionary
@@ -175,10 +175,10 @@ class ModelTuner:
         n_iter : int, optional (default=10)
             The number of iterations. The default is 10.
 
-        cv : int, optional (default=None)
-            The number of cross-validation splits. The default is None.
+        cv : int (default=3)
+            The number of cross-validation splits. The default is 3.
         
-        n_jobs : int, optional (default=-1)
+        n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
 
         Returns
@@ -277,7 +277,7 @@ class ModelTuner:
                     tuning_size: str,
                     param_grid: dict,
                     eval_metric: str,
-                    cv: Optional[int] = None,
+                    cv: int = 3,
                     n_jobs: int = -1) -> Optional[dict]:
         """
         Implements grid search hyperparameter optimization on the giveen machine learning model
@@ -315,10 +315,10 @@ class ModelTuner:
             
             * 'f1' for F1 score
 
-        cv : int, optional (default=None)
-            The number of cross-validation splits. The default is None.
+        cv : int (default=3)
+            The number of cross-validation splits. The default is 3.
 
-        n_jobs : int, optional (default=-1)
+        n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
 
         Returns
@@ -361,7 +361,7 @@ class ModelTuner:
                       param_grid: dict,
                       eval_metric: str,
                       n_iter: int = 10,
-                      cv: Optional[int] = None,
+                      cv: int = 3,
                       n_jobs: int = -1) -> Optional[dict]:
         """
         Implements random search hyperparameter optimization on the giveen machine learning model
@@ -402,10 +402,10 @@ class ModelTuner:
         n_iter : int, optional (default=10)
             The number of trials. The default is 10.
 
-        cv : int, optional (default=None)
-            The number of cross-validation splits. The default is None.
+        cv : int (default=3)
+            The number of cross-validation splits. The default is 3.
 
-        n_jobs : int, optional (default=-1)
+        n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
 
         optimization_size : str, optional (default="quick")

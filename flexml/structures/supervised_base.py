@@ -483,7 +483,7 @@ class SupervisedBase:
                 plt.show()
 
             else:
-                self.logger.info("Feature importance is not available for this model, If you think there is a mistake, please open an issue on GitHub repository")
+                self.logger.info(f"Feature importance is not available for this model {(model_name)}, If you think there is a mistake, please open an issue on GitHub repository")
 
         except Exception as e:
             self.logger.error(f"Could not calculate feature importance for the following model: {model}, Error: {e}")
@@ -495,7 +495,7 @@ class SupervisedBase:
                    eval_metric: Optional[str] = None,
                    param_grid: Optional[dict] = None,
                    n_iter: int = 10,
-                   cv: Optional[int] = None,
+                   cv: int = 3,
                    n_jobs: int = -1):
         """
         Tunes the model based on the given parameter grid and evaluation metric.
@@ -544,10 +544,10 @@ class SupervisedBase:
         n_iter : int (default = 10)
             The number of trials to run in the tuning process (Only for RandomizedSearchCV and Optuna)
             
-        cv : int (default = None)
+        cv : int (default = 3)
             The number of cross-validation folds to use for the tuning process (Only for GridSearchCV and RandomizedSearchCV)
         
-        n_jobs: int
+        n_jobs: int (default = -1)
             The number of jobs to run in parallel for the tuning process. -1 means using all threads in the CPU
 
         Returns
@@ -593,7 +593,7 @@ class SupervisedBase:
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
         
-        if cv != None and (not isinstance(cv, int) or cv < 2):
+        if not isinstance(cv, int) or cv < 2:
             info_msg = f"cv parameter should be minimum 2, got {cv}\nChanged it to 2 for the tuning process"
             cv = 2
             self.logger.info(info_msg)
