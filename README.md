@@ -1,8 +1,8 @@
-![Python versions](https://img.shields.io/badge/python_3.9+-blue)
+![Python versions](https://img.shields.io/badge/python_3.9+-blue) ![](https://img.shields.io/github/v/release/ozguraslank/flexml)
 # FlexML
 
 <div align="center">
-<img src="img/flexml_banner.jpeg" alt="drawing" width="400"/>
+<img src="img/flexml_banner.jpeg" alt="drawing" width="500"/>
 </div>
 
 ## Introduction
@@ -17,33 +17,58 @@ To install FlexML, you can use pip:
 pip install flexml
 ```
 
-## Quick Start
+## Start Guide with Regression Experiment
 
 ```python
-# Experiment for a Regression problem for diabates dataset
+# Experiment for a Regression problem for California House Value Prediction dataset
 from flexml import Regression
-from sklearn.datasets import load_diabetes
+from sklearn.datasets import fetch_california_housing
 
-# Load the diabetes dataset
-df = load_diabetes(as_frame=True)['frame']
+# Load the California House Value Prediction dataset as a Pandas dataframe
+df = fetch_california_housing(as_frame=True)['frame']
 
-# Initialize the regression experiment with 'quick' experiment_size, so less models will be used
+# Setup a regression experiment with 'quick' experiment_size for faster results by using less ml models, "wide" for all
+# (check flexml/config/ml_models.py to check out to all ml models available in the library)
 reg_exp = Regression(df, target_col="target", experiment_size="quick")
 
-# Start the experiment with r2 evaluation metric
+# Start the experiment with r2 evaluation metric (default)
 reg_exp.start_experiment(eval_metric="r2")
-
-# Get the best model
-best_model = reg_exp.get_best_models(top_n_models=1)
-print(best_model)
->>> LinearRegression()
-
-# Tune the best model with Optuna
-reg_exp.tune_model(tuning_method="optuna", tuning_size="wide", eval_metric="r2")
-tuned_model = reg_exp.tuned_model
-print(tuned_model)
->>> LinearRegression()
 ```
+--> Once **start_experiment()** process finishes, you will see the model leaderboard as below: <br>
+<div align="left">
+<img src="img/start_guide_reg_output.jpg" alt="drawing" width="400"/>
+</div>
+
+```python
+# Get the best model, you can pass 'eval_metric' param as well
+best_model = reg_exp.get_best_models()
+
+# Get the best model by name (Alternative)
+_temp_ = reg_exp.get_model_by_name("LGBMRegressor")
+
+print(best_model)
+>>> <catboost.core.CatBoostRegressor object>
+
+# Tune the best model with Randomized Search or pass a model object as param to the beginning
+reg_exp.tune_model(tuning_method="randomized_search", tuning_size="quick", eval_metric="r2", n_iter=4)
+```
+
+--> Once **tune_model()** process finishes, you will see the updated model leaderboard as below: <br>
+<div align="left">
+<img src="img/start_guide_reg_tuning_output.jpg" alt="drawing" width="500"/>
+</div>
+
+```python
+# Get the latest tuned model
+tuned_model = reg_exp.tuned_model
+
+# Alternatively, get it via get_model_by_name()
+_temp_ = reg_exp.get_model_by_name("CatBoostRegressor_(randomized_search(quick))_(cv=3)_(n_iter=4)")
+
+print(tuned_model)
+>>> <catboost.core.CatBoostRegressor object>
+```
+<br>
 You can also take a look to jupyter notebook files in the 'notebooks' folder in the repository for more detailed explanations of the usage
 
 ## How to Contribute:
