@@ -29,7 +29,7 @@ df = fetch_california_housing(as_frame=True)['frame']
 
 # Setup a regression experiment with 'quick' experiment_size for faster results by using less ml models, "wide" for all
 # (check flexml/config/ml_models.py to check out to all ml models available in the library)
-reg_exp = Regression(df, target_col="target", experiment_size="quick")
+reg_exp = Regression(df, target_col="MedHouseVal", experiment_size="quick")
 
 # Start the experiment with r2 evaluation metric (default)
 reg_exp.start_experiment(eval_metric="r2")
@@ -46,8 +46,7 @@ best_model = reg_exp.get_best_models()
 # Get the best model by name (Alternative)
 _temp_ = reg_exp.get_model_by_name("LGBMRegressor")
 
-print(best_model)
->>> <catboost.core.CatBoostRegressor object>
+print(best_model) # >>> <catboost.core.CatBoostRegressor object>
 
 # Tune the best model with Randomized Search or pass a model object as param to the beginning
 reg_exp.tune_model(tuning_method="randomized_search", tuning_size="quick", eval_metric="r2", n_iter=4)
@@ -65,8 +64,7 @@ tuned_model = reg_exp.tuned_model
 # Alternatively, get it via get_model_by_name()
 _temp_ = reg_exp.get_model_by_name("CatBoostRegressor_(randomized_search(quick))_(cv=3)_(n_iter=4)")
 
-print(tuned_model)
->>> <catboost.core.CatBoostRegressor object>
+print(tuned_model) # >>> <catboost.core.CatBoostRegressor object>
 ```
 <br>
 You can also take a look to jupyter notebook files in the 'notebooks' folder in the repository for more detailed explanations of the usage
