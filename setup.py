@@ -6,7 +6,7 @@ def parse_requirements(filename: str):
 
 setup(
     name="flexml",
-    version="1.0.2",
+    version="1.0.3",
     author="Ozgur Aslan",
     author_email="ozguraslank@gmail.com",
     description="Easy-to-use and flexible AutoML library for Python",
@@ -26,5 +26,5 @@ setup(
     packages=find_packages(),
     install_requires=parse_requirements("requirements.txt"),
     python_requires='>=3.9',
-    include_package_data=False,  # Set to True if you want to include non-code files
+    include_package_data=False
 )
