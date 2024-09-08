@@ -182,7 +182,6 @@ QUICK_CLASSIFICATION_MODELS = [
         "tuning_param_grid": {
             "penalty": ["l1", "l2", "elasticnet", None],
             "C": [0.01, 0.1, 1, 10, 100],
-            "solver": ["lbfgs", "liblinear", "sag", "saga"],
             "max_iter": [100, 200, 300, 400, 500]
         }
     },
