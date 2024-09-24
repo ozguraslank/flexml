@@ -1,4 +1,3 @@
-import pandas as pd
 from flexml.structures.supervised_base import SupervisedBase
 
 class Regression(SupervisedBase):
@@ -51,11 +50,4 @@ class Regression(SupervisedBase):
     ------------------------------------------------------------
     >>> best_model = reg_exp.get_best_models(eval_metric = 'r')
     """
-    def __init__(self,
-                 data: pd.DataFrame,
-                 target_col: str,
-                 experiment_size: str = 'quick',
-                 test_size: float = 0.25,
-                 random_state: int = 42,
-                 logging_to_file: str = False):
-        super().__init__(data, target_col, experiment_size, test_size, random_state, logging_to_file)
+    pass
