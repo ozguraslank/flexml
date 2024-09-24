@@ -1,5 +1,6 @@
-import pandas as pd
 from flexml.structures.supervised_base import SupervisedBase
+
+
 
 class Classification(SupervisedBase):
     """
@@ -48,11 +49,4 @@ class Classification(SupervisedBase):
     ------------------------------------------------------------
     >>> best_model = classification_exp.get_best_models(eval_metric = 'accuracy')
     """
-    def __init__(self,
-                 data: pd.DataFrame,
-                 target_col: str,
-                 experiment_size: str = 'quick',
-                 test_size: float = 0.25,
-                 random_state: int = 42,
-                 logging_to_file = False):
-        super().__init__(data, target_col, experiment_size, test_size, random_state, logging_to_file)
+    pass
