@@ -1,4 +1,5 @@
 from typing import Optional
+from time import time
 import numpy as np
 import pandas as pd
 import optuna
@@ -344,10 +345,14 @@ class ModelTuner:
         param_grid = model_stats['tuning_param_grid']
         
         try:
+            t_start = time()
             search_result = GridSearchCV(model, param_grid, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X_train, self.y_train)
+            t_end = time()
+            time_taken = round(t_end - t_start, 2)
 
             model_stats['tuned_model'] = search_result.best_estimator_
-            model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 4)
+            model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 6)
+            model_stats['time_taken_sec'] = time_taken
             model_stats['tuned_model_evaluation_metric'] = eval_metric
             return model_stats
         
@@ -442,10 +447,14 @@ class ModelTuner:
         param_grid = model_stats['tuning_param_grid']
 
         try:
+            t_start = time()
             search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X_train, self.y_train)
+            t_end = time()
+            time_taken = round(t_end - t_start, 2)
 
             model_stats['tuned_model'] = search_result.best_estimator_
-            model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 4)
+            model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 6)
+            model_stats['time_taken_sec'] = time_taken
             model_stats['tuned_model_evaluation_metric'] = eval_metric
             return model_stats
         
@@ -577,8 +586,12 @@ class ModelTuner:
             return score
         
         try:
+            t_start = time()
             study = optuna.create_study(direction=study_direction)
             study.optimize(objective, n_trials=n_iter, timeout=timeout, n_jobs=n_jobs)
+            t_end = time()
+            time_taken = round(t_end - t_start, 2)
+            model_stats['time_taken_sec'] = time_taken
             return model_stats
         
         except Exception as e:
