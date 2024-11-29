@@ -1,3 +1,4 @@
+from time import time
 from typing import Union, Optional
 from tqdm import tqdm
 import pandas as pd
@@ -272,7 +273,10 @@ class SupervisedBase:
             model_name = model_info['name']
             model = model_info['model']
             try:
+                t_start = time()
                 model.fit(self.X_train, self.y_train)
+                t_end = time()
+                time_taken = round(t_end - t_start, 2)
                 y_pred = model.predict(self.X_test)
                 model_perf = self.__evaluate_model_perf(self.y_test, y_pred)
 
@@ -281,7 +285,8 @@ class SupervisedBase:
                         "model": model,
                         "model_stats": {
                             "model_name": model_name,
-                            **model_perf}
+                            **model_perf,
+                            "Time Taken (sec)": time_taken}
                     }
                 })
 
@@ -430,6 +435,8 @@ class SupervisedBase:
         
         eval_metric = self.__eval_metric_checker(eval_metric)
         sorted_model_stats_df = self.__sort_models(eval_metric)
+        sorted_model_stats_df['Time Taken (sec)'] = sorted_model_stats_df['Time Taken (sec)'].apply(lambda x: round(x, 2))
+        sorted_model_stats_df.index += 1
         
         # If the user is not on a interactive kernel such as Jupyter Notebook, the styled DataFrame will not be displayed
         # Instead, the user will see the raw DataFrame
@@ -561,6 +568,7 @@ class SupervisedBase:
             """
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
+            tuned_time_taken = tuning_report['time_taken_sec']
             tuned_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']}({tuning_size}))_(cv={tuning_report['cv']})_(n_iter={tuning_report['n_iter']})"
 
             # Add the tuned model and it's score to the model_training_info list
@@ -570,7 +578,8 @@ class SupervisedBase:
                     "model": self.tuned_model,
                     "model_stats": {
                         "model_name": tuned_model_name,
-                        **model_perf
+                        **model_perf,
+                        "Time Taken (sec)": tuned_time_taken
                     }
                 }
             })
