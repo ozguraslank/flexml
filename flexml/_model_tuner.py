@@ -1,11 +1,18 @@
-from typing import Optional
-from time import time
 import numpy as np
 import pandas as pd
 import optuna
+from typing import Optional
+from time import time
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-from sklearn.metrics import r2_score, mean_absolute_error, mean_squared_error
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from sklearn.metrics import (
+    r2_score, 
+    mean_absolute_error, 
+    mean_squared_error,
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score)
+
 from flexml.logger.logger import get_logger
 
 

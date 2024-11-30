@@ -20,9 +20,6 @@ class TestClassification(unittest.TestCase):
             classification_exp = Classification(
                 data = df,
                 target_col = "target",
-                experiment_size = exp_size,
-                test_size = 0.25,
-                random_state = 42,
                 logging_to_file = False
             )
         except Exception as e:
@@ -31,7 +28,11 @@ class TestClassification(unittest.TestCase):
             raise Exception(error_msg)
         
         try:
-            classification_exp.start_experiment()
+            classification_exp.start_experiment(
+                experiment_size = exp_size,
+                test_size = 0.25,
+                random_state = 42,
+            )
         except Exception as e:
             error_msg = f"An error occured while running {exp_size} classification experiment, Error: {e}"
             self.logger.error(error_msg)
