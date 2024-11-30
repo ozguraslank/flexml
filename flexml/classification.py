@@ -1,7 +1,5 @@
 from flexml.structures.supervised_base import SupervisedBase
 
-
-
 class Classification(SupervisedBase):
     """
     A class to train and evaluate different classification models.
@@ -14,28 +12,15 @@ class Classification(SupervisedBase):
     target_col : str
         The target column name in the data.
 
-    experiment_size : str, (default='quick')
-        The size of the experiment to run. It can be 'quick' or 'wide'
-        
-        * If It's selected 'quick', quick amount of machine learning models will be used to get quick results
-        * If It's selected 'wide', wide range of machine learning models will be used to get more comprehensive results
-    
-    test_size : float, default=0.25
-        The size of the test data in the train-test split process.
-    
-    random_state : int, default=42
-        The random state value for the train-test split process
-        For more info, visit https://scikit-learn.org/stable/glossary.html#term-random_state
-
     logging_to_file: bool, (default=False)
         If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved.
 
     Example
     -------
-    >>> from flexml.classification import Classification
+    >>> from flexml import Classification
     >>> df = pd.read_csv("MY_DATA.csv")
-    >>> classification_exp = Classification(data=df, target_col='target_col', experiment_size='quick')
-    >>> classification_exp.start_experiment()
+    >>> classification_exp = Classification(data=df, target_col='target_col')
+    >>> classification_exp.start_experiment(experiment_size = 'quick')
     >>> classification_exp.show_model_stats(eval_metric='accuracy')
 
     ------------------------------------------------------------

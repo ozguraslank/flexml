@@ -22,19 +22,21 @@ class TestMLModels(unittest.TestCase):
     reg_exp = Regression(
         data = reg_df,
         target_col = "target",
-        experiment_size = "wide",
-        test_size = 0.25,
-        random_state = 42,
         logging_to_file = False
+    )
+    reg_exp._prepare_data(
+        test_size = 0.5, # Keeping test_size high to make the training faster
+        random_state = 42
     )
 
     classification_exp = Classification(
         data = classification_df,
         target_col = "target",
-        experiment_size = "wide",
-        test_size = 0.25,
-        random_state = 42,
         logging_to_file = False
+    )
+    classification_exp._prepare_data(
+        test_size = 0.5, # Keeping test_size high to make the training faster
+        random_state = 42
     )
 
     @parameterized.expand([(model_pack['name'], model_pack['model'], model_pack['tuning_param_grid']) for model_pack in WIDE_REGRESSION_MODELS])
@@ -57,9 +59,15 @@ class TestMLModels(unittest.TestCase):
                 n_jobs=-1
             )
         except Exception as e:
-            error_msg = f"An error occurred while tuning {model_name} model with the following param_grid {model_tuning_params}. Error: {e}"
-            self.logger.error(error_msg)
-            raise Exception(error_msg)
+            if 'Invalid top_n_models value' in str(e):
+                # Since we don't use the start_experiment() function, there will be no saved models and this error will be raised --
+                # Because, we call _show_tuning_report when tune_model operation is done and that function calls get_best_models() function that calls __top_n_models_checker() where the error will be raised :)
+                pass
+            else:
+                # Handle other exceptions
+                error_msg = f"An error occurred while tuning {model_name} model with the following param_grid {model_tuning_params}. Error: {e}"
+                self.logger.error(error_msg)
+                raise Exception(error_msg)
 
     @parameterized.expand([(model_pack['name'], model_pack['model'], model_pack['tuning_param_grid']) for model_pack in WIDE_CLASSIFICATION_MODELS])
     def test_classification_ml_models(self, model_name, model, model_tuning_params):
@@ -81,6 +89,10 @@ class TestMLModels(unittest.TestCase):
                 n_jobs=-1
             )
         except Exception as e:
-            error_msg = f"An error occurred while tuning {model_name} model with the following param_grid {model_tuning_params}. Error: {e}"
-            self.logger.error(error_msg)
-            raise Exception(error_msg)
+            if 'Invalid top_n_models value' in str(e):
+                # Same as in 'test_regression_ml_models' function
+                pass
+            else:
+                error_msg = f"An error occurred while tuning {model_name} model with the following param_grid {model_tuning_params}. Error: {e}"
+                self.logger.error(error_msg)
+                raise Exception(error_msg)

@@ -20,9 +20,6 @@ class TestRegression(unittest.TestCase):
             reg_exp = Regression(
                 data = df,
                 target_col = "target",
-                experiment_size = exp_size,
-                test_size = 0.25,
-                random_state = 42,
                 logging_to_file = False
             )
         except Exception as e:
@@ -31,7 +28,10 @@ class TestRegression(unittest.TestCase):
             raise Exception(error_msg)
 
         try:
-            reg_exp.start_experiment()
+            reg_exp.start_experiment(
+                experiment_size = exp_size,
+                test_size = 0.25,
+                random_state = 42)
         except Exception as e:
             error_msg = f"An error occured while running {exp_size} regression experiment, Error: {e}"
             self.logger.error(error_msg)
