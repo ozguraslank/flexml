@@ -70,7 +70,7 @@ class ModelTuner:
                               model_available_params: dict,
                               param_grid: dict) -> dict:
         """
-        This method is used to validate the param_grid dictionary for the model. Also It changes the size of the param_grid If the user wants to have a quick optimization.
+        This method is used to validate the param_grid dictionary for the model
 
         Parameters
         ----------
@@ -341,17 +341,6 @@ class ModelTuner:
 
         n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
-
-        optimization_size : str, optional (default="quick")
-            The size of the optimization. It can be 'quick' or 'wide'. The default is "quick".
-
-            * If It's 'wide', whole the param_grid that defined in flexml/config/ml_models.py will be used for the optimization
-
-            * If It's 'quick', only the half of the param_grid that defined in flexml/config/ml_models.py will be used for the optimization
-                
-                -> This is used to decrease the optimization time by using less hyperparameters, but It may not give the best results compared to 'wide' since 'wide' uses more hyperparameters
-                
-                -> Also, half of the param_grid will be selected randomly, so the results may change in each run
         
         Returns
         -------
