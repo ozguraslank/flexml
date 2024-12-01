@@ -640,9 +640,19 @@ class SupervisedBase:
                 self.__logger.error(error_msg)
                 raise ValueError(error_msg)
         
+        if not isinstance(n_iter, int) or n_iter < 1:
+            info_msg = f"n_iter parameter should be minimum 1, got {n_iter}\nChanged it to 10 for the tuning process"
+            n_iter = 10
+            self.__logger.info(info_msg)
+
         if not isinstance(cv, int) or cv < 2:
             info_msg = f"cv parameter should be minimum 2, got {cv}\nChanged it to 2 for the tuning process"
             cv = 2
+            self.__logger.info(info_msg)
+
+        if not isinstance(n_jobs, int) or n_jobs < -1:
+            info_msg = f"n_jobs parameter should be minimum -1, got {n_jobs}\nChanged it to -1 for the tuning process"
+            n_jobs = -1
             self.__logger.info(info_msg)
 
         self.__logger.info(f"[PROCESS] Model Tuning process is started with '{tuning_method}' method")
