@@ -545,7 +545,8 @@ class SupervisedBase:
                    param_grid: Optional[dict] = None,
                    n_iter: int = 10,
                    cv: int = 3,
-                   n_jobs: int = -1):
+                   n_jobs: int = -1,
+                   verbose: int = 0):
         """
         Tunes the model based on the given parameter grid and evaluation metric.
 
@@ -590,6 +591,29 @@ class SupervisedBase:
         
         n_jobs: int (default = -1)
             The number of jobs to run in parallel for the tuning process. -1 means using all threads in the CPU
+
+        verbose: int (default = 0)
+            The verbosity level of the tuning process. If It's set to 0, no logs will be shown during the tuning process. Otherwise, the logs will be shown based on the value of the verbose parameter
+
+            * For GridsearchCV and RandomizedSearchCV, the information will be as below:
+            
+                * >1 : the computation time for each fold and parameter candidate is displayed
+
+                * >2 : the score is also displayed
+
+                * >3 : the fold and candidate parameter indexes are also displayed together with the starting time of the computation
+
+            * For optuna:
+
+                * >DEBUG (Equals to 4): Most detailed logging (prints almost everything)
+
+                * >INFO (Equals to 3): Standard informational output
+
+                * >WARNING (Equals to 2): Only warnings and errors
+
+                * >ERROR (Equals to 1): Only error messages
+
+                * >CRITICAL (Equals to 0): Only critical errors
 
         Returns
         -------
@@ -663,7 +687,8 @@ class SupervisedBase:
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 cv=cv,
-                n_jobs=n_jobs
+                n_jobs=n_jobs,
+                verbose=verbose
             )
             _show_tuning_report(tuning_result)
             
@@ -674,7 +699,8 @@ class SupervisedBase:
                 eval_metric=eval_metric,
                 n_iter=n_iter,
                 cv=cv,
-                n_jobs=n_jobs
+                n_jobs=n_jobs,
+                verbose=verbose
             )
             _show_tuning_report(tuning_result)
                 
@@ -684,7 +710,8 @@ class SupervisedBase:
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 n_iter=n_iter,
-                n_jobs=n_jobs
+                n_jobs=n_jobs,
+                verbose=verbose
             )
             _show_tuning_report(tuning_result)
             
