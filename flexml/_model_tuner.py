@@ -70,7 +70,7 @@ class ModelTuner:
                               model_available_params: dict,
                               param_grid: dict) -> dict:
         """
-        This method is used to validate the param_grid dictionary for the model. Also It changes the size of the param_grid If the user wants to have a quick optimization.
+        This method is used to validate the param_grid dictionary for the model
 
         Parameters
         ----------
@@ -225,7 +225,8 @@ class ModelTuner:
                     param_grid: dict,
                     eval_metric: str,
                     cv: int = 3,
-                    n_jobs: int = -1) -> Optional[dict]:
+                    n_jobs: int = -1,
+                    verbose: int = 0) -> Optional[dict]:
         """
         Implements grid search hyperparameter optimization on the giveen machine learning model
 
@@ -260,6 +261,15 @@ class ModelTuner:
         n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
 
+        verbose: int (default = 0)
+            The verbosity level of the tuning process. If It's set to 0, no logs will be shown during the tuning process. Otherwise, the logs will be shown based on the value of the verbose parameter:
+            
+            * 1 : the computation time for each fold and parameter candidate is displayed
+
+            * 2 : the score is also displayed
+
+            * 3 : the fold and candidate parameter indexes are also displayed together with the starting time of the computation
+
         Returns
         -------
         model_stats: dict
@@ -284,7 +294,7 @@ class ModelTuner:
         
         try:
             t_start = time()
-            search_result = GridSearchCV(model, param_grid, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X_train, self.y_train)
+            search_result = GridSearchCV(model, param_grid, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X_train, self.y_train)
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
@@ -304,7 +314,8 @@ class ModelTuner:
                       eval_metric: str,
                       n_iter: int = 10,
                       cv: int = 3,
-                      n_jobs: int = -1) -> Optional[dict]:
+                      n_jobs: int = -1,
+                      verbose: int = 0) -> Optional[dict]:
         """
         Implements random search hyperparameter optimization on the giveen machine learning model
 
@@ -341,17 +352,6 @@ class ModelTuner:
 
         n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
-
-        optimization_size : str, optional (default="quick")
-            The size of the optimization. It can be 'quick' or 'wide'. The default is "quick".
-
-            * If It's 'wide', whole the param_grid that defined in flexml/config/ml_models.py will be used for the optimization
-
-            * If It's 'quick', only the half of the param_grid that defined in flexml/config/ml_models.py will be used for the optimization
-                
-                -> This is used to decrease the optimization time by using less hyperparameters, but It may not give the best results compared to 'wide' since 'wide' uses more hyperparameters
-                
-                -> Also, half of the param_grid will be selected randomly, so the results may change in each run
         
         Returns
         -------
@@ -377,7 +377,7 @@ class ModelTuner:
 
         try:
             t_start = time()
-            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=1).fit(self.X_train, self.y_train)
+            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X_train, self.y_train)
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
@@ -397,7 +397,8 @@ class ModelTuner:
                eval_metric: str,
                n_iter: int = 10,
                timeout: Optional[int] = None,
-               n_jobs: int = -1) -> Optional[dict]:
+               n_jobs: int = -1,
+               verbose: int = 0) -> Optional[dict]:
         """
         Implements Optuna hyperparameter optimization on the giveen machine learning model
 
@@ -435,6 +436,19 @@ class ModelTuner:
         n_jobs : int, optional (default=-1)
             The number of parallel jobs to run. The default is -1.
 
+        verbose: int (default = 0)
+            The verbosity level of the tuning process. If It's set to 0, no logs will be shown during the tuning process. Otherwise, the logs will be shown based on the value of the verbose parameter:
+
+            * DEBUG (Equals to 4): Most detailed logging (prints almost everything)
+
+            * INFO (Equals to 3): Standard informational output
+
+            * WARNING (Equals to 2): Only warnings and errors
+
+            * ERROR (Equals to 1): Only error messages
+
+            * CRITICAL (Equals to 0): Only critical errors
+
         Returns
         -------
         model_stats: dict
@@ -456,6 +470,18 @@ class ModelTuner:
         """
         model_stats = self._setup_tuning("optuna", model, param_grid, n_iter=n_iter, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
+
+        # Set verbosity levels
+        if verbose == 0:
+            optuna.logging.set_verbosity(optuna.logging.CRITICAL)
+        elif verbose == 1:
+            optuna.logging.set_verbosity(optuna.logging.ERROR)
+        elif verbose == 2:
+            optuna.logging.set_verbosity(optuna.logging.WARNING)
+        elif verbose == 3:
+            optuna.logging.set_verbosity(optuna.logging.INFO)
+        elif verbose == 4:
+            optuna.logging.set_verbosity(optuna.logging.DEBUG)
 
         study_direction = "maximize" if eval_metric in ['r2', 'accuracy', 'precision', 'recall', 'f1'] else "minimize"
 
