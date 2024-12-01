@@ -52,7 +52,6 @@ class TestMLModels(unittest.TestCase):
             self.reg_exp.tune_model(
                 model=model,
                 tuning_method="randomized_search",
-                tuning_size='wide',
                 param_grid=model_tuning_params,
                 n_iter=3,
                 cv=None,
@@ -82,10 +81,9 @@ class TestMLModels(unittest.TestCase):
             self.classification_exp.tune_model(
                 model=model,
                 tuning_method="randomized_search",
-                tuning_size='wide',
                 param_grid=model_tuning_params,
                 n_iter=3,
-                cv=None,
+                cv=2,
                 n_jobs=-1
             )
         except Exception as e:

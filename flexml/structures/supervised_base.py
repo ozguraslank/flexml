@@ -541,7 +541,6 @@ class SupervisedBase:
     def tune_model(self, 
                    model: Optional[object] = None,
                    tuning_method: Optional[str] = 'randomized_search',
-                   tuning_size: Optional[str] = 'wide',
                    eval_metric: Optional[str] = None,
                    param_grid: Optional[dict] = None,
                    n_iter: int = 10,
@@ -564,14 +563,6 @@ class SupervisedBase:
             * 'randomized_search' for RandomizedSearchCV (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.RandomizedSearchCV.html)
             
             * 'optuna' for Optuna (https://optuna.readthedocs.io/en/stable/)
-
-        tuning_size: str (default = 'wide')
-            The size of the tuning process. It can be 'quick' or 'wide'
-
-            * If 'quick' is selected, number of params or number of values in the each params will be decrased.
-                -> For detailed information, visit flexml/_model_tuner.py/_param_grid_validator() function's doc
-
-            * If 'wide' is selected, param_grid will stay same
 
         eval_metric : str (default='r2' for regression, 'accuracy' for classification)
             The evaluation metric to use for model evaluation
@@ -612,7 +603,7 @@ class SupervisedBase:
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
             tuned_time_taken = tuning_report['time_taken_sec']
-            tuned_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']}({tuning_size}))_(cv={tuning_report['cv']})_(n_iter={tuning_report['n_iter']})"
+            tuned_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']})_(cv={tuning_report['cv']})_(n_iter={tuning_report['n_iter']})"
 
             # Add the tuned model and it's score to the model_training_info list
             model_perf = self.__evaluate_model_perf(self.y_test, self.tuned_model.predict(self.X_test))
@@ -654,12 +645,11 @@ class SupervisedBase:
             cv = 2
             self.__logger.info(info_msg)
 
-        self.__logger.info("[PROCESS] Model Tuning process is started")
+        self.__logger.info(f"[PROCESS] Model Tuning process is started with '{tuning_method}' method")
         tuning_method = tuning_method.lower()
         if tuning_method == "grid_search":
             tuning_result = self.model_tuner.grid_search(
                 model=model,
-                tuning_size=tuning_size,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 cv=cv,
@@ -670,7 +660,6 @@ class SupervisedBase:
         elif tuning_method == "randomized_search":
             tuning_result = self.model_tuner.random_search(
                 model=model,
-                tuning_size=tuning_size,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 n_iter=n_iter,
@@ -682,7 +671,6 @@ class SupervisedBase:
         elif tuning_method == "optuna":
             tuning_result = self.model_tuner.optuna_search(
                 model=model,
-                tuning_size=tuning_size,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 n_iter=n_iter,
