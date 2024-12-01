@@ -68,8 +68,7 @@ class ModelTuner:
 
     def _param_grid_validator(self,
                               model_available_params: dict,
-                              param_grid: dict,
-                              tuning_size: str) -> dict:
+                              param_grid: dict) -> dict:
         """
         This method is used to validate the param_grid dictionary for the model. Also It changes the size of the param_grid If the user wants to have a quick optimization.
 
@@ -79,18 +78,7 @@ class ModelTuner:
             All params that model has
 
         param_grid : dict
-            The dictionary that contains the hyperparameters and their possible values.
-
-        tuning_size : str, optional (default="quick")
-            The size of the tuning. It can be 'quick' or 'wide'. The default is "quick".
-
-            * If It's 'wide', whole the param_grid that defined in flexml/config/ml_models.py will be used for the tuning
-
-            * If It's 'quick', only the half of the param_grid that defined in flexml/config/ml_models.py will be used for the optimization
-                
-                -> This is used to decrease the tuning time by using less hyperparameters, but It may not give the best results compared to 'wide' since 'wide' uses more hyperparameters
-                
-                -> Also, half of the param_grid will be selected randomly, so the results may change in each run
+            The dictionary that contains the hyperparameters and their possible values
         """
         param_amount = len(param_grid)
         if param_amount == 0:
@@ -106,52 +94,12 @@ class ModelTuner:
                 self.logger.error(error_msg)
                 raise ValueError(error_msg)
             
-        # If the tuning size is 'quick', only the half of the param_grid will be used for the tuning process
-        if tuning_size == "quick":
-            # SIZE DECRASING STRATEGY
-            """
-            n = len(param_grid)
-            
-            if n <= 3: Let n stay as the same, decrase the number of variables in the param_grid If number of variables is bigger than 3 index 0 and last index in values will stay same)
-                >>> example: learning_rate: [1, 2, 3, 4, 5] -> [1, 2, 5] or [1, 3, 5] or [1, 4, 5] (Randomly selected)
-            
-            else: n = n / 2 If n is even, n = n - (n-1)/2 If n is odd
-                >>> example: n: 5 -> 3 or 6 -> 3 or 7 -> 4 or 9 -> 5 or 10 -> 5
-            """
-            if param_amount <= 3:
-                for param in param_grid:
-                    number_of_values = len(param_grid[param])
-                    if number_of_values > 3:
-                        current_param_values = param_grid[param]
-                        new_param_values = [current_param_values.pop(0)]
-                        new_param_values.append(current_param_values.pop(-1))
-
-                        if len(current_param_values) != 0 and number_of_values <= 5:
-                            new_param_values.append(np.random.choice(current_param_values))
-                        else:
-                            number_of_values_left = len(current_param_values)
-                            number_of_values_to_append = int(number_of_values_left / 2 if number_of_values_left % 2 == 0 else number_of_values_left - (number_of_values_left - 1) / 2)
-                            for _ in range(number_of_values_to_append):
-                                new_param_values.append(current_param_values.pop(np.random.randint(0, len(current_param_values))))                        
-                        new_param_values.sort(key=lambda x: (x is not None, x)) # Sort the values to keep the param order, [None, 5, 3] -> [None, 3, 5]
-                        param_grid[param] = new_param_values
-            else:
-                param_amount_to_keep = int(param_amount / 2 if param_amount % 2 == 0 else param_amount - (param_amount - 1) / 2)
-                # No need to remove some of the values in the param_grid since number of params will be decrased by half almost here
-                new_param_grid = {}
-                for _ in range(int(param_amount_to_keep)):
-                    random_param = np.random.choice(list(param_grid.keys()))
-                    new_param_grid[random_param] = param_grid[random_param]
-                    del param_grid[random_param]
-                param_grid = new_param_grid
-            
         return param_grid
     
     def _setup_tuning(self,
                       tuning_method: str,
                       model: object,
                       param_grid: dict,
-                      tuning_size: str,
                       n_iter: Optional[int] = None,
                       cv: int = 3,
                       n_jobs: int = -1):
@@ -171,14 +119,6 @@ class ModelTuner:
 
         model : object
             The model object that will be tuned.
-
-        tuning_size: str (default = 'wide')
-            The size of the tuning process. It can be 'quick' or 'wide'
-
-            * If 'quick' is selected, number of params or number of values in the each params will be decrased.
-                -> For detailed information, visit flexml/_model_tuner.py/_param_grid_validator() function's doc
-
-            * If 'wide' is selected, param_grid will stay same
 
         n_iter : int, optional (default=10)
             The number of iterations. The default is 10.
@@ -217,7 +157,7 @@ class ModelTuner:
         else:
             model_params = model.get_params()
 
-        param_grid = self._param_grid_validator(model_params, param_grid, tuning_size)
+        param_grid = self._param_grid_validator(model_params, param_grid)
         model_stats = {
             "tuning_method": tuning_method,
             "tuning_param_grid": param_grid,
@@ -282,7 +222,6 @@ class ModelTuner:
             
     def grid_search(self,
                     model: object,
-                    tuning_size: str,
                     param_grid: dict,
                     eval_metric: str,
                     cv: int = 3,
@@ -294,14 +233,6 @@ class ModelTuner:
         ----------
         model : object
             The model object that will be tuned.
-
-        tuning_size: str (default = 'wide')
-            The size of the tuning process. It can be 'quick' or 'wide'
-
-            * If 'quick' is selected, number of params or number of values in the each params will be decrased.
-                -> For detailed information, visit flexml/_model_tuner.py/_param_grid_validator() function's doc
-
-            * If 'wide' is selected, param_grid will stay same
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values.
@@ -348,7 +279,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("GridSearchCV", model, param_grid, tuning_size, n_iter=None, cv=cv, n_jobs=n_jobs)
+        model_stats = self._setup_tuning("GridSearchCV", model, param_grid, n_iter=None, cv=cv, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
         
         try:
@@ -369,7 +300,6 @@ class ModelTuner:
     
     def random_search(self,
                       model: object,
-                      tuning_size: str,
                       param_grid: dict,
                       eval_metric: str,
                       n_iter: int = 10,
@@ -382,14 +312,6 @@ class ModelTuner:
         ----------
         model : object
             The model object that will be tuned.
-
-        tuning_size: str (default = 'wide')
-            The size of the tuning process. It can be 'quick' or 'wide'
-
-            * If 'quick' is selected, number of params or number of values in the each params will be decrased.
-                -> For detailed information, visit flexml/_model_tuner.py/_param_grid_validator() function's doc
-
-            * If 'wide' is selected, param_grid will stay same
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values.
@@ -450,7 +372,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("randomized_search", model, param_grid, tuning_size, n_iter=n_iter, cv=cv, n_jobs=n_jobs)
+        model_stats = self._setup_tuning("randomized_search", model, param_grid, n_iter=n_iter, cv=cv, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
 
         try:
@@ -471,7 +393,6 @@ class ModelTuner:
         
     def optuna_search(self,
                model: object,
-               tuning_size: str,
                param_grid: dict,
                eval_metric: str,
                n_iter: int = 10,
@@ -484,14 +405,6 @@ class ModelTuner:
         ----------
         model : object
             The model object that will be tuned.
-
-        tuning_size: str (default = 'wide')
-            The size of the tuning process. It can be 'quick' or 'wide'
-
-            * If 'quick' is selected, number of params or number of values in the each params will be decrased.
-                -> For detailed information, visit flexml/_model_tuner.py/_param_grid_validator() function's doc
-
-            * If 'wide' is selected, param_grid will stay same
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values.
@@ -541,7 +454,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("optuna", model, param_grid, tuning_size, n_iter=n_iter, n_jobs=n_jobs)
+        model_stats = self._setup_tuning("optuna", model, param_grid, n_iter=n_iter, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
 
         study_direction = "maximize" if eval_metric in ['r2', 'accuracy', 'precision', 'recall', 'f1'] else "minimize"
