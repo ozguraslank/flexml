@@ -202,19 +202,19 @@ class ModelTuner:
         eval_metric = eval_metric.lower()
         
         if eval_metric == 'r2':
-            return r2_score(self.y_test, model.predict(self.X_test))
+            return round(r2_score(self.y_test, model.predict(self.X_test)), 6)
         elif eval_metric == 'mae':
-            return mean_absolute_error(self.y_test, model.predict(self.X_test))
+            return round(mean_absolute_error(self.y_test, model.predict(self.X_test)), 6)
         elif eval_metric == 'mse':
-            return mean_squared_error(self.y_test, model.predict(self.X_test))
+            return round(mean_squared_error(self.y_test, model.predict(self.X_test)), 6)
         elif eval_metric == 'accuracy':
-            return accuracy_score(self.y_test, model.predict(self.X_test))
+            return round(accuracy_score(self.y_test, model.predict(self.X_test)), 6)
         elif eval_metric == 'precision':
-            return precision_score(self.y_test, model.predict(self.X_test))
+            return round(precision_score(self.y_test, model.predict(self.X_test)), 6)
         elif eval_metric == 'recall':
-            return recall_score(self.y_test, model.predict(self.X_test))
+            return round(recall_score(self.y_test, model.predict(self.X_test)), 6)
         elif eval_metric == 'f1':
-            return f1_score(self.y_test, model.predict(self.X_test))
+            return round(f1_score(self.y_test, model.predict(self.X_test)), 6)
         else:
             error_msg = "Error while evaluating the current model during the model tuning process. The eval_metric should be one of the following: 'r2', 'mae', 'mse', 'accuracy', 'precision', 'recall', 'f1'"
             self.logger.error(error_msg)
@@ -526,7 +526,7 @@ class ModelTuner:
             
             # Update the best score and best hyperparameters If the current score is better than the best one
             if model_stats['tuned_model_score'] is None or score > model_stats['tuned_model_score']:
-                model_stats['tuned_model_score'] = round(score, 4)
+                model_stats['tuned_model_score'] = round(score, 6)
                 model_stats['tuned_model'] = test_model
 
             return score

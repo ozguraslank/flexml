@@ -188,7 +188,9 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        if eval_metric not in self.__ALL_EVALUATION_METRICS:
+        if ((self.__ML_TASK_TYPE == "Classification" and eval_metric.lower().capitalize() not in self.__ALL_EVALUATION_METRICS) or
+                (self.__ML_TASK_TYPE == "Regression" and eval_metric.upper() not in self.__ALL_EVALUATION_METRICS)):
+
             error_msg = f"{eval_metric} is not a valid evaluation metric for {self.__ML_TASK_TYPE}, expected one of the following: {self.__ALL_EVALUATION_METRICS}"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
@@ -237,10 +239,10 @@ class SupervisedBase:
         """
 
         if self.__ML_TASK_TYPE == "Regression":
-            r2 = round(r2_score(y_test, y_pred), 4)
-            mae = round(mean_absolute_error(y_test, y_pred), 4)
-            mse = round(mean_squared_error(y_test, y_pred), 4)
-            rmse = round(np.sqrt(mse), 4)
+            r2 = round(r2_score(y_test, y_pred), 6)
+            mae = round(mean_absolute_error(y_test, y_pred), 6)
+            mse = round(mean_squared_error(y_test, y_pred), 6)
+            rmse = round(np.sqrt(mse), 6)
             return {
                 "r2": r2,
                 "mae": mae,
@@ -249,10 +251,10 @@ class SupervisedBase:
             }
         
         elif self.__ML_TASK_TYPE == "Classification":
-            accuracy = round(accuracy_score(y_test, y_pred), 4)
-            precision = round(precision_score(y_test, y_pred, average='weighted'), 4)
-            recall = round(recall_score(y_test, y_pred, average='weighted'), 4)
-            f1 = round(f1_score(y_test, y_pred, average='weighted'), 4)
+            accuracy = round(accuracy_score(y_test, y_pred), 6)
+            precision = round(precision_score(y_test, y_pred, average='weighted'), 6)
+            recall = round(recall_score(y_test, y_pred, average='weighted'), 6)
+            f1 = round(f1_score(y_test, y_pred, average='weighted'), 6)
             return {
                 "accuracy": accuracy,
                 "precision": precision,
