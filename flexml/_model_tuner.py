@@ -14,6 +14,7 @@ from sklearn.metrics import (
     f1_score)
 
 from flexml.logger.logger import get_logger
+from flexml.helpers import eval_metric_checker
 
 
 class ModelTuner:
@@ -66,6 +67,25 @@ class ModelTuner:
 
         self.logger = get_logger(__name__, "PROD", logging_to_file)
 
+    @staticmethod
+    def __eval_metric_revieser(eval_metric: str) -> str:
+        """
+        Scikit-learn based hyperparameter optimization methods (GridSearch & Randomized Search) require spesific namings for evaluation metrics
+
+        This method is used to revise the evaluation metric name for the optimization process
+
+        Parameters
+        ----------
+        eval_metric : str
+            The evaluation metric
+
+        Returns
+        -------
+        str
+            The revised evaluation metric name. e.g. 'R2' to 'r2, 'Accuracy' to 'accuracy', 'F1 Score' to 'f1_weighted' etc.
+        """
+        return eval_metric.lower() if eval_metric != 'F1 Score' else 'f1_weighted'
+ 
     def _param_grid_validator(self,
                               model_available_params: dict,
                               param_grid: dict) -> dict:
@@ -185,38 +205,38 @@ class ModelTuner:
         eval_metric : str
             The evaluation metric that will be used to evaluate the model. It can be one of the following:
             
-            * 'r2' for R^2 score
+            * 'R2' for R^2 score
             
-            * 'mae' for Mean Absolute Error
+            * 'MAE' for Mean Absolute Error
             
-            * 'mse' for Mean Squared Error
+            * 'MSE' for Mean Squared Error
             
-            * 'accuracy' for Accuracy
+            * 'Accuracy' for Accuracy
             
-            * 'precision' for Precision
+            * 'Precision' for Precision
             
-            * 'recall' for Recall
+            * 'Recall' for Recall
             
-            * 'f1' for F1 score
+            * 'F1 Score' for F1 score
         """
-        eval_metric = eval_metric.lower()
+        eval_metric = eval_metric_checker(self.ml_problem_type, eval_metric)
         
-        if eval_metric == 'r2':
+        if eval_metric == 'R2':
             return round(r2_score(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'mae':
+        elif eval_metric == 'MAE':
             return round(mean_absolute_error(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'mse':
+        elif eval_metric == 'MSE':
             return round(mean_squared_error(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'accuracy':
+        elif eval_metric == 'Accuracy':
             return round(accuracy_score(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'precision':
+        elif eval_metric == 'Precision':
             return round(precision_score(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'recall':
+        elif eval_metric == 'Recall':
             return round(recall_score(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'f1':
+        elif eval_metric == 'F1 Score':
             return round(f1_score(self.y_test, model.predict(self.X_test)), 6)
         else:
-            error_msg = "Error while evaluating the current model during the model tuning process. The eval_metric should be one of the following: 'r2', 'mae', 'mse', 'accuracy', 'precision', 'recall', 'f1'"
+            error_msg = "Error while evaluating the current model during the model tuning process. The eval_metric should be one of the following: 'R2', 'MAE', 'MSE', 'Accuracy', 'Precision', 'Recall', 'F1 Score'"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
             
@@ -241,19 +261,19 @@ class ModelTuner:
         eval_metric : str
             The evaluation metric that will be used to evaluate the model. It can be one of the following:
             
-            * 'r2' for R^2 score
+            * 'R2' for R^2 score
             
-            * 'mae' for Mean Absolute Error
+            * 'MAE' for Mean Absolute Error
             
-            * 'mse' for Mean Squared Error
+            * 'MSE' for Mean Squared Error
             
-            * 'accuracy' for Accuracy
+            * 'Accuracy' for Accuracy
             
-            * 'precision' for Precision
+            * 'Precision' for Precision
             
-            * 'recall' for Recall
+            * 'Recall' for Recall
             
-            * 'f1' for F1 score
+            * 'F1 Score' for F1 score
 
         cv : int (default=3)
             The number of cross-validation splits. The default is 3.
@@ -291,10 +311,11 @@ class ModelTuner:
         """
         model_stats = self._setup_tuning("GridSearchCV", model, param_grid, n_iter=None, cv=cv, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
+        scoring_eval_metric = self.__eval_metric_revieser(eval_metric)
         
         try:
             t_start = time()
-            search_result = GridSearchCV(model, param_grid, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X_train, self.y_train)
+            search_result = GridSearchCV(model, param_grid, scoring=scoring_eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X_train, self.y_train)
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
@@ -330,19 +351,19 @@ class ModelTuner:
         eval_metric : str
             The evaluation metric that will be used to evaluate the model. It can be one of the following:
             
-            * 'r2' for R^2 score
+            * 'R2' for R^2 score
             
-            * 'mae' for Mean Absolute Error
+            * 'MAE' for Mean Absolute Error
             
-            * 'mse' for Mean Squared Error
+            * 'MSE' for Mean Squared Error
             
-            * 'accuracy' for Accuracy
+            * 'Accuracy' for Accuracy
             
-            * 'precision' for Precision
+            * 'Precision' for Precision
             
-            * 'recall' for Recall
+            * 'Recall' for Recall
             
-            * 'f1' for F1 score
+            * 'F1 Score' for F1 score
 
         n_iter : int, optional (default=10)
             The number of trials. The default is 10.
@@ -374,10 +395,11 @@ class ModelTuner:
         """
         model_stats = self._setup_tuning("randomized_search", model, param_grid, n_iter=n_iter, cv=cv, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
+        scoring_eval_metric = self.__eval_metric_revieser(eval_metric)
 
         try:
             t_start = time()
-            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X_train, self.y_train)
+            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=scoring_eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X_train, self.y_train)
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
@@ -413,19 +435,19 @@ class ModelTuner:
         eval_metric : str
             The evaluation metric that will be used to evaluate the model. It can be one of the following:
             
-            * 'r2' for R^2 score
+            * 'R2' for R^2 score
             
-            * 'mae' for Mean Absolute Error
+            * 'MAE' for Mean Absolute Error
             
-            * 'mse' for Mean Squared Error
+            * 'MSE' for Mean Squared Error
             
-            * 'accuracy' for Accuracy
+            * 'Accuracy' for Accuracy
             
-            * 'precision' for Precision
+            * 'Precision' for Precision
             
-            * 'recall' for Recall
+            * 'Recall' for Recall
             
-            * 'f1' for F1 score
+            * 'F1 Score' for F1 score
 
         n_iter : int, optional (default=100)
             The number of trials. The default is 100.
@@ -483,7 +505,7 @@ class ModelTuner:
         elif verbose == 4:
             optuna.logging.set_verbosity(optuna.logging.DEBUG)
 
-        study_direction = "maximize" if eval_metric in ['r2', 'accuracy', 'precision', 'recall', 'f1'] else "minimize"
+        study_direction = "maximize" if eval_metric in ['R2', 'Accuracy', 'Precision', 'Recall', 'F1 Score'] else "minimize"
 
         def objective(trial):
             """
