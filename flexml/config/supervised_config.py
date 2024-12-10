@@ -11,9 +11,9 @@ ML_MODELS = {
 
 # Regression & Classification Evaluation Metrics
 EVALUATION_METRICS = {
-    "Regression": {"DEFAULT": "r2",
-                   "ALL": ["r2", "mae", "mse", "rmse"]},
+    "Regression": {"DEFAULT": "R2",
+                   "ALL": ["R2", "MAE", "MSE", "RMSE"]},
                    
-    "Classification": {"DEFAULT": "accuracy",
-                       "ALL": ["accuracy", "precision", "recall", "f1_score"]}
+    "Classification": {"DEFAULT": "Accuracy",
+                       "ALL": ["Accuracy", "Precision", "Recall", "F1 Score"]}
 }

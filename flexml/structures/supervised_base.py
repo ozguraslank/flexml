@@ -17,6 +17,7 @@ from sklearn.metrics import (
 
 from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS
 from flexml.logger.logger import get_logger
+from flexml.helpers import eval_metric_checker
 from flexml._model_tuner import ModelTuner
 
 
@@ -164,36 +165,6 @@ class SupervisedBase:
             error_msg = f"An error occurred while splitting the data into train and test: {str(e)}"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
-        
-    def __eval_metric_checker(self, eval_metric: Optional[str] = None) -> str:
-        """
-        Since eval_metric setting and validation is a common process for both Regression and Classification tasks...
-        this method is used to set and validate the evaluation metric.
-
-        Parameters
-        ----------
-        eval_metric : str
-            The evaluation metric to use for model evaluation.
-        
-        Returns
-        -------
-        str
-            The evaluation metric to use for model evaluation for the current task (Regression or Classification)
-        """
-        if eval_metric is None: # If the user passed nothing, the default evaluation metric will be used ('r2' for Regression, 'accuracy' for Classification)
-            return self.__DEFAULT_EVALUATION_METRIC
-        
-        if not isinstance(eval_metric, str):
-            error_msg = f"eval_metric expected to be a string, got {type(eval_metric)}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
-        
-        if eval_metric not in self.__ALL_EVALUATION_METRICS:
-            error_msg = f"{eval_metric} is not a valid evaluation metric for {self.__ML_TASK_TYPE}, expected one of the following: {self.__ALL_EVALUATION_METRICS}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
-        
-        return eval_metric
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
         """
@@ -231,33 +202,33 @@ class SupervisedBase:
         dict
             A dictionary containing the evaluation metric of the current task
                 
-                * r2, mae, mse, rmse for Regression tasks
+                * R2, MAE, MSE, RMSE for Regression tasks
 
-                * accuracy, precision, recall, f1_score for Classification tasks
+                * Accuracy, Precision, Recall, F1 Score for Classification tasks
         """
 
         if self.__ML_TASK_TYPE == "Regression":
-            r2 = round(r2_score(y_test, y_pred), 4)
-            mae = round(mean_absolute_error(y_test, y_pred), 4)
-            mse = round(mean_squared_error(y_test, y_pred), 4)
-            rmse = round(np.sqrt(mse), 4)
+            r2 = round(r2_score(y_test, y_pred), 6)
+            mae = round(mean_absolute_error(y_test, y_pred), 6)
+            mse = round(mean_squared_error(y_test, y_pred), 6)
+            rmse = round(np.sqrt(mse), 6)
             return {
-                "r2": r2,
-                "mae": mae,
-                "mse": mse,
-                "rmse": rmse
+                "R2": r2,
+                "MAE": mae,
+                "MSE": mse,
+                "RMSE": rmse
             }
         
         elif self.__ML_TASK_TYPE == "Classification":
-            accuracy = round(accuracy_score(y_test, y_pred), 4)
-            precision = round(precision_score(y_test, y_pred, average='weighted'), 4)
-            recall = round(recall_score(y_test, y_pred, average='weighted'), 4)
-            f1 = round(f1_score(y_test, y_pred, average='weighted'), 4)
+            accuracy = round(accuracy_score(y_test, y_pred), 6)
+            precision = round(precision_score(y_test, y_pred, average='weighted'), 6)
+            recall = round(recall_score(y_test, y_pred, average='weighted'), 6)
+            f1 = round(f1_score(y_test, y_pred, average='weighted'), 6)
             return {
-                "accuracy": accuracy,
-                "precision": precision,
-                "recall": recall,
-                "f1_score": f1
+                "Accuracy": accuracy,
+                "Precision": precision,
+                "Recall": recall,
+                "F1 Score": f1
             }
         
         else:
@@ -287,7 +258,7 @@ class SupervisedBase:
         test_size : float, (default=0.25)
             The size of the test data in the train-test split process.
 
-        eval_metric : str (default='r2' for Regression, 'accuracy' for Classification)
+        eval_metric : str (default='R2' for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation.
 
         random_state : int, (default=42)
@@ -296,7 +267,7 @@ class SupervisedBase:
             For more info, visit https://scikit-learn.org/stable/glossary.html#term-random_state
         """
         
-        self.eval_metric = self.__eval_metric_checker(eval_metric)
+        self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         self.experiment_size = experiment_size
         self.test_size = test_size
         self.random_state = random_state
@@ -372,12 +343,12 @@ class SupervisedBase:
         ----------
         top_n_models : int
             The number of top models to select based on the evaluation metric.
-        eval_metric : str (default='r2 for Regression, 'accuracy' for Classification)
+        eval_metric : str (default='R2 for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation:
                 
-                * r2, mae, mse, rmse for Regression tasks
+                * R2, MAE, MSE, RMSE for Regression tasks
 
-                * accuracy, precision, recall, f1_score for Classification tasks
+                * Accuracy, Precision, Recall, F1 Score for Classification tasks
         Returns
         -------
         object or list[object]
@@ -391,7 +362,7 @@ class SupervisedBase:
         top_n_models = self.__top_n_models_checker(top_n_models)
 
         if eval_metric is not None:
-            eval_metric = self.__eval_metric_checker(eval_metric)
+            eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         else: # If the user doesn't pass a eval_metric, get the evaluation metric passed to the start_experiment function
             eval_metric = self.eval_metric
         
@@ -423,8 +394,8 @@ class SupervisedBase:
 
         Parameters
         ----------
-        eval_metric : str (default='r2')
-            The evaluation metric to use for model evaluation (e.g. 'r2', 'mae', 'mse', 'rmse')
+        eval_metric : str (default='R2')
+            The evaluation metric to use for model evaluation (e.g. 'R2', 'MAE', 'MSE', 'RMSE')
 
         Returns
         -------
@@ -436,10 +407,10 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        eval_metric = self.__eval_metric_checker(eval_metric)
+        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Since lower is better for mae, mse and rmse in Regression tasks, they should be sorted in ascending order
-        if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['mae', 'mse', 'rmse']:
+        if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['MAE', 'MSE', 'RMSE']:
             return self.__model_stats_df.sort_values(by=eval_metric, ascending=True).reset_index(drop = True)
         else:
             return self.__model_stats_df.sort_values(by=eval_metric, ascending=False).reset_index(drop = True)
@@ -450,11 +421,11 @@ class SupervisedBase:
 
         Parameters
         ----------
-        eval_metric : str (default='r2' for regression, 'accuracy' for classification)
+        eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
             The evaluation metric to use for model evaluation
         
-            * r2, mae, mse, rmse for Regression tasks
-            * accuracy, precision, recall, f1_score for Classification tasks
+            * R2, MAE, MSE, RMSE for Regression tasks
+            * Accuracy, Precision, Recall, F1 Score for Classification tasks
         """
         def highlight_best(s: pd.Series) -> list[str]:
             """
@@ -476,7 +447,7 @@ class SupervisedBase:
                 is_best = s == s.max()
             return ['background-color: green' if v else '' for v in is_best]
         
-        eval_metric = self.__eval_metric_checker(eval_metric)
+        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         sorted_model_stats_df = self.__sort_models(eval_metric)
         sorted_model_stats_df['Time Taken (sec)'] = sorted_model_stats_df['Time Taken (sec)'].apply(lambda x: round(x, 2))
         sorted_model_stats_df.index += 1
@@ -565,12 +536,12 @@ class SupervisedBase:
             
             * 'optuna' for Optuna (https://optuna.readthedocs.io/en/stable/)
 
-        eval_metric : str (default='r2' for regression, 'accuracy' for classification)
+        eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
             The evaluation metric to use for model evaluation
         
-            * r2, mae, mse, rmse for Regression tasks
+            * R2, MAE, MSE, RMSE for Regression tasks
 
-            * accuracy, precision, recall, f1_score for Classification tasks
+            * Accuracy, Precision, Recall, F1 Score for Classification tasks
 
         param_grid : dict (default = defined custom param dict in flexml/config/tune_model_config.py)
             The parameter set to use for model tuning.
@@ -644,7 +615,7 @@ class SupervisedBase:
             self.get_best_models() # Update the self.__model_stats_df
             self.show_model_stats()
 
-        eval_metric = self.__eval_metric_checker(eval_metric)
+        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
 
         # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
         if not hasattr(self, 'model_tuner'):
