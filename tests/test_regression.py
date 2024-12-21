@@ -2,7 +2,6 @@ from parameterized import parameterized
 import unittest
 import pandas as pd
 from sklearn.datasets import load_diabetes
-
 from flexml.regression import Regression
 from flexml.logger.logger import get_logger
 
@@ -54,7 +53,7 @@ class TestRegression(unittest.TestCase):
             tuning_methods = ["randomized_search", "optuna"]
 
             for method in tuning_methods:
-                reg_exp.tune_model(n_iter=3, cv = 2)
+                reg_exp.tune_model(n_iter=3, n_folds = 3)
 
                 if reg_exp.tuned_model is None:
                     error_msg = f"An error occured while tuning the model with {method} in {exp_size} regression, tuned model is None"

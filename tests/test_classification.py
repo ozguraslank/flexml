@@ -55,7 +55,7 @@ class TestClassification(unittest.TestCase):
             tuning_methods = ["randomized_search", "optuna"]
 
             for method in tuning_methods:
-                classification_exp.tune_model(n_iter=3, cv = 2)
+                classification_exp.tune_model(n_iter=3, n_folds = 3)
 
                 if classification_exp.tuned_model is None:
                     error_msg = f"An error occured while tuning the model with {method} in {exp_size} classification, tuned model is None"

@@ -24,25 +24,35 @@ class TestMLModels(unittest.TestCase):
         target_col = "target",
         logging_to_file = False
     )
-    reg_exp._prepare_data(
+    reg_cv_splitter = list(reg_exp._prepare_data(
+        cv_method="hold-out",
         test_size = 0.5, # Keeping test_size high to make the training faster
         random_state = 42
-    )
+    ))
 
     classification_exp = Classification(
         data = classification_df,
         target_col = "target",
         logging_to_file = False
     )
-    classification_exp._prepare_data(
+    classification_cv_splitter = list(classification_exp._prepare_data(
+        cv_method="hold-out",
         test_size = 0.5, # Keeping test_size high to make the training faster
         random_state = 42
-    )
+    ))
 
     @parameterized.expand([(model_pack['name'], model_pack['model'], model_pack['tuning_param_grid']) for model_pack in WIDE_REGRESSION_MODELS])
     def test_regression_ml_models(self, model_name, model, model_tuning_params):
         try:
-            model.fit(self.reg_exp.X_train, self.reg_exp.y_train)
+            X = self.reg_exp.X
+            y = self.reg_exp.y
+            
+            for train_idx, test_idx in self.reg_cv_splitter:
+                X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+                y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+            model.fit(X_train, y_train)
+
         except Exception as e:
             error_msg = f"An error occurred while fitting {model_name} model. Error: {e}"
             self.logger.error(error_msg)
@@ -54,7 +64,7 @@ class TestMLModels(unittest.TestCase):
                 tuning_method="randomized_search",
                 param_grid=model_tuning_params,
                 n_iter=3,
-                cv=None,
+                n_folds=3,
                 n_jobs=-1
             )
         except Exception as e:
@@ -71,7 +81,15 @@ class TestMLModels(unittest.TestCase):
     @parameterized.expand([(model_pack['name'], model_pack['model'], model_pack['tuning_param_grid']) for model_pack in WIDE_CLASSIFICATION_MODELS])
     def test_classification_ml_models(self, model_name, model, model_tuning_params):
         try:
-            model.fit(self.classification_exp.X_train, self.classification_exp.y_train)
+            X = self.classification_exp.X
+            y = self.classification_exp.y
+            
+            for train_idx, test_idx in self.classification_cv_splitter:
+                X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+                y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+            model.fit(X_train, y_train)
+
         except Exception as e:
             error_msg = f"An error occurred while fitting {model_name} model. Error: {e}"
             self.logger.error(error_msg)
@@ -83,7 +101,7 @@ class TestMLModels(unittest.TestCase):
                 tuning_method="randomized_search",
                 param_grid=model_tuning_params,
                 n_iter=3,
-                cv=2,
+                n_folds=3,
                 n_jobs=-1
             )
         except Exception as e:
