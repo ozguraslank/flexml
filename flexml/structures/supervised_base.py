@@ -5,19 +5,9 @@ from time import time
 from typing import Union, Optional
 from tqdm import tqdm
 from IPython import get_ipython
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import (
-    r2_score, 
-    mean_absolute_error, 
-    mean_squared_error,
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score)
-
 from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS
 from flexml.logger.logger import get_logger
-from flexml.helpers import eval_metric_checker
+from flexml.helpers import eval_metric_checker, get_cv_splits, evaluate_model_perf
 from flexml._model_tuner import ModelTuner
 
 
@@ -28,37 +18,56 @@ class SupervisedBase:
     Parameters
     ----------
     data : pd.DataFrame
-        The input data for the model training process.
+        The input data for the model training process
     
     target_col : str
-        The target column name in the data.
+        The target column name in the data
 
     logging_to_file: bool, (default=False)
-        If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved.
+        If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved
+
+    random_state : int, (default=42)
+        The random state value for the data processing process
     """
     def __init__(self,
                  data: pd.DataFrame,
                  target_col: str,
-                 logging_to_file: str = False):
+                 logging_to_file: str = False,
+                 random_state: int = 42):
+
+        # Logger to log app activities (Logs are stored in /logs/flexml_logs.log file if logging_to_file is passed as True)
+        self.__logger = get_logger(__name__, "PROD", logging_to_file)
+
+        if not isinstance(random_state, int) or random_state < 0:
+            error_msg = f"random_state should be a positive integer, got {random_state}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         self.data = data
         self.target_col = target_col
         self.logging_to_file = logging_to_file
-        self.__ML_MODELS = []
-        self.__ML_TASK_TYPE = "Regression" if "Regression" in self.__class__.__name__ else "Classification"
-        self.__DEFAULT_EVALUATION_METRIC = EVALUATION_METRICS[self.__ML_TASK_TYPE]["DEFAULT"]
-        self.__ALL_EVALUATION_METRICS = EVALUATION_METRICS[self.__ML_TASK_TYPE]["ALL"]
+        self._current_data_processing_random_state = random_state
 
-        # Logger to log app activities (Logs are stored in flexml/logs/log.log file)
-        self.__logger = get_logger(__name__, "PROD", self.logging_to_file)
-
-        # Data and ML model preparation stage
+        # Data Preparation
         self.__validate_data()
         self.feature_names = self.data.drop(columns=[self.target_col]).columns
         self.__model_training_info = []
         self.__model_stats_df = None
         self.__sorted_model_stats_df = None
         self.__data_is_prepared = False # Since _prepare_data() is going to be called in the start_experiment() method, data shouldn't be prepared again when start_experiment() is called again to test other scenarios
-        self.__current_random_state = None # Keep random_state information to check if the data is prepared with the same random_state, If not, prepare the data again
+
+        # Model Preparation
+        self.__ML_MODELS = []
+        self.__ML_TASK_TYPE = "Regression" if "Regression" in self.__class__.__name__ else "Classification"
+        self.__ALL_EVALUATION_METRICS = EVALUATION_METRICS[self.__ML_TASK_TYPE]["ALL"]
+
+        # Keep the start_experiment params in memory to avoid re-creating cv_splits again for no-data-change conditions in start_experiment and tune_model
+        self._current_training_random_state = None
+        self._current_cv_method = None
+        self._current_n_folds = None
+        self._current_test_size = None
+        self._current_groups_col = None
+        self._current_experiment_size = None
 
     def __repr__(self):
         return f"SupervisedBase(\ndata={self.data.head()},\ntarget_col={self.target_col},\nlogging_to_file={self.logging_to_file})"
@@ -99,72 +108,72 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-    def _prepare_data(self, test_size: float = 0.25, random_state: int = 42):
+    def _prepare_data(
+            self,
+            cv_method: str = 'k-fold',
+            n_folds: Optional[int] = None,
+            test_size: Optional[float] = None, 
+            groups_col: Optional[str] = None,
+            random_state: int = 42,
+            apply_feature_engineering: bool = False):
         """
         Prepares the data for the model training process
 
         Parameters
         ----------
-        test_size : float, (default=0.25)
+        test_size : float, (default=0.25 for hold-out method)
             The size of the test data in the train-test split process
 
         random_state : int, (default=42)
             The random state value for the train-test split process
         """
         try:
+            self.X = self.data.drop(columns=[self.target_col])
+            self.y = self.data[self.target_col]
             self.test_size = test_size
-            self.__train_test_split(test_size, random_state)
-            self.__data_is_prepared = True
-            self.__logger.info("[PROCESS] Data is prepared")
 
+            if apply_feature_engineering:
+                self.__logger.info("[PROCESS] Data is prepared")
+                self.__data_is_prepared = True
+                # TODO: Feature Engineering steps will be added here
+                pass
+            
+            self.__logger.info("[PROCESS] CV is returning")
+            return get_cv_splits(
+                df=self.data,
+                cv_method=cv_method,
+                n_folds=n_folds,
+                test_size=test_size,
+                y_label=self.data[self.target_col], 
+                groups_col=groups_col,
+                random_state=random_state
+            )
+        
         except Exception as e:
             error_msg = f"An error occurred while preparing the data: {str(e)}"
             self.__logger.error(error_msg)
             raise Exception(error_msg)
         
-    def __prepare_models(self):
+    def __prepare_models(self, experiment_size: str):
         """
         Prepares the models based on the selected experiment size ('quick' or 'wide')
-        """
-        if not isinstance(self.experiment_size, str):
-            error_msg = f"experiment_size expected to be a string, got {type(self.experiment_size)}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
-
-        if self.experiment_size not in ['quick', 'wide']:
-            error_msg = f"experiment_size expected to be either 'quick' or 'wide', got {self.experiment_size}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
-        
-        self.__ML_MODELS = ML_MODELS.get(self.__ML_TASK_TYPE).get(self.experiment_size.upper())
-        
-    def __train_test_split(self, test_size: float, random_state: int) -> list[np.ndarray]:
-        """
-        Splits the data into train and test.
-        Uses scikit-learn's train_test_split function, for more information, visit https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.train_test_split.html
 
         Parameters
         ----------
-        test_size : float
-            The size of the test data in the train-test split process
-
-        random_state : int
-            The random state value for shuffling the data before splitting
-
-        Returns
-        -------
-        list[np.ndarray]
-            A list of arrays containing the train and test data.
+        experiment_size : str
+            The size of the experiment to run. It can be 'quick' or 'wide'
         """
-        try:   
-            X = self.data.drop(columns=[self.target_col])
-            y = self.data[self.target_col]
-            self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=test_size, random_state=random_state)
-        
-        except Exception as e:
-            error_msg = f"An error occurred while splitting the data into train and test: {str(e)}"
+        if not isinstance(experiment_size, str):
+            error_msg = f"experiment_size expected to be a string, got {type(experiment_size)}"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
+
+        if experiment_size not in ['quick', 'wide']:
+            error_msg = f"experiment_size expected to be either 'quick' or 'wide', got {experiment_size}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        self.__ML_MODELS = ML_MODELS.get(self.__ML_TASK_TYPE).get(experiment_size.upper())
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
         """
@@ -185,127 +194,133 @@ class SupervisedBase:
         
         return top_n_models
     
-    def __evaluate_model_perf(self, y_test, y_pred):
-        """
-        Evaluates how good are the predictions by comparing them with the actual values, returns regression evaluation scores
-
-        Parameters
-        ----------
-        y_test : np.ndarray
-            The actual values of the target column.
-        
-        y_pred : np.ndarray
-            The predicted values of the target column.
-        
-        Returns
-        -------
-        dict
-            A dictionary containing the evaluation metric of the current task
-                
-                * R2, MAE, MSE, RMSE for Regression tasks
-
-                * Accuracy, Precision, Recall, F1 Score for Classification tasks
-        """
-
-        if self.__ML_TASK_TYPE == "Regression":
-            r2 = round(r2_score(y_test, y_pred), 6)
-            mae = round(mean_absolute_error(y_test, y_pred), 6)
-            mse = round(mean_squared_error(y_test, y_pred), 6)
-            rmse = round(np.sqrt(mse), 6)
-            return {
-                "R2": r2,
-                "MAE": mae,
-                "MSE": mse,
-                "RMSE": rmse
-            }
-        
-        elif self.__ML_TASK_TYPE == "Classification":
-            accuracy = round(accuracy_score(y_test, y_pred), 6)
-            precision = round(precision_score(y_test, y_pred, average='weighted'), 6)
-            recall = round(recall_score(y_test, y_pred, average='weighted'), 6)
-            f1 = round(f1_score(y_test, y_pred, average='weighted'), 6)
-            return {
-                "Accuracy": accuracy,
-                "Precision": precision,
-                "Recall": recall,
-                "F1 Score": f1
-            }
-        
-        else:
-            error_msg = f"Unsupported task type, only 'Regression' and 'Classification' tasks are supported, got {self.__ML_TASK_TYPE}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
-    
     def start_experiment(self,
                         experiment_size: str = 'quick',
-                        test_size: float = 0.25,
+                        cv_method: str = 'k-fold',
+                        n_folds: Optional[int] = None,
+                        test_size: Optional[float] = None,
                         eval_metric: Optional[str] = None,
-                        random_state: int = 42):
+                        random_state: int = 42,
+                        groups_col: Optional[str] = None):
         """
         Trains machine learning algorithms and evaluates them based on the specified evaluation metric
-        
+
         Parameters
         ----------
         experiment_size : str, (default='quick')
             The size of the experiment to run. It can be 'quick' or 'wide'
-            
-            * If It's selected 'quick', less amount of machine learning models will be used to get quick results
-            
-            * If It's selected 'wide', wide range of machine learning models will be used to get more comprehensive results
+            - 'quick': Uses fewer models for faster results.
+            - 'wide': Uses more models for comprehensive results.
+            Models are defined in config/ml_models.py
 
-            You can take a look at the models in the library at config/ml_models.py
+        cv_method : str, (default='k-fold')
+            Cross-validation method to use. Options:
+            - "k-fold" (default) (Provide `n_folds`)
+            - "hold-out" (Provide `test_size`)
+            - "StratifiedKfold" (Provide `n_folds`)
+            - "ShuffleSplit" (Provide `n_folds` and `test_size`)
+            - "StratifiedShuffleSplit" (Provide `n_folds`, `test_size`)
+            - "GroupKFold" (Provide `n_folds` and `groups_col`)
+            - "GroupShuffleSplit" (Provide `n_folds`, `test_size`, and `groups_col`)
 
-        test_size : float, (default=0.25)
-            The size of the test data in the train-test split process.
+        n_folds : int, (default=5 for cv methods except hold-out)
+            Number of folds for cross-validation methods
+
+        test_size : float, (default=0.25 for hold-out cv, None for other methods)
+            The size of the test data if using hold-out or shuffle-based splits
 
         eval_metric : str (default='R2' for Regression, 'Accuracy' for Classification)
-            The evaluation metric to use for model evaluation.
+            The evaluation metric to use for model evaluation
 
         random_state : int, (default=42)
-            The random state value for the train-test split process
-            
-            For more info, visit https://scikit-learn.org/stable/glossary.html#term-random_state
+            The random state value for the model training process
+            # TODO: Not implemented yet, will be implemented in 1.1.0 release
+
+        groups_col : str, optional
+            Column name for group-based cross-validation methods
+
+        Notes for Cross-Validation Methods
+        ----------------------------------
+        - Group-based methods require `groups_col` to define group labels
+        - If both `n_folds` and `test_size` are provided, shuffle-based methods are prioritized
+        - Defaults to a standard 5-fold if neither `n_folds` nor `test_size` is provided
         """
-        
         self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
-        self.experiment_size = experiment_size
+        self.__model_training_info = []  # Reset model training info
+        self.__model_stats_df = None     # Reset model stats DataFrame
+        apply_feature_engineering = True if not self.__data_is_prepared else False # If It's the first time to execute start_experiment(), apply feature engineering, otherwise don't apply it
+        self._current_experiment_size = experiment_size
+
+        # if any cross-validation related parameter is changed, re-create the cv_splits
+        if not (self._current_training_random_state == random_state and \
+            self.__current_cv_method == cv_method and \
+            self.__current_n_folds == n_folds and \
+            self.__current_test_size == test_size and \
+            self.__current_groups_col == groups_col):
+
+            self._current_training_random_state = random_state
+            self.__current_cv_method = cv_method
+            self.__current_n_folds = n_folds
+            self.__current_test_size = test_size
+            self.__current_groups_col = groups_col
+
+            self.cv_splits = list(self._prepare_data(
+                cv_method=cv_method,
+                n_folds=n_folds,
+                test_size=test_size,
+                groups_col=groups_col,
+                random_state=self._current_training_random_state,
+                apply_feature_engineering=apply_feature_engineering
+            ))
+
+        self.__prepare_models(experiment_size)
+
+        self.cv_method = cv_method
+        self.n_folds = n_folds
         self.test_size = test_size
-        self.random_state = random_state
-        self.__model_training_info = [] # Reset the model training info before starting the experiment
-        self.__model_stats_df = None    # Reset the model stats DataFrame before starting the experiment
+        cv_splits_copy = self.cv_splits.copy() # Will be used for trainings
 
-        if not self.__data_is_prepared or (self.__current_random_state and self.__current_random_state != random_state):
-            self.__current_random_state = random_state
-            self._prepare_data(test_size, random_state)
-
-        self.__prepare_models()
-
-        self.__logger.info("[PROCESS] Training the ML models")
+        self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} cross-validation")
 
         for model_idx in tqdm(range(len(self.__ML_MODELS))):
             model_info = self.__ML_MODELS[model_idx]
             model_name = model_info['name']
             model = model_info['model']
             try:
-                t_start = time()
-                model.fit(self.X_train, self.y_train)
-                t_end = time()
-                time_taken = round(t_end - t_start, 2)
-                y_pred = model.predict(self.X_test)
-                model_perf = self.__evaluate_model_perf(self.y_test, y_pred)
+                all_metrics = []
+                all_times = []
+
+                for train_idx, test_idx in cv_splits_copy:
+                    X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
+                    y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
+
+                    t_start = time()
+                    model.fit(X_train, y_train)
+                    t_end = time()
+
+                    time_taken = round(t_end - t_start, 2)
+                    y_pred = model.predict(X_test)
+                    model_perf = evaluate_model_perf(self.__ML_TASK_TYPE, y_test, y_pred)
+
+                    all_metrics.append(model_perf)
+                    all_times.append(time_taken)
+
+                # Aggregate metrics across all folds
+                avg_metrics = {k: np.mean([m[k] for m in all_metrics]) for k in all_metrics[0]}
+                total_time_taken = np.sum(all_times)
 
                 self.__model_training_info.append({
                     model_name: {
                         "model": model,
                         "model_stats": {
                             "model_name": model_name,
-                            **model_perf,
-                            "Time Taken (sec)": time_taken}
+                            **avg_metrics,
+                            "Time Taken (sec)": total_time_taken}
                     }
                 })
 
             except Exception as e:
-                self.__logger.error(f"An error occured while training {model_name}: {str(e)}")
+                self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
 
         self.__logger.info("[PROCESS] Model training is finished!")
         self.get_best_models(eval_metric)
@@ -515,7 +530,10 @@ class SupervisedBase:
                    eval_metric: Optional[str] = None,
                    param_grid: Optional[dict] = None,
                    n_iter: int = 10,
-                   cv: int = 3,
+                   cv_method: str = 'k-fold',
+                   n_folds: int = 5,
+                   test_size: Optional[float] = None,
+                   groups_col: Optional[str] = None,
                    n_jobs: int = -1,
                    verbose: int = 0):
         """
@@ -557,9 +575,12 @@ class SupervisedBase:
         n_iter : int (default = 10)
             The number of trials to run in the tuning process (Only for RandomizedSearchCV and Optuna)
             
-        cv : int (default = 3)
+        n_folds : int (default = 5)
             The number of cross-validation folds to use for the tuning process (Only for GridSearchCV and RandomizedSearchCV)
         
+        test_size : float, (default=0.25 for hold-out cv, None for other methods)
+            The size of the test data if using hold-out or shuffle-based splits
+
         n_jobs: int (default = -1)
             The number of jobs to run in parallel for the tuning process. -1 means using all threads in the CPU
 
@@ -598,10 +619,10 @@ class SupervisedBase:
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
             tuned_time_taken = tuning_report['time_taken_sec']
-            tuned_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']})_(cv={tuning_report['cv']})_(n_iter={tuning_report['n_iter']})"
+            tuned_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']})_(n_iter={tuning_report['n_iter']})"
 
             # Add the tuned model and it's score to the model_training_info list
-            model_perf = self.__evaluate_model_perf(self.y_test, self.tuned_model.predict(self.X_test))
+            model_perf = tuning_report['model_perf']
             self.__model_training_info.append({
                 tuned_model_name:{
                     "model": self.tuned_model,
@@ -616,10 +637,6 @@ class SupervisedBase:
             self.show_model_stats()
 
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
-
-        # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
-        if not hasattr(self, 'model_tuner'):
-            self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X_train, self.X_test, self.y_train, self.y_test, self.logging_to_file)
 
         # Get the best model If the user doesn't pass any model object
         if model is None:
@@ -636,32 +653,50 @@ class SupervisedBase:
                 raise ValueError(error_msg)
         
         if not isinstance(n_iter, int) or n_iter < 1:
-            info_msg = f"n_iter parameter should be minimum 1, got {n_iter}\nChanged it to 10 for the tuning process"
+            info_msg = f"n_iter parameter should be minimum 1, got {n_iter}, Changed it to 10 for the tuning process"
             n_iter = 10
             self.__logger.info(info_msg)
 
-        if not isinstance(cv, int) or cv < 2:
-            info_msg = f"cv parameter should be minimum 2, got {cv}\nChanged it to 2 for the tuning process"
-            cv = 2
+        if not isinstance(n_folds, int) or n_folds < 2:
+            info_msg = f"n_folds parameter should be minimum 2, got {n_folds}, Changed it to 2 for the tuning process"
+            n_folds = 2
             self.__logger.info(info_msg)
 
         if not isinstance(n_jobs, int) or n_jobs < -1:
-            info_msg = f"n_jobs parameter should be minimum -1, got {n_jobs}\nChanged it to -1 for the tuning process"
+            info_msg = f"n_jobs parameter should be minimum -1, got {n_jobs}, Changed it to -1 for the tuning process"
             n_jobs = -1
             self.__logger.info(info_msg)
 
-        self.__logger.info(f"[PROCESS] Model Tuning process is started with '{tuning_method}' method")
+        # If tune_model cross validation params are same, get the current one
+        if hasattr(self, 'cv_splits') and cv_method == self.cv_method and n_folds == self.n_folds and test_size == self.test_size and groups_col == self.groups_col:
+            self.__logger.info("[INFO] Using the latest cross-validation splits that created in the last start_experiment() run for the tuning process")
+            cv_obj = self.cv_splits
+        else:
+            cv_obj = list(get_cv_splits(
+                df=self.data,
+                cv_method=cv_method,
+                n_folds=n_folds,
+                test_size=test_size,
+                y_label=self.data[self.target_col], 
+                groups_col=groups_col
+            ))
+
+        # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
+        if not hasattr(self, 'model_tuner'):
+            self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, self.y, self.logging_to_file)
+
+        print(f"Eval Metric: {eval_metric}")
+        self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")
         tuning_method = tuning_method.lower()
         if tuning_method == "grid_search":
             tuning_result = self.model_tuner.grid_search(
                 model=model,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
-                cv=cv,
+                cv=cv_obj,
                 n_jobs=n_jobs,
                 verbose=verbose
             )
-            _show_tuning_report(tuning_result)
             
         elif tuning_method == "randomized_search":
             tuning_result = self.model_tuner.random_search(
@@ -669,26 +704,26 @@ class SupervisedBase:
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 n_iter=n_iter,
-                cv=cv,
+                cv=cv_obj,
                 n_jobs=n_jobs,
                 verbose=verbose
             )
-            _show_tuning_report(tuning_result)
                 
         elif tuning_method == "optuna":
             tuning_result = self.model_tuner.optuna_search(
                 model=model,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
+                cv=cv_obj,
                 n_iter=n_iter,
                 n_jobs=n_jobs,
                 verbose=verbose
             )
-            _show_tuning_report(tuning_result)
             
         else:
             error_msg = f"Unsupported tuning method: {tuning_method}, expected one of the following: 'grid_search', 'randomized_search', 'optuna'"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
-            
+        
+        _show_tuning_report(tuning_result)
         self.__logger.info("[PROCESS] Model Tuning process is finished")

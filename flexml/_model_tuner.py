@@ -1,20 +1,12 @@
 import numpy as np
 import pandas as pd
 import optuna
-from typing import Optional
+from typing import Optional, Union
 from time import time
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
-from sklearn.metrics import (
-    r2_score, 
-    mean_absolute_error, 
-    mean_squared_error,
-    accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score)
-
+from flexml.config.supervised_config import TUNING_METRIC_TRANSFORMATIONS
 from flexml.logger.logger import get_logger
-from flexml.helpers import eval_metric_checker
+from flexml.helpers import evaluate_model_perf
 
 
 class ModelTuner:
@@ -37,54 +29,37 @@ class ModelTuner:
         
         * 'Regression' for regression problems
 
-    X_train : pd.DataFrame
-        The training set features
-    
-    X_test : pd.DataFrame
-        The test set features
-
-    y_train : pd.DataFrame
-        The training set target values
-
-    y_test : pd.DataFrame
-        The test set target values
-
     logging_to_file: bool, (default=False)
         If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved
     """
     def __init__(self, 
                  ml_problem_type: str,
-                 X_train: pd.DataFrame, 
-                 X_test: pd.DataFrame, 
-                 y_train: pd.DataFrame, 
-                 y_test: pd.DataFrame,
+                 X: Union[pd.DataFrame, np.ndarray], 
+                 y: Union[pd.DataFrame, np.ndarray],
                  logging_to_file: bool = False):
-        self.ml_problem_type = ml_problem_type.lower().capitalize() # Fix ml_problem_type's format in just case, It should be in the following format: 'Example'
-        self.X_train = X_train
-        self.X_test = X_test
-        self.y_train = y_train
-        self.y_test = y_test
+        """
+        Parameters
+        ----------
+        ml_problem_type : str
+            Type of the ML problem ('Classification' or 'Regression')
+
+        X : pd.DataFrame
+            The feature values of the dataset
+
+        y : pd.DataFrame
+            The target values of the dataset
+
+        logging_to_file : bool, optional (default=False)
+            Whether to log to a file
+        """
+        self.ml_problem_type = ml_problem_type.lower().capitalize()  # Normalize case
+        self.X = X
+        self.y = y
 
         self.logger = get_logger(__name__, "PROD", logging_to_file)
 
-    @staticmethod
-    def __eval_metric_revieser(eval_metric: str) -> str:
-        """
-        Scikit-learn based hyperparameter optimization methods (GridSearch & Randomized Search) require spesific namings for evaluation metrics
-
-        This method is used to revise the evaluation metric name for the optimization process
-
-        Parameters
-        ----------
-        eval_metric : str
-            The evaluation metric
-
-        Returns
-        -------
-        str
-            The revised evaluation metric name. e.g. 'R2' to 'r2, 'Accuracy' to 'accuracy', 'F1 Score' to 'f1_weighted' etc.
-        """
-        return eval_metric.lower() if eval_metric != 'F1 Score' else 'f1_weighted'
+        self.eval_metrics_in_tuning_format = TUNING_METRIC_TRANSFORMATIONS.get(self.ml_problem_type)
+        self.reverse_signed_eval_metrics = TUNING_METRIC_TRANSFORMATIONS.get("reverse_signed_eval_metrics")
  
     def _param_grid_validator(self,
                               model_available_params: dict,
@@ -121,7 +96,6 @@ class ModelTuner:
                       model: object,
                       param_grid: dict,
                       n_iter: Optional[int] = None,
-                      cv: int = 3,
                       n_jobs: int = -1):
         """
         Sets up the tuning process by creating the model_stats dictionary
@@ -142,9 +116,6 @@ class ModelTuner:
 
         n_iter : int, optional (default=10)
             The number of iterations. The default is 10.
-
-        cv : int (default=3)
-            The number of cross-validation splits. The default is 3.
         
         n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
@@ -159,8 +130,6 @@ class ModelTuner:
             * 'tuning_param_grid': The hyperparameter grid that is used for the optimization
             
             * 'n_iter': The number of iterations
-
-            * 'cv': The number of cross-validation splits
             
             * 'n_jobs': The number of parallel jobs to run
             
@@ -182,7 +151,6 @@ class ModelTuner:
             "tuning_method": tuning_method,
             "tuning_param_grid": param_grid,
             "n_iter": n_iter,
-            "cv": cv,
             "n_jobs": n_jobs,
             "tuned_model": None,
             "tuned_model_score": None,
@@ -190,61 +158,12 @@ class ModelTuner:
         }
 
         return model_stats
-    
-    def _model_evaluator(self,
-                         model: object,
-                         eval_metric: str):
-        """
-        Evaluates the model with the given evaluation metric by using the test set
-
-        Parameters
-        ----------
-        model : object
-            The model object that will be evaluated.
-
-        eval_metric : str
-            The evaluation metric that will be used to evaluate the model. It can be one of the following:
-            
-            * 'R2' for R^2 score
-            
-            * 'MAE' for Mean Absolute Error
-            
-            * 'MSE' for Mean Squared Error
-            
-            * 'Accuracy' for Accuracy
-            
-            * 'Precision' for Precision
-            
-            * 'Recall' for Recall
-            
-            * 'F1 Score' for F1 score
-        """
-        eval_metric = eval_metric_checker(self.ml_problem_type, eval_metric)
-        
-        if eval_metric == 'R2':
-            return round(r2_score(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'MAE':
-            return round(mean_absolute_error(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'MSE':
-            return round(mean_squared_error(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'Accuracy':
-            return round(accuracy_score(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'Precision':
-            return round(precision_score(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'Recall':
-            return round(recall_score(self.y_test, model.predict(self.X_test)), 6)
-        elif eval_metric == 'F1 Score':
-            return round(f1_score(self.y_test, model.predict(self.X_test)), 6)
-        else:
-            error_msg = "Error while evaluating the current model during the model tuning process. The eval_metric should be one of the following: 'R2', 'MAE', 'MSE', 'Accuracy', 'Precision', 'Recall', 'F1 Score'"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
             
     def grid_search(self,
                     model: object,
                     param_grid: dict,
                     eval_metric: str,
-                    cv: int = 3,
+                    cv: object,
                     n_jobs: int = -1,
                     verbose: int = 0) -> Optional[dict]:
         """
@@ -253,10 +172,10 @@ class ModelTuner:
         Parameters
         ----------
         model : object
-            The model object that will be tuned.
+            The model object that will be tuned
 
         param_grid : dict
-            The dictionary that contains the hyperparameters and their possible values.
+            The dictionary that contains the hyperparameters and their possible values
 
         eval_metric : str
             The evaluation metric that will be used to evaluate the model. It can be one of the following:
@@ -275,8 +194,8 @@ class ModelTuner:
             
             * 'F1 Score' for F1 score
 
-        cv : int (default=3)
-            The number of cross-validation splits. The default is 3.
+        cv : object
+            A cross-validation splitter object (e.g., KFold, StratifiedKFold, etc.)
 
         n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
@@ -309,18 +228,27 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("GridSearchCV", model, param_grid, n_iter=None, cv=cv, n_jobs=n_jobs)
+        model_stats = self._setup_tuning("GridSearchCV", model, param_grid, n_iter=None, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
-        scoring_eval_metric = self.__eval_metric_revieser(eval_metric)
         
         try:
             t_start = time()
-            search_result = GridSearchCV(model, param_grid, scoring=scoring_eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X_train, self.y_train)
+            search_result = GridSearchCV(model, param_grid, scoring=self.eval_metrics_in_tuning_format, refit=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X, self.y)
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
+            scores = {
+                metric: (
+                    -search_result.cv_results_[f'mean_test_{metric}'][search_result.best_index_]
+                    if metric in self.reverse_signed_eval_metrics else
+                    search_result.cv_results_[f'mean_test_{metric}'][search_result.best_index_]
+                )
+                for metric in list(self.eval_metrics_in_tuning_format.keys())
+            }
+
             model_stats['tuned_model'] = search_result.best_estimator_
-            model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 6)
+            model_stats['tuned_model_score'] = round(search_result.best_estimator_.score, 6)
+            model_stats['model_perf'] = scores
             model_stats['time_taken_sec'] = time_taken
             model_stats['tuned_model_evaluation_metric'] = eval_metric
             return model_stats
@@ -333,8 +261,8 @@ class ModelTuner:
                       model: object,
                       param_grid: dict,
                       eval_metric: str,
+                      cv: object,
                       n_iter: int = 10,
-                      cv: int = 3,
                       n_jobs: int = -1,
                       verbose: int = 0) -> Optional[dict]:
         """
@@ -343,10 +271,10 @@ class ModelTuner:
         Parameters
         ----------
         model : object
-            The model object that will be tuned.
+            The model object that will be tuned
 
         param_grid : dict
-            The dictionary that contains the hyperparameters and their possible values.
+            The dictionary that contains the hyperparameters and their possible values
 
         eval_metric : str
             The evaluation metric that will be used to evaluate the model. It can be one of the following:
@@ -365,14 +293,14 @@ class ModelTuner:
             
             * 'F1 Score' for F1 score
 
-        n_iter : int, optional (default=10)
-            The number of trials. The default is 10.
+        cv : object
+            A cross-validation splitter object (e.g., KFold, StratifiedKFold, etc.)
 
-        cv : int (default=3)
-            The number of cross-validation splits. The default is 3.
+        n_iter : int, optional (default=10)
+            The number of trials. The default is 10
 
         n_jobs : int (default=-1)
-            The number of parallel jobs to run. The default is -1.
+            The number of parallel jobs to run. The default is -1
         
         Returns
         -------
@@ -383,8 +311,6 @@ class ModelTuner:
             
             * 'tuning_param_grid': The hyperparameter grid that is used for the optimization
             
-            * 'cv': The number of cross-validation splits
-            
             * 'n_jobs': The number of parallel jobs to run
             
             * 'tuned_model': The tuned model object
@@ -393,18 +319,27 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("randomized_search", model, param_grid, n_iter=n_iter, cv=cv, n_jobs=n_jobs)
+        model_stats = self._setup_tuning("randomized_search", model, param_grid, n_iter=n_iter, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
-        scoring_eval_metric = self.__eval_metric_revieser(eval_metric)
 
         try:
             t_start = time()
-            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=scoring_eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X_train, self.y_train)
+            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=self.eval_metrics_in_tuning_format, refit=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X, self.y)
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
+            scores = {
+                metric: (
+                    -search_result.cv_results_[f'mean_test_{metric}'][search_result.best_index_]
+                    if metric in self.reverse_signed_eval_metrics else
+                    search_result.cv_results_[f'mean_test_{metric}'][search_result.best_index_]
+                )
+                for metric in list(self.eval_metrics_in_tuning_format.keys())
+            }
+
             model_stats['tuned_model'] = search_result.best_estimator_
-            model_stats['tuned_model_score'] = round(self._model_evaluator(search_result.best_estimator_, eval_metric), 6)
+            model_stats['tuned_model_score'] = search_result.best_estimator_.score
+            model_stats['model_perf'] = scores
             model_stats['time_taken_sec'] = time_taken
             model_stats['tuned_model_evaluation_metric'] = eval_metric
             return model_stats
@@ -414,23 +349,24 @@ class ModelTuner:
             return None
         
     def optuna_search(self,
-               model: object,
-               param_grid: dict,
-               eval_metric: str,
-               n_iter: int = 10,
-               timeout: Optional[int] = None,
-               n_jobs: int = -1,
-               verbose: int = 0) -> Optional[dict]:
+                      model: object,
+                      param_grid: dict,
+                      eval_metric: str,
+                      cv: object,
+                      n_iter: int = 10,
+                      timeout: Optional[int] = None,
+                      n_jobs: int = -1,
+                      verbose: int = 0) -> Optional[dict]:
         """
         Implements Optuna hyperparameter optimization on the giveen machine learning model
 
         Parameters
         ----------
         model : object
-            The model object that will be tuned.
+            The model object that will be tuned
 
         param_grid : dict
-            The dictionary that contains the hyperparameters and their possible values.
+            The dictionary that contains the hyperparameters and their possible values
 
         eval_metric : str
             The evaluation metric that will be used to evaluate the model. It can be one of the following:
@@ -449,14 +385,17 @@ class ModelTuner:
             
             * 'F1 Score' for F1 score
 
-        n_iter : int, optional (default=100)
-            The number of trials. The default is 100.
+        cv : object
+            A cross-validation splitter object (e.g., KFold, StratifiedKFold, etc.)
+
+        n_iter : int, optional (default=10)
+            The number of trials. The default is 10
 
         timeout : int, optional (default=None)
-            The timeout in seconds. The default is None.
+            The timeout in seconds. The default is None
 
         n_jobs : int, optional (default=-1)
-            The number of parallel jobs to run. The default is -1.
+            The number of parallel jobs to run. The default is -1
 
         verbose: int (default = 0)
             The verbosity level of the tuning process. If It's set to 0, no logs will be shown during the tuning process. Otherwise, the logs will be shown based on the value of the verbose parameter:
@@ -508,60 +447,59 @@ class ModelTuner:
         study_direction = "maximize" if eval_metric in ['R2', 'Accuracy', 'Precision', 'Recall', 'F1 Score'] else "minimize"
 
         def objective(trial):
-            """
-            Brief explanation of the objective function usage here:
-
-            * The objective function is used to optimize the hyperparameters of the model with Optuna
-            * It's called in each trial and returns the evaluation metric score of the model with the current hyperparameters
-            
-            * In our scenario, we have to make the param grid dynamic for every model, so that:
-                * We have to get the first element of the param_values to understand the data type of the hyperparameter
-                * Then, we have to use the appropriate Optuna function to get the hyperparameter value for the current trial
-            """
+            # Generate parameters for the trial
             params = {}
             for param_name, param_values in param_grid.items():
                 first_element = param_values[0]
 
-                if isinstance(first_element, str) or isinstance(first_element, bool):
-                    param_value = trial.suggest_categorical(param_name, param_values)
-                    params[param_name] = param_value
-
+                if isinstance(first_element, (str, bool)):
+                    params[param_name] = trial.suggest_categorical(param_name, param_values)
                 elif isinstance(first_element, int):
-                    param_value = trial.suggest_int(param_name, first_element, param_values[len(param_values) - 1])
-                    params[param_name] = param_value
-
+                    params[param_name] = trial.suggest_int(param_name, param_values[0], param_values[-1])
                 elif isinstance(first_element, float):
-                    param_value = trial.suggest_float(param_name, first_element, param_values[len(param_values) - 1])
-                    params[param_name] = param_value
-
-                # TODO: Other types can be added too, e.g. suggest_loguniform, suggest_uniform, suggest_discrete_uniform
+                    params[param_name] = trial.suggest_float(param_name, param_values[0], param_values[-1])
                 else:
-                    info_msg = f"{param_name} parameter is not added to tuning process since It's data type is not supported for Optuna tuning\n \
-                                Please use one of the following data types in your params: 'str', 'bool', 'int', 'float'. Instead of {type(first_element)}"
+                    info_msg = f"{param_name} parameter is not added to tuning since its type is not supported by Optuna."
                     self.logger.info(info_msg)
-            
+
+            # Initialize the model with the trial's parameters
             test_model = type(model)()
             test_model.set_params(**params)
-            test_model.fit(self.X_train, self.y_train)
-            
-            score = self._model_evaluator(test_model, eval_metric)
-            
-            # Update the best score and best hyperparameters If the current score is better than the best one
-            if model_stats['tuned_model_score'] is None or score > model_stats['tuned_model_score']:
-                model_stats['tuned_model_score'] = round(score, 6)
-                model_stats['tuned_model'] = test_model
 
-            return score
-        
+            # Perform cross-validation and calculate the score
+            scores = []
+            for train_idx, test_idx in cv:  # Use custom splitter object
+                X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
+                y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
+
+                test_model.fit(X_train, y_train)
+                y_pred = test_model.predict(X_test)
+
+                scores.append(evaluate_model_perf(self.ml_problem_type, y_test, y_pred))
+
+            # Calculate the mean score across all folds
+            avg_metrics = {k: np.mean([m[k] for m in scores]) for k in scores[0]}
+            mean_score = avg_metrics.get(eval_metric, float('inf'))
+
+            # Update the best score and model
+            if model_stats['tuned_model_score'] is None or mean_score > model_stats['tuned_model_score']:
+                model_stats['tuned_model_score'] = round(mean_score, 6)
+                model_stats['tuned_model'] = test_model
+                model_stats['model_perf'] = avg_metrics
+
+            return mean_score
+
         try:
+            # Perform Optuna optimization
             t_start = time()
             study = optuna.create_study(direction=study_direction)
             study.optimize(objective, n_trials=n_iter, timeout=timeout, n_jobs=n_jobs)
             t_end = time()
-            time_taken = round(t_end - t_start, 2)
-            model_stats['time_taken_sec'] = time_taken
+
+            # Update model stats
+            model_stats['time_taken_sec'] = round(t_end - t_start, 2)
             return model_stats
-        
+
         except Exception as e:
             self.logger.error(f"Error while tuning the model with Optuna, Error: {e}")
             return None
