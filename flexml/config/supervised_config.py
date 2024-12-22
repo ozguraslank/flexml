@@ -12,10 +12,10 @@ ML_MODELS = {
 # Regression & Classification Evaluation Metrics
 EVALUATION_METRICS = {
     "Regression": {"DEFAULT": "R2",
-                   "ALL": ["R2", "MAE", "MSE", "RMSE"]},
+                   "ALL": ["R2", "MAE", "MSE", "RMSE", "MAPE"]},
                    
     "Classification": {"DEFAULT": "Accuracy",
-                       "ALL": ["Accuracy", "Precision", "Recall", "F1 Score"]}
+                       "ALL": ["Accuracy", "Precision", "Recall", "F1 Score", "ROC-AUC"]}
 }
 
 # Model Tuning Metric Transformations
@@ -24,14 +24,16 @@ TUNING_METRIC_TRANSFORMATIONS = {
         'R2': 'r2',
         'MAE': 'neg_mean_absolute_error',
         'MSE': 'neg_mean_squared_error',
-        'RMSE': 'neg_root_mean_squared_error'
+        'RMSE': 'neg_root_mean_squared_error',
+        'MAPE': 'neg_mean_absolute_percentage_error'
     },
 
     "Classification": {
         'Accuracy': 'accuracy',
         'Precision': 'precision',
         'Recall': 'recall',
-        'F1 Score': 'f1_weighted'
+        'F1 Score': 'f1_weighted',
+        'ROC-AUC': 'roc_auc'
     },
 
     "reverse_signed_eval_metrics": ['MAE', 'MSE', 'RMSE']

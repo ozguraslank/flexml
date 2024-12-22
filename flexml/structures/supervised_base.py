@@ -488,7 +488,7 @@ class SupervisedBase:
             list[str]
                 A list of strings containing the green background color for the best value so we can highlight it while showing the model stats
             """
-            if s.name in ['mae', 'mse', 'rmse']:
+            if s.name in ['MAE', 'MSE', 'RMSE', 'MAPE']:
                 is_best = s == s.min()
             else:
                 is_best = s == s.max()
