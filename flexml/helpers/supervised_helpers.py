@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from typing import Union
+
 from sklearn.metrics import (
     r2_score, 
     mean_absolute_error, 
@@ -8,7 +9,8 @@ from sklearn.metrics import (
     accuracy_score,
     precision_score,
     recall_score,
-    f1_score)
+    f1_score,
+    roc_auc_score)
 
 def _evaluate_preds(
     y_true: Union[pd.Series, np.ndarray],
@@ -35,6 +37,8 @@ def _evaluate_preds(
         
         * 'MSE' for Mean Squared Error
         
+        * 'RMSE' for Root Mean Squared Error
+        
         * 'Accuracy' for Accuracy
         
         * 'Precision' for Precision
@@ -42,6 +46,10 @@ def _evaluate_preds(
         * 'Recall' for Recall
         
         * 'F1 Score' for F1 score
+        
+        * 'MAPE' for Mean Absolute Percentage Error
+        
+        * 'ROC-AUC' for Receiver Operating Characteristic Area Under Curve
 
     Returns
     -------
@@ -64,8 +72,12 @@ def _evaluate_preds(
         return round(recall_score(y_true, y_pred), 6)
     elif eval_metric == 'F1 Score':
         return round(f1_score(y_true, y_pred), 6)
+    elif eval_metric == 'MAPE':
+        return round(np.mean(np.abs((y_true - y_pred) / y_true)) * 100, 6)
+    elif eval_metric == 'ROC-AUC':
+        return round(roc_auc_score(y_true, y_pred), 6)
     else:
-        raise ValueError(f"Error while evaluating the current model. The eval_metric should be one of the following: 'R2', 'MAE', 'MSE', 'RMSE', 'Accuracy', 'Precision', 'Recall', 'F1 Score'. Got {eval_metric}")
+        raise ValueError(f"Error while evaluating the current model. The eval_metric should be one of the following: 'R2', 'MAE', 'MSE', 'RMSE', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'MAPE', 'ROC-AUC'. Got {eval_metric}")
         
 def evaluate_model_perf(
     ml_task_type, 
@@ -91,9 +103,9 @@ def evaluate_model_perf(
     dict
         A dictionary containing the evaluation metric of the current task
             
-            * R2, MAE, MSE, RMSE for Regression tasks
+            * R2, MAE, MSE, RMSE, MAPE for Regression tasks
 
-            * Accuracy, Precision, Recall, F1 Score for Classification tasks
+            * Accuracy, Precision, Recall, F1 Score, ROC-AUC for Classification tasks
     """
 
     if ml_task_type == "Regression":
@@ -101,11 +113,13 @@ def evaluate_model_perf(
         mae = _evaluate_preds(y_test, y_pred, 'MAE')
         mse = _evaluate_preds(y_test, y_pred, 'MSE')
         rmse = _evaluate_preds(y_test, y_pred, 'RMSE')
+        mape = _evaluate_preds(y_test, y_pred, 'MAPE')
         return {
             "R2": r2,
             "MAE": mae,
             "MSE": mse,
-            "RMSE": rmse
+            "RMSE": rmse,
+            "MAPE": mape
         }
     
     elif ml_task_type == "Classification":
@@ -113,11 +127,13 @@ def evaluate_model_perf(
         precision = _evaluate_preds(y_test, y_pred, 'Precision')
         recall = _evaluate_preds(y_test, y_pred, 'Recall')
         f1 = _evaluate_preds(y_test, y_pred, 'F1 Score')
+        roc_auc = _evaluate_preds(y_test, y_pred, 'ROC-AUC')
         return {
             "Accuracy": accuracy,
             "Precision": precision,
             "Recall": recall,
-            "F1 Score": f1
+            "F1 Score": f1,
+            "ROC-AUC": roc_auc
         }
     
     else:
