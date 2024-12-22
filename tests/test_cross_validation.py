@@ -32,7 +32,12 @@ class TestCrossValidation(unittest.TestCase):
         ("Regression", "GroupShuffleSplit", {"n_splits": 5, "test_size": 0.2, "groups_col": "group"}),
         ("Regression", "hold-out", {"n_splits": None, "test_size": 0.2, "groups_col": None}),
     ])
-    def test_cross_validation(self, ml_task_type: str, cv_method: str, params: dict):
+    def test_cross_validation(
+        self,
+        ml_task_type: str,
+        cv_method: str,
+        params: dict
+    ):
         if ml_task_type == "Classification":
             df = self.classification_data.copy()
             y_label = "target"

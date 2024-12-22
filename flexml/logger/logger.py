@@ -37,7 +37,11 @@ def _logger_configuration(log_level: str, logging_to_file: bool = False):
         handlers=handlers
     )
 
-def get_logger(name: str, log_level: str, logging_to_file: bool = False) -> logging.Logger:
+def get_logger(
+    name: str,
+    log_level: str,
+    logging_to_file: bool = False
+) -> logging.Logger:
     """
     Returns a logger object with the given name
 

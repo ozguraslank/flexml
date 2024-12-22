@@ -1,8 +1,7 @@
-from parameterized import parameterized
 import unittest
 import pandas as pd
+from parameterized import parameterized
 from sklearn.datasets import load_breast_cancer
-
 from flexml.classification import Classification
 from flexml.logger.logger import get_logger
 

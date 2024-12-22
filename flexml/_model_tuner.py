@@ -32,11 +32,13 @@ class ModelTuner:
     logging_to_file: bool, (default=False)
         If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved
     """
-    def __init__(self, 
-                 ml_problem_type: str,
-                 X: Union[pd.DataFrame, np.ndarray], 
-                 y: Union[pd.DataFrame, np.ndarray],
-                 logging_to_file: bool = False):
+    def __init__(
+        self, 
+        ml_problem_type: str,
+        X: Union[pd.DataFrame, np.ndarray], 
+        y: Union[pd.DataFrame, np.ndarray],
+        logging_to_file: bool = False
+    ):
         """
         Parameters
         ----------
@@ -61,9 +63,11 @@ class ModelTuner:
         self.eval_metrics_in_tuning_format = TUNING_METRIC_TRANSFORMATIONS.get(self.ml_problem_type)
         self.reverse_signed_eval_metrics = TUNING_METRIC_TRANSFORMATIONS.get("reverse_signed_eval_metrics")
  
-    def _param_grid_validator(self,
-                              model_available_params: dict,
-                              param_grid: dict) -> dict:
+    def _param_grid_validator(
+        self,
+        model_available_params: dict,
+        param_grid: dict
+    ) -> dict:
         """
         This method is used to validate the param_grid dictionary for the model
 
@@ -91,12 +95,14 @@ class ModelTuner:
             
         return param_grid
     
-    def _setup_tuning(self,
-                      tuning_method: str,
-                      model: object,
-                      param_grid: dict,
-                      n_iter: Optional[int] = None,
-                      n_jobs: int = -1):
+    def _setup_tuning(
+        self,
+        tuning_method: str,
+        model: object,
+        param_grid: dict,
+        n_iter: Optional[int] = None,
+        n_jobs: int = -1
+    ):
         """
         Sets up the tuning process by creating the model_stats dictionary
 
@@ -159,13 +165,15 @@ class ModelTuner:
 
         return model_stats
             
-    def grid_search(self,
-                    model: object,
-                    param_grid: dict,
-                    eval_metric: str,
-                    cv: object,
-                    n_jobs: int = -1,
-                    verbose: int = 0) -> Optional[dict]:
+    def grid_search(
+        self,
+        model: object,
+        param_grid: dict,
+        eval_metric: str,
+        cv: object,
+        n_jobs: int = -1,
+        verbose: int = 0
+    ) -> Optional[dict]:
         """
         Implements grid search hyperparameter optimization on the giveen machine learning model
 
@@ -257,14 +265,16 @@ class ModelTuner:
             self.logger.error(f"Error while tuning the model with GridSearchCV, Error: {e}")
             return None
     
-    def random_search(self,
-                      model: object,
-                      param_grid: dict,
-                      eval_metric: str,
-                      cv: object,
-                      n_iter: int = 10,
-                      n_jobs: int = -1,
-                      verbose: int = 0) -> Optional[dict]:
+    def random_search(
+        self,
+        model: object,
+        param_grid: dict,
+        eval_metric: str,
+        cv: object,
+        n_iter: int = 10,
+        n_jobs: int = -1,
+        verbose: int = 0
+    ) -> Optional[dict]:
         """
         Implements random search hyperparameter optimization on the giveen machine learning model
 
@@ -348,15 +358,17 @@ class ModelTuner:
             self.logger.error(f"Error while tuning the model with RandomizedSearchCV, Error: {e}")
             return None
         
-    def optuna_search(self,
-                      model: object,
-                      param_grid: dict,
-                      eval_metric: str,
-                      cv: object,
-                      n_iter: int = 10,
-                      timeout: Optional[int] = None,
-                      n_jobs: int = -1,
-                      verbose: int = 0) -> Optional[dict]:
+    def optuna_search(
+        self,
+        model: object,
+        param_grid: dict,
+        eval_metric: str,
+        cv: object,
+        n_iter: int = 10,
+        timeout: Optional[int] = None,
+        n_jobs: int = -1,
+        verbose: int = 0
+    ) -> Optional[dict]:
         """
         Implements Optuna hyperparameter optimization on the giveen machine learning model
 

@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Optional
+from typing import Optional, Any, Iterator
 from sklearn.model_selection import (KFold, StratifiedKFold, ShuffleSplit, 
                                      StratifiedShuffleSplit, train_test_split,
                                      GroupKFold, GroupShuffleSplit)
@@ -15,7 +15,7 @@ def get_cv_splits(
     groups_col: Optional[str] = None,
     random_state: int = 42,
     logging_to_file: str = False
-):
+) -> Iterator[Any]:
     """
     Returns indices for cross-validation splits according to the specified method and parameters.
 
@@ -45,6 +45,12 @@ def get_cv_splits(
 
     groups_col : str, optional
         The name of the column in `df` that contains group labels. Required for group-based methods
+
+    random_state : int, (default=42)
+        Random seed value
+
+    logging_to_file : bool, optional
+        Whether to log to file or not. Default is False
 
     Returns
     -------
