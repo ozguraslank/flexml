@@ -14,7 +14,10 @@ class Classification(SupervisedBase):
 
     logging_to_file: bool, (default=False)
         If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved.
-
+    
+    random_state : int, (default=42)
+        The random state for data processing processes
+        
     Example
     -------
     >>> from flexml import Classification

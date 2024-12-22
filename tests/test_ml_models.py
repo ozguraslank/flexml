@@ -1,9 +1,7 @@
-from parameterized import parameterized
 import unittest
-import pandas as pd
+from parameterized import parameterized
 from sklearn.datasets import load_diabetes
 from sklearn.datasets import load_breast_cancer
-
 from flexml.regression import Regression
 from flexml.classification import Classification
 from flexml.logger.logger import get_logger
@@ -42,7 +40,12 @@ class TestMLModels(unittest.TestCase):
     ))
 
     @parameterized.expand([(model_pack['name'], model_pack['model'], model_pack['tuning_param_grid']) for model_pack in WIDE_REGRESSION_MODELS])
-    def test_regression_ml_models(self, model_name, model, model_tuning_params):
+    def test_regression_ml_models(
+        self,
+        model_name: str,
+        model: object,
+        model_tuning_params: dict
+    ):
         try:
             X = self.reg_exp.X
             y = self.reg_exp.y
@@ -79,7 +82,12 @@ class TestMLModels(unittest.TestCase):
                 raise Exception(error_msg)
 
     @parameterized.expand([(model_pack['name'], model_pack['model'], model_pack['tuning_param_grid']) for model_pack in WIDE_CLASSIFICATION_MODELS])
-    def test_classification_ml_models(self, model_name, model, model_tuning_params):
+    def test_classification_ml_models(
+        self,
+        model_name: str,
+        model: object, 
+        model_tuning_params: dict
+    ):
         try:
             X = self.classification_exp.X
             y = self.classification_exp.y

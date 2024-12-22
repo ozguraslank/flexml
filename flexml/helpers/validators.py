@@ -1,11 +1,13 @@
-from typing import Optional, List
+from typing import Optional, List, Any
 from flexml.config.supervised_config import EVALUATION_METRICS
 from flexml.logger.logger import get_logger
 
-def eval_metric_checker(ml_task_type: str,
-                        eval_metric: Optional[str] = None,
-                        all_evaluation_metrics: Optional[List[str]] = None,
-                        default_evaluation_metric: Optional[str] = None) -> str:
+def eval_metric_checker(
+    ml_task_type: str,
+    eval_metric: Optional[str] = None,
+    all_evaluation_metrics: Optional[List[str]] = None,
+    default_evaluation_metric: Optional[str] = None
+) -> str:
     """
     Since eval_metric setting and validation is a common process for both Regression and Classification tasks...
     this method is used to set and validate the evaluation metric.
@@ -60,3 +62,26 @@ def eval_metric_checker(ml_task_type: str,
         raise ValueError(error_msg)
     
     return eval_metric
+
+def random_state_checker(random_state: Any) -> int:
+    """
+    Validates the random_state parameter
+
+    Parameters
+    ----------
+    random_state : Any
+        Random state value
+
+    Returns
+    -------
+    int
+        Validated random state
+    """
+    logger = get_logger(__name__, "PROD", False)
+
+    if not isinstance(random_state, int) or random_state < 0:
+        error_msg = f"random_state should be a positive integer, got {random_state}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    return random_state

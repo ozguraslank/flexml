@@ -2,12 +2,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from time import time
-from typing import Union, Optional
+from typing import Any, Union, Optional, Iterator
 from tqdm import tqdm
 from IPython import get_ipython
 from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS
 from flexml.logger.logger import get_logger
-from flexml.helpers import eval_metric_checker, get_cv_splits, evaluate_model_perf
+from flexml.helpers import eval_metric_checker, random_state_checker, get_cv_splits, evaluate_model_perf
 from flexml._model_tuner import ModelTuner
 
 
@@ -29,19 +29,18 @@ class SupervisedBase:
     random_state : int, (default=42)
         The random state value for the data processing process
     """
-    def __init__(self,
-                 data: pd.DataFrame,
-                 target_col: str,
-                 logging_to_file: str = False,
-                 random_state: int = 42):
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        target_col: str,
+        logging_to_file: str = False,
+        random_state: int = 42
+    ):
 
         # Logger to log app activities (Logs are stored in /logs/flexml_logs.log file if logging_to_file is passed as True)
         self.__logger = get_logger(__name__, "PROD", logging_to_file)
 
-        if not isinstance(random_state, int) or random_state < 0:
-            error_msg = f"random_state should be a positive integer, got {random_state}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
+        random_state = random_state_checker(random_state)
         
         self.data = data
         self.target_col = target_col
@@ -109,23 +108,48 @@ class SupervisedBase:
             raise ValueError(error_msg)
         
     def _prepare_data(
-            self,
-            cv_method: str = 'k-fold',
-            n_folds: Optional[int] = None,
-            test_size: Optional[float] = None, 
-            groups_col: Optional[str] = None,
-            random_state: int = 42,
-            apply_feature_engineering: bool = False):
+        self,
+        cv_method: str = 'k-fold',
+        n_folds: Optional[int] = None,
+        test_size: Optional[float] = None, 
+        groups_col: Optional[str] = None,
+        random_state: int = 42,
+        apply_feature_engineering: bool = False
+    ) -> Iterator[Any]:
         """
         Prepares the data for the model training process
 
         Parameters
         ----------
-        test_size : float, (default=0.25 for hold-out method)
-            The size of the test data in the train-test split process
+        cv_method : str, (default='k-fold')
+            Cross-validation method to use. Options:
+            - "k-fold" (default) (Provide `n_folds`)
+            - "hold-out" (Provide `test_size`)
+            - "StratifiedKfold" (Provide `n_folds`)
+            - "ShuffleSplit" (Provide `n_folds` and `test_size`)
+            - "StratifiedShuffleSplit" (Provide `n_folds`, `test_size`)
+            - "GroupKFold" (Provide `n_folds` and `groups_col`)
+            - "GroupShuffleSplit" (Provide `n_folds`, `test_size`, and `groups_col`)
+
+        n_folds : int, (default=5 for cv methods except hold-out)
+            Number of folds for cross-validation methods
+
+        test_size : float, (default=0.25 for hold-out cv, None for other methods)
+            The size of the test data if using hold-out or shuffle-based splits
+
+        groups_col : str, optional
+            Column name for group-based cross-validation methods
 
         random_state : int, (default=42)
-            The random state value for the train-test split process
+            The random state value for the data processing process
+
+        apply_feature_engineering : bool, (default=False)
+            If True, the feature engineering steps will be applied to the data
+
+        Returns
+        -------
+        cv_object: Iterator
+            CV iterator object that includes the train and test indices for each fold
         """
         try:
             self.X = self.data.drop(columns=[self.target_col])
@@ -138,7 +162,6 @@ class SupervisedBase:
                 # TODO: Feature Engineering steps will be added here
                 pass
             
-            self.__logger.info("[PROCESS] CV is returning")
             return get_cv_splits(
                 df=self.data,
                 cv_method=cv_method,
@@ -177,7 +200,12 @@ class SupervisedBase:
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
         """
-        Since top_n_models is a common process for both Regression
+        Validates the top_n_models parameter taken from the user
+
+        Parameters
+        ----------
+        top_n_models : int
+            The number of top models to select based on the evaluation metric
         """
         if top_n_models is None:
             return 1
@@ -194,14 +222,16 @@ class SupervisedBase:
         
         return top_n_models
     
-    def start_experiment(self,
-                        experiment_size: str = 'quick',
-                        cv_method: str = 'k-fold',
-                        n_folds: Optional[int] = None,
-                        test_size: Optional[float] = None,
-                        eval_metric: Optional[str] = None,
-                        random_state: int = 42,
-                        groups_col: Optional[str] = None):
+    def start_experiment(
+        self,
+        experiment_size: str = 'quick',
+        cv_method: str = 'k-fold',
+        n_folds: Optional[int] = None,
+        test_size: Optional[float] = None,
+        eval_metric: Optional[str] = None,
+        random_state: int = 42,
+        groups_col: Optional[str] = None
+    ):
         """
         Trains machine learning algorithms and evaluates them based on the specified evaluation metric
 
@@ -246,6 +276,8 @@ class SupervisedBase:
         - Defaults to a standard 5-fold if neither `n_folds` nor `test_size` is provided
         """
         self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+        random_state = random_state_checker(random_state)
+
         self.__model_training_info = []  # Reset model training info
         self.__model_stats_df = None     # Reset model stats DataFrame
         apply_feature_engineering = True if not self.__data_is_prepared else False # If It's the first time to execute start_experiment(), apply feature engineering, otherwise don't apply it
@@ -524,18 +556,20 @@ class SupervisedBase:
         except Exception as e:
             self.__logger.error(f"Could not calculate feature importance for the following model: {model}, Error: {e}")
 
-    def tune_model(self, 
-                   model: Optional[object] = None,
-                   tuning_method: Optional[str] = 'randomized_search',
-                   eval_metric: Optional[str] = None,
-                   param_grid: Optional[dict] = None,
-                   n_iter: int = 10,
-                   cv_method: str = 'k-fold',
-                   n_folds: int = 5,
-                   test_size: Optional[float] = None,
-                   groups_col: Optional[str] = None,
-                   n_jobs: int = -1,
-                   verbose: int = 0):
+    def tune_model(
+        self, 
+        model: Optional[object] = None,
+        tuning_method: Optional[str] = 'randomized_search',
+        eval_metric: Optional[str] = None,
+        param_grid: Optional[dict] = None,
+        n_iter: int = 10,
+        cv_method: str = 'k-fold',
+        n_folds: int = 5,
+        test_size: Optional[float] = None,
+        groups_col: Optional[str] = None,
+        n_jobs: int = -1,
+        verbose: int = 0
+    ):
         """
         Tunes the model based on the given parameter grid and evaluation metric.
 
