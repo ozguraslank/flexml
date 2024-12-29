@@ -197,7 +197,9 @@ class SupervisedBase:
                 y_array=self.data[self.target_col], 
                 groups_col=groups_col,
                 random_state=random_state,
-                shuffle=shuffle
+                shuffle=shuffle,
+                ml_task_type=self.__ML_TASK_TYPE,
+                logging_to_file=self.logging_to_file
             )
         
         except Exception as e:
@@ -799,7 +801,9 @@ class SupervisedBase:
                 n_folds=n_folds,
                 test_size=test_size,
                 y_array=self.data[self.target_col], 
-                groups_col=groups_col
+                groups_col=groups_col,
+                ml_task_type=self.__ML_TASK_TYPE,
+                logging_to_file=self.logging_to_file
             ))
 
         # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called

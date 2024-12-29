@@ -15,7 +15,7 @@ def get_cv_splits(
     test_size: Optional[float] = None,
     y_array: Optional[pd.Series] = None,
     groups_col: Optional[str] = None,
-    random_state: int = 42,
+    random_state: Optional[int] = None,
     shuffle: bool = True,
     ml_task_type: Optional[str] = None,
     logging_to_file: str = False
@@ -28,7 +28,7 @@ def get_cv_splits(
     df : pd.DataFrame
         The full dataset (features and target combined)
 
-    cv_method : str, (default='kfold' for Regression, 'stratified_kfold' for Classification)
+    cv_method : str, (default='kfold' for Regression, 'stratified_kfold' for Classification If `ml_task_type` is provided, else 'kfold')
         Cross-validation method to use. Options:
         - For Regression:
             - "kfold" (default) (Provide `n_folds`)
@@ -38,7 +38,7 @@ def get_cv_splits(
             - "group_shuffle_split" (Provide `n_folds`, `test_size`, and `groups_col`)
         
         - For Classification:
-            - "kfold" (default) (Provide `n_folds`)
+            - "kfold" (Provide `n_folds`)
             - "stratified_kfold" (default) (Provide `n_folds`)
             - "holdout" (Provide `test_size`)
             - "stratified_shuffle_split" (Provide `n_folds`, `test_size`)
@@ -57,8 +57,8 @@ def get_cv_splits(
     groups_col : str, optional
         The name of the column in `df` that contains group labels. Required for group-based methods
 
-    random_state : int, (default=42)
-        Random seed value
+    random_state : int, optional (default=None)
+        The random state value for the data processing process (Ignored If 'shuffle' is set to False)
 
     shuffle: bool, (default=True)
         If True, the data will be shuffled before the model training process
