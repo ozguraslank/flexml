@@ -5,9 +5,15 @@ from time import time
 from typing import Any, Union, Optional, Iterator
 from tqdm import tqdm
 from IPython import get_ipython
-from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS
+from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
 from flexml.logger.logger import get_logger
-from flexml.helpers import eval_metric_checker, random_state_checker, get_cv_splits, evaluate_model_perf
+from flexml.helpers import (
+    eval_metric_checker,
+    random_state_checker,
+    cross_validation_checker,
+    get_cv_splits,
+    evaluate_model_perf
+)
 from flexml._model_tuner import ModelTuner
 
 
@@ -23,18 +29,24 @@ class SupervisedBase:
     target_col : str
         The target column name in the data
 
+    random_state : int, optional (default=None)
+        The random state value for the data processing process (Ignored If 'shuffle' is set to False)
+
+        If None, It uses the global random state instance from numpy.random. Thus, It will produce different results in every execution
+
+    shuffle: bool, (default=True)
+        If True, the data will be shuffled before the model training process
+
     logging_to_file: bool, (default=False)
         If True, the logs will be saved to a file in the current path, located in /logs/flexml_logs.log, Otherwise, it will not be saved
-
-    random_state : int, (default=42)
-        The random state value for the data processing process
     """
     def __init__(
         self,
         data: pd.DataFrame,
         target_col: str,
+        random_state: Optional[int] = None,
+        shuffle: bool = True,
         logging_to_file: str = False,
-        random_state: int = 42
     ):
 
         # Logger to log app activities (Logs are stored in /logs/flexml_logs.log file if logging_to_file is passed as True)
@@ -45,6 +57,7 @@ class SupervisedBase:
         self.data = data
         self.target_col = target_col
         self.logging_to_file = logging_to_file
+        self.shuffle = shuffle
         self._current_data_processing_random_state = random_state
 
         # Data Preparation
@@ -59,6 +72,9 @@ class SupervisedBase:
         self.__ML_MODELS = []
         self.__ML_TASK_TYPE = "Regression" if "Regression" in self.__class__.__name__ else "Classification"
         self.__ALL_EVALUATION_METRICS = EVALUATION_METRICS[self.__ML_TASK_TYPE]["ALL"]
+
+        # Cross-Validation Settings
+        self.__AVAILABLE_CV_METHODS = CROSS_VALIDATION_METHODS[self.__ML_TASK_TYPE]
 
         # Keep the start_experiment params in memory to avoid re-creating cv_splits again for no-data-change conditions in start_experiment and tune_model
         self._current_training_random_state = None
@@ -109,11 +125,12 @@ class SupervisedBase:
         
     def _prepare_data(
         self,
-        cv_method: str = 'k-fold',
-        n_folds: Optional[int] = None,
+        cv_method: str,
+        n_folds: int = 5,
         test_size: Optional[float] = None, 
         groups_col: Optional[str] = None,
-        random_state: int = 42,
+        random_state: Optional[int] = None,
+        shuffle: bool = True,
         apply_feature_engineering: bool = False
     ) -> Iterator[Any]:
         """
@@ -121,17 +138,24 @@ class SupervisedBase:
 
         Parameters
         ----------
-        cv_method : str, (default='k-fold')
+        cv_method : str, (default='kfold' for Regression, 'stratified_kfold' for Classification)
             Cross-validation method to use. Options:
-            - "k-fold" (default) (Provide `n_folds`)
-            - "hold-out" (Provide `test_size`)
-            - "StratifiedKfold" (Provide `n_folds`)
-            - "ShuffleSplit" (Provide `n_folds` and `test_size`)
-            - "StratifiedShuffleSplit" (Provide `n_folds`, `test_size`)
-            - "GroupKFold" (Provide `n_folds` and `groups_col`)
-            - "GroupShuffleSplit" (Provide `n_folds`, `test_size`, and `groups_col`)
+            - For Regression:
+                - "kfold" (default) (Provide `n_folds`)
+                - "holdout" (Provide `test_size`)
+                - "shuffle_split" (Provide `n_folds` and `test_size`)
+                - "group_kfold" (Provide `n_folds` and `groups_col`)
+                - "group_shuffle_split" (Provide `n_folds`, `test_size`, and `groups_col`)
+            
+            - For Classification:
+                - "kfold" (default) (Provide `n_folds`)
+                - "stratified_kfold" (default) (Provide `n_folds`)
+                - "holdout" (Provide `test_size`)
+                - "stratified_shuffle_split" (Provide `n_folds`, `test_size`)
+                - "group_kfold" (Provide `n_folds` and `groups_col`)
+                - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
 
-        n_folds : int, (default=5 for cv methods except hold-out)
+        n_folds : int, optional (default=None for hold-out validation, 5 for other cv methods)
             Number of folds for cross-validation methods
 
         test_size : float, (default=0.25 for hold-out cv, None for other methods)
@@ -142,6 +166,9 @@ class SupervisedBase:
 
         random_state : int, (default=42)
             The random state value for the data processing process
+
+        shuffle: bool, (default=True)
+            If True, the data will be shuffled before the model training process
 
         apply_feature_engineering : bool, (default=False)
             If True, the feature engineering steps will be applied to the data
@@ -167,9 +194,12 @@ class SupervisedBase:
                 cv_method=cv_method,
                 n_folds=n_folds,
                 test_size=test_size,
-                y_label=self.data[self.target_col], 
+                y_array=self.data[self.target_col], 
                 groups_col=groups_col,
-                random_state=random_state
+                random_state=random_state,
+                shuffle=shuffle,
+                ml_task_type=self.__ML_TASK_TYPE,
+                logging_to_file=self.logging_to_file
             )
         
         except Exception as e:
@@ -225,11 +255,11 @@ class SupervisedBase:
     def start_experiment(
         self,
         experiment_size: str = 'quick',
-        cv_method: str = 'k-fold',
+        cv_method: Optional[str] = None,
         n_folds: Optional[int] = None,
         test_size: Optional[float] = None,
         eval_metric: Optional[str] = None,
-        random_state: int = 42,
+        random_state: Optional[int] = None,
         groups_col: Optional[str] = None
     ):
         """
@@ -243,17 +273,25 @@ class SupervisedBase:
             - 'wide': Uses more models for comprehensive results.
             Models are defined in config/ml_models.py
 
-        cv_method : str, (default='k-fold')
+        cv_method : str, (default='kfold' for Regression, 'stratified_kfold' for Classification)
             Cross-validation method to use. Options:
-            - "k-fold" (default) (Provide `n_folds`)
-            - "hold-out" (Provide `test_size`)
-            - "StratifiedKfold" (Provide `n_folds`)
-            - "ShuffleSplit" (Provide `n_folds` and `test_size`)
-            - "StratifiedShuffleSplit" (Provide `n_folds`, `test_size`)
-            - "GroupKFold" (Provide `n_folds` and `groups_col`)
-            - "GroupShuffleSplit" (Provide `n_folds`, `test_size`, and `groups_col`)
 
-        n_folds : int, (default=5 for cv methods except hold-out)
+            - For Regression:
+                - "kfold" (default) (Provide `n_folds`)
+                - "holdout" (Provide `test_size`)
+                - "shuffle_split" (Provide `n_folds` and `test_size`)
+                - "group_kfold" (Provide `n_folds` and `groups_col`)
+                - "group_shuffle_split" (Provide `n_folds`, `test_size`, and `groups_col`)
+            
+            - For Classification:
+                - "kfold" (default) (Provide `n_folds`)
+                - "stratified_kfold" (default) (Provide `n_folds`)
+                - "holdout" (Provide `test_size`)
+                - "stratified_shuffle_split" (Provide `n_folds`, `test_size`)
+                - "group_kfold" (Provide `n_folds` and `groups_col`)
+                - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
+
+        n_folds : int, optional (default=None for hold-out validation, 5 for other cv methods)
             Number of folds for cross-validation methods
 
         test_size : float, (default=0.25 for hold-out cv, None for other methods)
@@ -262,7 +300,7 @@ class SupervisedBase:
         eval_metric : str (default='R2' for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation
 
-        random_state : int, (default=42)
+        random_state : int, optional (default=None)
             The random state value for the model training process
             # TODO: Not implemented yet, will be implemented in 1.1.0 release
 
@@ -283,18 +321,36 @@ class SupervisedBase:
         apply_feature_engineering = True if not self.__data_is_prepared else False # If It's the first time to execute start_experiment(), apply feature engineering, otherwise don't apply it
         self._current_experiment_size = experiment_size
 
-        # if any cross-validation related parameter is changed, re-create the cv_splits
-        if not (self._current_training_random_state == random_state and \
-            self.__current_cv_method == cv_method and \
-            self.__current_n_folds == n_folds and \
-            self.__current_test_size == test_size and \
-            self.__current_groups_col == groups_col):
+        # Check cross-validation method params
+        cv_method = cross_validation_checker(
+            df=self.data,
+            cv_method=cv_method,
+            n_folds=n_folds,
+            test_size=test_size,
+            groups_col=groups_col,
+            available_cv_methods=self.__AVAILABLE_CV_METHODS,
+            ml_task_type=self.__ML_TASK_TYPE
+        )
 
+        # Check if the cross-validation parameters are changed or not, If they are changed, re-create the cv_splits
+        params_changed_flag = (
+            self._current_training_random_state != random_state
+            or self._current_cv_method != cv_method
+            or self._current_n_folds != n_folds
+            or self._current_test_size != test_size
+            or self._current_groups_col != groups_col
+        )
+
+        # Check if the shuffle is True and random_state is None, If It's the case, re-create the cv_splits
+        shuffle_with_no_random_state_flag = self.shuffle and random_state is None
+
+        # if any cross-validation related parameter is changed, re-create the cv_splits
+        if params_changed_flag or shuffle_with_no_random_state_flag:
             self._current_training_random_state = random_state
-            self.__current_cv_method = cv_method
-            self.__current_n_folds = n_folds
-            self.__current_test_size = test_size
-            self.__current_groups_col = groups_col
+            self._current_cv_method = cv_method
+            self._current_n_folds = n_folds
+            self._current_test_size = test_size
+            self._current_groups_col = groups_col
 
             self.cv_splits = list(self._prepare_data(
                 cv_method=cv_method,
@@ -302,6 +358,7 @@ class SupervisedBase:
                 test_size=test_size,
                 groups_col=groups_col,
                 random_state=self._current_training_random_state,
+                shuffle=self.shuffle,
                 apply_feature_engineering=apply_feature_engineering
             ))
 
@@ -560,13 +617,13 @@ class SupervisedBase:
         self, 
         model: Optional[object] = None,
         tuning_method: Optional[str] = 'randomized_search',
-        eval_metric: Optional[str] = None,
-        param_grid: Optional[dict] = None,
         n_iter: int = 10,
-        cv_method: str = 'k-fold',
-        n_folds: int = 5,
+        cv_method: Optional[str] = None,
+        n_folds: Optional[int] = None,
         test_size: Optional[float] = None,
         groups_col: Optional[str] = None,
+        eval_metric: Optional[str] = None,
+        param_grid: Optional[dict] = None,
         n_jobs: int = -1,
         verbose: int = 0
     ):
@@ -588,6 +645,36 @@ class SupervisedBase:
             
             * 'optuna' for Optuna (https://optuna.readthedocs.io/en/stable/)
 
+        n_iter : int (default = 10)
+            The number of trials to run in the tuning process (Only for RandomizedSearchCV and Optuna)
+
+        cv_method : str, (default='kfold' for Regression, 'stratified_kfold' for Classification)
+            Cross-validation method to use. Options:
+
+            - For Regression:
+                - "kfold" (default) (Provide `n_folds`)
+                - "holdout" (Provide `test_size`)
+                - "shuffle_split" (Provide `n_folds` and `test_size`)
+                - "group_kfold" (Provide `n_folds` and `groups_col`)
+                - "group_shuffle_split" (Provide `n_folds`, `test_size`, and `groups_col`)
+            
+            - For Classification:
+                - "kfold" (default) (Provide `n_folds`)
+                - "stratified_kfold" (default) (Provide `n_folds`)
+                - "holdout" (Provide `test_size`)
+                - "stratified_shuffle_split" (Provide `n_folds`, `test_size`)
+                - "group_kfold" (Provide `n_folds` and `groups_col`)
+                - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
+            
+        n_folds : int, optional (default=None for hold-out validation, 5 for other cv methods)
+            The number of cross-validation folds to use for the tuning process (Only for GridSearchCV and RandomizedSearchCV)
+        
+        test_size : float, (default=0.25 for hold-out cv, None for other methods)
+            The size of the test data if using hold-out or shuffle-based splits
+
+        groups_col : str, optional
+            Column name for group-based cross-validation methods
+
         eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
             The evaluation metric to use for model evaluation
         
@@ -605,15 +692,6 @@ class SupervisedBase:
             >>>       'max_depth': [3, 4, 5],
             >>>       'learning_rate': [0.01, 0.05, 0.1]
             >>>      }
-
-        n_iter : int (default = 10)
-            The number of trials to run in the tuning process (Only for RandomizedSearchCV and Optuna)
-            
-        n_folds : int (default = 5)
-            The number of cross-validation folds to use for the tuning process (Only for GridSearchCV and RandomizedSearchCV)
-        
-        test_size : float, (default=0.25 for hold-out cv, None for other methods)
-            The size of the test data if using hold-out or shuffle-based splits
 
         n_jobs: int (default = -1)
             The number of jobs to run in parallel for the tuning process. -1 means using all threads in the CPU
@@ -671,6 +749,17 @@ class SupervisedBase:
             self.show_model_stats()
 
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+        
+        # Check cross-validation method params
+        cv_method = cross_validation_checker(
+            df=self.data,
+            cv_method=cv_method,
+            n_folds=n_folds,
+            test_size=test_size,
+            groups_col=groups_col,
+            available_cv_methods=self.__AVAILABLE_CV_METHODS,
+            ml_task_type=self.__ML_TASK_TYPE
+        )
 
         # Get the best model If the user doesn't pass any model object
         if model is None:
@@ -691,11 +780,6 @@ class SupervisedBase:
             n_iter = 10
             self.__logger.info(info_msg)
 
-        if not isinstance(n_folds, int) or n_folds < 2:
-            info_msg = f"n_folds parameter should be minimum 2, got {n_folds}, Changed it to 2 for the tuning process"
-            n_folds = 2
-            self.__logger.info(info_msg)
-
         if not isinstance(n_jobs, int) or n_jobs < -1:
             info_msg = f"n_jobs parameter should be minimum -1, got {n_jobs}, Changed it to -1 for the tuning process"
             n_jobs = -1
@@ -711,15 +795,16 @@ class SupervisedBase:
                 cv_method=cv_method,
                 n_folds=n_folds,
                 test_size=test_size,
-                y_label=self.data[self.target_col], 
-                groups_col=groups_col
+                y_array=self.data[self.target_col], 
+                groups_col=groups_col,
+                ml_task_type=self.__ML_TASK_TYPE,
+                logging_to_file=self.logging_to_file
             ))
 
         # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
         if not hasattr(self, 'model_tuner'):
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, self.y, self.logging_to_file)
 
-        print(f"Eval Metric: {eval_metric}")
         self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")
         tuning_method = tuning_method.lower()
         if tuning_method == "grid_search":
