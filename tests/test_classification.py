@@ -1,3 +1,5 @@
+import os
+import pickle
 import unittest
 import pandas as pd
 from parameterized import parameterized
@@ -70,3 +72,25 @@ class TestClassification(unittest.TestCase):
             error_msg = f"An error occured while tuning the model in {exp_size} classification, Error: {e}"
             self.logger.error(error_msg)
             raise Exception(error_msg)
+
+    def test_save_model(self):
+        try:
+            classification_exp = Classification(
+                data=self.df,
+                target_col="target",
+                logging_to_file=False
+            )
+            classification_exp.start_experiment(
+                experiment_size="quick",
+                test_size=0.25,
+                random_state=42,
+            )
+            save_path = "test_classification_model.pkl"
+            classification_exp.save_model(save_path=save_path)
+            self.assertTrue(os.path.exists(save_path))
+            with open(save_path, 'rb') as f:
+                model = pickle.load(f)
+            self.assertIsNotNone(model)
+        finally:
+            if os.path.exists(save_path):
+                os.remove(save_path)

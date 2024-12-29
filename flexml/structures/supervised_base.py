@@ -1,3 +1,4 @@
+import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -491,6 +492,47 @@ class SupervisedBase:
             return best_models[0]
         
         return best_models
+    
+    
+    def save_model(self, model: Optional[object] = None, save_path: str = None):
+        """
+        Saves a specified model or the best model based on evaluation metrics.
+
+        Parameters
+        ----------
+        model : object, optional
+            The model to save. If None, the best model will be saved.
+        save_path : str, optional
+            The path to save the model. If not specified, saves in the default path.
+
+        Raises
+        ------
+        ValueError
+            If no models have been evaluated yet and no model is specified.
+        """
+        if model is None:
+            try:
+                # Get the best model if no specific model is provided
+                model = self.get_best_models()
+            except ValueError as e:
+                error_msg = "No models have been evaluated yet, and no model was specified to save."
+                self.__logger.error(error_msg)
+                raise ValueError(error_msg) from e
+
+        # Ensure save_path is defined, default to a specific path if not provided
+        if save_path is None:
+            save_path = "best_model.pkl"  # Default save path
+            self.__logger.info(f"No save_path provided. Using default path: {save_path}")
+
+        # Save the model
+        try:
+            with open(save_path, 'wb') as f:
+                pickle.dump(model, f)
+            self.__logger.info(f"Model saved successfully at {save_path}")
+        except Exception as e:
+            self.__logger.error(f"Failed to save model: {e}")
+            raise
+    
 
     def __sort_models(self, eval_metric: Optional[str] = None):
         """
