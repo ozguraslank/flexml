@@ -450,7 +450,7 @@ class SupervisedBase:
         eval_metric : str (default='R2 for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation:
                 
-                * R2, MAE, MSE, RMSE for Regression tasks
+                * R2, MAE, MSE, RMSE, MAPE for Regression tasks
 
                 * Accuracy, Precision, Recall, F1 Score for Classification tasks
         Returns
@@ -499,12 +499,12 @@ class SupervisedBase:
         Parameters
         ----------
         eval_metric : str (default='R2')
-            The evaluation metric to use for model evaluation (e.g. 'R2', 'MAE', 'MSE', 'RMSE')
+            The evaluation metric to use for model evaluation
 
         Returns
         -------
         pd.DataFrame
-            A pandas DataFrame containing the sorted model statistics according to the desired eval_metric.
+            A pandas DataFrame containing the sorted model statistics according to the desired eval_metric
         """
         if len(self.__model_stats_df) == 0:
             error_msg = "There is no model performance data to sort!"
@@ -514,7 +514,7 @@ class SupervisedBase:
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Since lower is better for mae, mse and rmse in Regression tasks, they should be sorted in ascending order
-        if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['MAE', 'MSE', 'RMSE']:
+        if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['MAE', 'MSE', 'RMSE', 'MAPE']:
             return self.__model_stats_df.sort_values(by=eval_metric, ascending=True).reset_index(drop = True)
         else:
             return self.__model_stats_df.sort_values(by=eval_metric, ascending=False).reset_index(drop = True)
@@ -528,7 +528,7 @@ class SupervisedBase:
         eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
             The evaluation metric to use for model evaluation
         
-            * R2, MAE, MSE, RMSE for Regression tasks
+            * R2, MAE, MSE, RMSE, MAPE for Regression tasks
             * Accuracy, Precision, Recall, F1 Score for Classification tasks
         """
         def highlight_best(s: pd.Series) -> list[str]:
@@ -678,7 +678,7 @@ class SupervisedBase:
         eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
             The evaluation metric to use for model evaluation
         
-            * R2, MAE, MSE, RMSE for Regression tasks
+            * R2, MAE, MSE, RMSE, MAPE for Regression tasks
 
             * Accuracy, Precision, Recall, F1 Score for Classification tasks
 

@@ -24,7 +24,7 @@ def eval_metric_checker(
         If passed as None, the default evaluation metric of the corresponding ml_task_type will be used
     
     all_evaluation_metrics : List[str], (default=None)
-        All possible evaluation metrics for the current task (Regression or Classification), e.g. ['R2', 'MAE', 'MSE', 'RMSE'] for Regression
+        All possible evaluation metrics for the current task (Regression or Classification), e.g. ['R2', 'MAE', 'MSE', 'RMSE', 'MAPE'] for Regression
 
         If passed as None, they will be fetched from the config file
 
