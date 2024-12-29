@@ -193,6 +193,10 @@ class ModelTuner:
             * 'MAE' for Mean Absolute Error
             
             * 'MSE' for Mean Squared Error
+
+            * 'RMSE' for Root Mean Squared Error
+
+            * 'MAPE' for Mean Absolute Percentage Error
             
             * 'Accuracy' for Accuracy
             
@@ -294,6 +298,10 @@ class ModelTuner:
             * 'MAE' for Mean Absolute Error
             
             * 'MSE' for Mean Squared Error
+
+            * 'RMSE' for Root Mean Squared Error
+
+            * 'MAPE' for Mean Absolute Percentage Error
             
             * 'Accuracy' for Accuracy
             
@@ -388,6 +396,10 @@ class ModelTuner:
             * 'MAE' for Mean Absolute Error
             
             * 'MSE' for Mean Squared Error
+
+            * 'RMSE' for Root Mean Squared Error
+
+            * 'MAPE' for Mean Absolute Percentage Error
             
             * 'Accuracy' for Accuracy
             

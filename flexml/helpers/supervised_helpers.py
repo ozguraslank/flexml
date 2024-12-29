@@ -38,6 +38,8 @@ def _evaluate_preds(
         * 'MSE' for Mean Squared Error
         
         * 'RMSE' for Root Mean Squared Error
+
+        * 'MAPE' for Mean Absolute Percentage Error
         
         * 'Accuracy' for Accuracy
         
@@ -46,8 +48,6 @@ def _evaluate_preds(
         * 'Recall' for Recall
         
         * 'F1 Score' for F1 score
-        
-        * 'MAPE' for Mean Absolute Percentage Error
         
         * 'ROC-AUC' for Receiver Operating Characteristic Area Under Curve
 
@@ -64,6 +64,8 @@ def _evaluate_preds(
         return round(mean_squared_error(y_true, y_pred), 6)
     elif eval_metric == 'RMSE':
         return round(np.sqrt(mean_squared_error(y_true, y_pred)), 6)
+    elif eval_metric == 'MAPE':
+        return round(np.mean(np.abs((y_true - y_pred) / y_true)) * 100, 6)
     elif eval_metric == 'Accuracy':
         return round(accuracy_score(y_true, y_pred), 6)
     elif eval_metric == 'Precision':
@@ -72,12 +74,10 @@ def _evaluate_preds(
         return round(recall_score(y_true, y_pred), 6)
     elif eval_metric == 'F1 Score':
         return round(f1_score(y_true, y_pred), 6)
-    elif eval_metric == 'MAPE':
-        return round(np.mean(np.abs((y_true - y_pred) / y_true)) * 100, 6)
     elif eval_metric == 'ROC-AUC':
         return round(roc_auc_score(y_true, y_pred), 6)
     else:
-        raise ValueError(f"Error while evaluating the current model. The eval_metric should be one of the following: 'R2', 'MAE', 'MSE', 'RMSE', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'MAPE', 'ROC-AUC'. Got {eval_metric}")
+        raise ValueError(f"Error while evaluating the current model. The eval_metric should be one of the following: 'R2', 'MAE', 'MSE', 'RMSE', 'MAPE', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'ROC-AUC'. Got {eval_metric}")
         
 def evaluate_model_perf(
     ml_task_type, 
