@@ -1,3 +1,4 @@
+import pandas as pd
 from typing import Optional, List, Any
 from flexml.config.supervised_config import EVALUATION_METRICS
 from flexml.logger.logger import get_logger
@@ -79,9 +80,73 @@ def random_state_checker(random_state: Any) -> int:
     """
     logger = get_logger(__name__, "PROD", False)
 
-    if not isinstance(random_state, int) or random_state < 0:
-        error_msg = f"random_state should be a positive integer, got {random_state}"
+    if random_state is not None and (not isinstance(random_state, int) or random_state < 0):
+        error_msg = f"random_state should be either None or a positive integer, got {random_state}"
         logger.error(error_msg)
         raise ValueError(error_msg)
     
     return random_state
+
+def cross_validation_checker(
+    df: pd.DataFrame,
+    cv_method: Optional[str] = None,
+    n_folds: Optional[int] = None,
+    test_size: Optional[float] = None,
+    groups_col: Optional[str] = None,
+    available_cv_methods: Optional[dict] = None,
+    ml_task_type: Optional[str] = None
+) -> str:
+    
+    logger = get_logger(__name__, "PROD", False)
+
+    if cv_method is None:
+        if ml_task_type is not None:
+            if ml_task_type == 'Regression':
+                cv_method = 'kfold'
+            elif ml_task_type == "Classification":
+                cv_method = 'stratified_kfold'
+            else:
+                error_msg = f"ml_task_type should be 'Regression' or 'Classification', got {ml_task_type}"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
+    else:
+        cv_method = cv_method.lower()
+        if available_cv_methods is not None and isinstance(available_cv_methods, dict):
+            if available_cv_methods.get(cv_method) is None:
+                # If cv_method is not found in the available cv methods, check the without '_' version -->
+                # e.g. 'stratified_kfold' and 'stratifiedkfold'
+                if cv_method in available_cv_methods.values():
+                    cv_method = list(available_cv_methods.keys())[list(available_cv_methods.values()).index(cv_method)]
+        
+    # Check if cv_method is still None
+    if cv_method is None:
+        error_msg = f"cv_method is not found in the available cross-validation methods, expected one of {list(available_cv_methods.keys())}, got {cv_method}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    if n_folds is not None and (not isinstance(n_folds, int) or n_folds < 2):
+        error_msg = "`n_folds` must be an integer >= 2 if provided"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    if test_size is not None and (not isinstance(test_size, float) or not 0 < test_size < 1):
+        error_msg = f"test_size parameter expected to be a float between 0 and 1, got {test_size}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    if groups_col is not None and groups_col not in df.columns:
+        error_msg = f"groups_col should be a column in the DataFrame, got {groups_col}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    if groups_col is not None and groups_col not in df.columns:
+        error_msg = f"`groups_col` must be a column in `df`, got '{groups_col}'"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    if cv_method in ["group_kfold", "group_shuffle_split"] and groups_col is None:
+        error_msg = "`groups_col` must be provided for group-based methods"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    return cv_method

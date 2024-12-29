@@ -3,17 +3,21 @@ from typing import Optional, Any, Iterator
 from sklearn.model_selection import (KFold, StratifiedKFold, ShuffleSplit, 
                                      StratifiedShuffleSplit, train_test_split,
                                      GroupKFold, GroupShuffleSplit)
+from flexml.config.supervised_config import CROSS_VALIDATION_METHODS
+from flexml.helpers import cross_validation_checker
 from flexml.logger.logger import get_logger
 
 
 def get_cv_splits(
     df: pd.DataFrame,
-    cv_method: str = "k-fold",
+    cv_method: str = "kfold",
     n_folds: Optional[int] = None,
     test_size: Optional[float] = None,
-    y_label: Optional[pd.Series] = None,
+    y_array: Optional[pd.Series] = None,
     groups_col: Optional[str] = None,
     random_state: int = 42,
+    shuffle: bool = True,
+    ml_task_type: Optional[str] = None,
     logging_to_file: str = False
 ) -> Iterator[Any]:
     """
@@ -24,23 +28,30 @@ def get_cv_splits(
     df : pd.DataFrame
         The full dataset (features and target combined)
 
-    cv_method : str, optional
-        The cross-validation method to use. Options:
-        - "k-fold" (default) (Provide `n_folds` only)
-        - "hold-out" (Provide `test_size` only)
-        - "StratifiedKfold" (Provide `n_folds` and `y_label`)
-        - "ShuffleSplit" (Provide `n_folds` and `test_size`)
-        - "StratifiedShuffleSplit" (Provide `n_folds`, `test_size`, and `y_label`)
-        - "GroupKFold" (Provide `n_folds` and `groups_col`)
-        - "GroupShuffleSplit" (Provide `n_folds`, `test_size`, and `groups_col`)
+    cv_method : str, (default='kfold' for Regression, 'stratified_kfold' for Classification)
+        Cross-validation method to use. Options:
+        - For Regression:
+            - "kfold" (default) (Provide `n_folds`)
+            - "holdout" (Provide `test_size`)
+            - "shuffle_split" (Provide `n_folds` and `test_size`)
+            - "group_kfold" (Provide `n_folds` and `groups_col`)
+            - "group_shuffle_split" (Provide `n_folds`, `test_size`, and `groups_col`)
+        
+        - For Classification:
+            - "kfold" (default) (Provide `n_folds`)
+            - "stratified_kfold" (default) (Provide `n_folds`)
+            - "holdout" (Provide `test_size`)
+            - "stratified_shuffle_split" (Provide `n_folds`, `test_size`)
+            - "group_kfold" (Provide `n_folds` and `groups_col`)
+            - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
 
     n_folds : int, optional
         Number of splits/folds for methods that use folds. Default is 5
 
     test_size : float, optional
-        The test size to use for hold-out, shuffle-based methods, or group shuffle split
+        The test size to use for holdout, shuffle-based methods, or group shuffle split
 
-    y_label : pd.Series or array-like, optional
+    y_array : pd.Series or array-like, optional
         The target variable. Required for stratified splits to ensure class balance in each fold
 
     groups_col : str, optional
@@ -48,6 +59,18 @@ def get_cv_splits(
 
     random_state : int, (default=42)
         Random seed value
+
+    shuffle: bool, (default=True)
+        If True, the data will be shuffled before the model training process
+
+    ml_task_type : str, optional
+        The type of ML task. Options: "Regression" or "Classification"
+
+        If you don't pass a value, the function won't accept None value for cv_method since It won't know the default cv method for your task
+
+        If you pass a value, the default `cv_method` will be set based on the task type:
+        - "Regression" => "kfold"
+        - "Classification" => "stratified_kfold"
 
     logging_to_file : bool, optional
         Whether to log to file or not. Default is False
@@ -58,108 +81,78 @@ def get_cv_splits(
         A generator that yields (train_index, test_index) for each split
     """
     logger = get_logger(__name__, "PROD", logging_to_file)
+    valid_methods = CROSS_VALIDATION_METHODS.get('all')
 
-    valid_methods = [
-        "k-fold", "hold-out", "StratifiedKfold", "ShuffleSplit", 
-        "StratifiedShuffleSplit", "GroupKFold", "GroupShuffleSplit"
-    ]
+    cv_method = cross_validation_checker(
+        df=df,
+        cv_method=cv_method,
+        n_folds=n_folds,
+        test_size=test_size,
+        groups_col=groups_col,
+        available_cv_methods=valid_methods,
+        ml_task_type=ml_task_type
+    )
 
-    if cv_method not in valid_methods:
-        error_msg = f"`cv_method` must be one of {valid_methods}, got '{cv_method}'"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-
-    if n_folds is not None and (not isinstance(n_folds, int) or n_folds < 2):
-        error_msg = "`n_folds` must be an integer >= 2 if provided"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-    
-    if test_size is not None and (not 0 < test_size < 1):
-        error_msg = "`test_size` must be a float between 0 and 1 if provided"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-
-    if groups_col is not None and groups_col not in df.columns:
-        error_msg = f"`groups_col` must be a column in `df`, got '{groups_col}'"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-    
-    if cv_method in ["StratifiedKfold", "StratifiedShuffleSplit"] and y_label is None:
-        error_msg = "`y_label` must be provided for stratified methods"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-    
-    if cv_method in ["GroupKFold", "GroupShuffleSplit"] and groups_col is None:
-        error_msg = "`groups_col` must be provided for group-based methods"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
-
-    if cv_method == 'hold-out' and not test_size:
-        logger.warning("No 'test_size' provided for hold-out method. Defaulting to 0.25")
+    if cv_method == 'holdout' and not test_size:
+        logger.warning(f"No 'test_size' provided for {cv_method} method. Defaulting to 0.25")
         test_size = 0.25
 
-    if cv_method == 'hold-out' and test_size and n_folds:
-        logger.warning("Both 'n_folds' and 'test_size' provided. Ignoring 'n_folds'")
+    if cv_method == 'holdout' and test_size and n_folds:
+        logger.warning(f"Both 'n_folds' and 'test_size' provided for {cv_method} validation method. Ignoring 'n_folds'")
         n_folds = None
 
-    if cv_method == 'k-fold' and test_size:
+    if cv_method == 'kfold' and test_size:
         logger.warning(f"Both 'n_folds' and 'test_size' provided for {cv_method} method. Ignoring 'test_size'")
         test_size = None
 
-    if cv_method != 'hold-out' and not n_folds:
+    if cv_method != 'holdout' and not n_folds:
         n_folds = 5
+
+    if cv_method in ["stratified_kfold", "stratified_shuffle_split"] and y_array is None:
+        error_msg = "`y_array` must be provided for stratified methods"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     groups = df[groups_col].values if groups_col else None
 
-    if groups is not None and cv_method not in ["GroupKFold", "GroupShuffleSplit"]:
+    if groups is not None and cv_method not in ["group_kfold", "group_shuffle_split"]:
         logger.warning(f"'groups_col' provided even though 'cv_method' is {cv_method}. Ignoring 'groups_col'")
         groups = None
 
-    # Splitter selection
-    if n_folds and test_size:
-        # Shuffle-based methods
-        if cv_method == "StratifiedShuffleSplit":
-            splitter = StratifiedShuffleSplit(n_splits=n_folds, test_size=test_size, random_state=random_state)
-            return splitter.split(df, y_label)
-        
-        elif cv_method == "GroupShuffleSplit":
-            splitter = GroupShuffleSplit(n_splits=n_folds, test_size=test_size, random_state=random_state)
-            return splitter.split(df, groups=groups)
-        
-        else:
-            splitter = ShuffleSplit(n_splits=n_folds, test_size=test_size, random_state=random_state)
-            return splitter.split(df)
+    elif cv_method == "kfold":
+        splitter = KFold(n_splits=n_folds, random_state=random_state, shuffle=shuffle)
+        return splitter.split(df)
 
-    if n_folds and not test_size:
-        # Fold-based methods
-        if cv_method == "StratifiedKfold":
-            splitter = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=random_state)
-            return splitter.split(df, y_label)
+    elif cv_method == "shuffle_split":
+        splitter = ShuffleSplit(n_splits=n_folds, test_size=test_size, random_state=random_state)
+        return splitter.split(df)
         
-        elif cv_method == "GroupKFold":
-            splitter = GroupKFold(n_splits=n_folds)
-            return splitter.split(df, groups=groups)
-        
-        else:
-            splitter = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
-            return splitter.split(df)
+    elif cv_method == "stratified_shuffle_split":
+        splitter = StratifiedShuffleSplit(n_splits=n_folds, test_size=test_size, random_state=random_state)
+        return splitter.split(df, y_array)
 
-    if test_size and not n_folds:
-        # Single split methods
-        if cv_method == "GroupShuffleSplit":
-            splitter = GroupShuffleSplit(n_folds=1, test_size=test_size, random_state=random_state)
-            return splitter.split(df, groups=groups)
-        
-        else:
-            train_index, test_index = train_test_split(
+    elif cv_method == "group_shuffle_split":
+        splitter = GroupShuffleSplit(n_splits=n_folds, test_size=test_size, random_state=random_state)
+        return splitter.split(df, groups=groups)
+
+    elif cv_method == "stratified_kfold":
+        splitter = StratifiedKFold(n_splits=n_folds, random_state=random_state, shuffle=shuffle) 
+        return splitter.split(df, y_array)
+    
+    elif cv_method == "group_kfold":
+        splitter = GroupKFold(n_splits=n_folds)
+        return splitter.split(df, groups=groups)
+    
+    elif cv_method == "holdout":
+        train_index, test_index = train_test_split(
                 df.index,
                 test_size=test_size,
-                shuffle=True,
+                shuffle=shuffle,
                 random_state=random_state,
-                stratify=y_label if cv_method == "StratifiedKfold" else None
-            )
-            return [(train_index, test_index)]
+                stratify=y_array if cv_method == "stratified_kfold" else None
+        )
+        return [(train_index, test_index)]
 
-    # Default fallback
-    splitter = KFold(n_folds=5, shuffle=True, random_state=random_state)
-    return splitter.split(df)
+    else: # Default
+        splitter = KFold(n_splits=5, random_state=random_state, shuffle=shuffle)
+        return splitter.split(df)

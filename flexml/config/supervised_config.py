@@ -39,3 +39,34 @@ TUNING_METRIC_TRANSFORMATIONS = {
     "reverse_signed_eval_metrics": ['MAE', 'MSE', 'RMSE']
     # These metrics are used in negative form for optimization processes, so we need to reverse the sign later, e.g. from -0.42 to 0.42
 }
+
+# Supported Cross Validation Methods
+CROSS_VALIDATION_METHODS = {
+    # 'all' used for the get_cv_splits() function at helpers/cross_validation.py, while others are used for SupervisedBase's validations
+    'all': {
+        'kfold': 'kfold',
+        'stratified_kfold': 'stratifiedkfold',
+        'holdout': 'holdout',
+        'stratified_shuffle_split': 'stratifiedshufflesplit',
+        'shuffle_split': 'shufflesplit',
+        'group_kfold': 'groupkfold',
+        'group_shuffle_split': 'groupshufflesplit'
+    },
+
+    'Regression': {
+        'kfold': 'kfold',
+        'holdout': 'holdout',
+        'shuffle_split': 'shufflesplit',
+        'group_kfold': 'groupkfold',
+        'group_shuffle_split': 'groupshufflesplit'
+    },
+
+    'Classification': {
+        'kfold': 'kfold',
+        'stratified_kfold': 'stratifiedkfold',
+        'holdout': 'holdout',
+        'stratified_shuffle_split': 'stratifiedshufflesplit',
+        'group_kfold': 'groupkfold',
+        'group_shuffle_split': 'groupshufflesplit'
+    }
+}
