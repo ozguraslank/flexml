@@ -155,7 +155,7 @@ class SupervisedBase:
                 - "group_kfold" (Provide `n_folds` and `groups_col`)
                 - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
 
-        n_folds : int, (default=5 for cv methods except hold-out)
+        n_folds : int, optional (default=None for hold-out validation, 5 for other cv methods)
             Number of folds for cross-validation methods
 
         test_size : float, (default=0.25 for hold-out cv, None for other methods)
@@ -256,7 +256,7 @@ class SupervisedBase:
         self,
         experiment_size: str = 'quick',
         cv_method: Optional[str] = None,
-        n_folds: int = 5,
+        n_folds: Optional[int] = None,
         test_size: Optional[float] = None,
         eval_metric: Optional[str] = None,
         random_state: Optional[int] = None,
@@ -291,7 +291,7 @@ class SupervisedBase:
                 - "group_kfold" (Provide `n_folds` and `groups_col`)
                 - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
 
-        n_folds : int, (default=5 for cv methods except hold-out)
+        n_folds : int, optional (default=None for hold-out validation, 5 for other cv methods)
             Number of folds for cross-validation methods
 
         test_size : float, (default=0.25 for hold-out cv, None for other methods)
@@ -619,7 +619,7 @@ class SupervisedBase:
         tuning_method: Optional[str] = 'randomized_search',
         n_iter: int = 10,
         cv_method: Optional[str] = None,
-        n_folds: int = 5,
+        n_folds: Optional[int] = None,
         test_size: Optional[float] = None,
         groups_col: Optional[str] = None,
         eval_metric: Optional[str] = None,
@@ -666,7 +666,7 @@ class SupervisedBase:
                 - "group_kfold" (Provide `n_folds` and `groups_col`)
                 - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
             
-        n_folds : int (default = 5)
+        n_folds : int, optional (default=None for hold-out validation, 5 for other cv methods)
             The number of cross-validation folds to use for the tuning process (Only for GridSearchCV and RandomizedSearchCV)
         
         test_size : float, (default=0.25 for hold-out cv, None for other methods)
@@ -780,11 +780,6 @@ class SupervisedBase:
             n_iter = 10
             self.__logger.info(info_msg)
 
-        if not isinstance(n_folds, int) or n_folds < 2:
-            info_msg = f"n_folds parameter should be minimum 2, got {n_folds}, Changed it to 2 for the tuning process"
-            n_folds = 2
-            self.__logger.info(info_msg)
-
         if not isinstance(n_jobs, int) or n_jobs < -1:
             info_msg = f"n_jobs parameter should be minimum -1, got {n_jobs}, Changed it to -1 for the tuning process"
             n_jobs = -1
@@ -810,7 +805,6 @@ class SupervisedBase:
         if not hasattr(self, 'model_tuner'):
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, self.y, self.logging_to_file)
 
-        print(f"Eval Metric: {eval_metric}")
         self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")
         tuning_method = tuning_method.lower()
         if tuning_method == "grid_search":

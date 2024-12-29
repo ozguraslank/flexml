@@ -97,6 +97,35 @@ def cross_validation_checker(
     ml_task_type: Optional[str] = None
 ) -> str:
     
+    """
+    df : pd.DataFrame
+        The DataFrame that will be performed cross-validation to
+
+    cv_method : str, (default='kfold' for Regression, 'stratified_kfold' for Classification if ml_task_type is not None)
+        The cross-validation method to use
+
+        If passed as None, the default cross-validation method for the corresponding ml_task_type will be used If ml_task_type is not None
+
+    n_folds : int, optional (default=None)
+        Number of folds to use for cross-validation
+
+    test_size : float, optional (default=None)
+        The proportion of the dataset to include in the test split
+
+    groups_col : str, optional (default=None)
+        The column in the DataFrame that contains the groups for group-based cross-validation methods
+    
+    available_cv_methods : dict, optional (default=None)
+        A dictionary containing the available cross-validation methods
+
+    ml_task_type : str, optional (default=None)
+        The type of ML task ('Regression' or 'Classification')
+
+    Returns
+    -------
+    str
+        The cross-validation method to use for the current task (Regression or Classification)
+    """
     logger = get_logger(__name__, "PROD", False)
 
     if cv_method is None:

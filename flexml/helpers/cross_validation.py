@@ -45,7 +45,7 @@ def get_cv_splits(
             - "group_kfold" (Provide `n_folds` and `groups_col`)
             - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
 
-    n_folds : int, optional
+    n_folds : int, optional (default=None for hold-out validation, 5 for other cv methods)
         Number of splits/folds for methods that use folds. Default is 5
 
     test_size : float, optional
