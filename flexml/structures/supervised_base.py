@@ -182,7 +182,6 @@ class SupervisedBase:
         try:
             self.X = self.data.drop(columns=[self.target_col])
             self.y = self.data[self.target_col]
-            self.test_size = test_size
 
             if apply_feature_engineering:
                 self.__logger.info("[PROCESS] Data is prepared")
@@ -364,10 +363,6 @@ class SupervisedBase:
             ))
 
         self.__prepare_models(experiment_size)
-
-        self.cv_method = cv_method
-        self.n_folds = n_folds
-        self.test_size = test_size
         cv_splits_copy = self.cv_splits.copy() # Will be used for trainings
 
         self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} cross-validation")
@@ -828,7 +823,7 @@ class SupervisedBase:
             self.__logger.info(info_msg)
 
         # If tune_model cross validation params are same, get the current one
-        if hasattr(self, 'cv_splits') and cv_method == self.cv_method and n_folds == self.n_folds and test_size == self.test_size and groups_col == self.groups_col:
+        if hasattr(self, 'cv_splits') and cv_method == self._current_cv_method and n_folds == self._current_n_folds and test_size == self._current_test_size and groups_col == self._current_groups_col:
             self.__logger.info("[INFO] Using the latest cross-validation splits that created in the last start_experiment() run for the tuning process")
             cv_obj = self.cv_splits
         else:
