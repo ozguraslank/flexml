@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from time import time
-from typing import Any, Union, Optional, Iterator
+from typing import Any, Union, Optional, Iterator, List, Dict
 from tqdm import tqdm
 from IPython import get_ipython
 from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
@@ -16,6 +16,7 @@ from flexml.helpers import (
     evaluate_model_perf
 )
 from flexml._model_tuner import ModelTuner
+from flexml._feature_engineer import FeatureEngineering
 
 
 class SupervisedBase:
@@ -35,6 +36,57 @@ class SupervisedBase:
 
         If None, It uses the global random state instance from numpy.random. Thus, It will produce different results in every execution
 
+    drop_columns : list, default=None
+        Columns that will be dropped from the data.
+    
+    categorical_imputation_method : str, default='mode'
+        Imputation method for categorical columns. Options:
+        * 'mode': Replace missing values with the most frequent value.
+        * 'constant': Replace missing values with a constant value.
+        * 'drop': Drop rows with missing values.
+
+    numerical_imputation_method : str, default='mean'
+        Imputation method for numerical columns. Options:
+        * 'mean': Replace missing values with the column mean.
+        * 'median': Replace missing values with the column median.
+        * 'mode': Replace missing values with the column mode.
+        * 'constant': Replace missing values with a constant value.
+        * 'drop': Drop rows with missing values.
+
+    column_imputation_map : dict, default=None
+        Custom mapping of columns to specific imputation methods.
+        Example usage: {'column_name': 'mean', 'column_name2': 'mode'}
+
+    numerical_imputation_constant : float, default=0.0
+        The constant value for imputing numerical columns when 'constant' is selected.
+
+    categorical_imputation_constant : str, default='Unknown'
+        The constant value for imputing categorical columns when 'constant' is selected.
+
+    encoding_method : str, default='label_encoder'
+        Encoding method for categorical columns. Options:
+        * 'label_encoder': Use label encoding.
+        * 'onehot_encoder': Use one-hot encoding.
+        * 'ordinal_encoder': Use ordinal encoding.
+        
+    onehot_limit : int, default=25
+        Maximum number of categories to use for one-hot encoding.
+
+    encoding_method_map : dict, default=None
+        Custom mapping of columns to encoding methods.
+        Example usage: {'column_name': 'onehot_encoder', 'column_name2': 'label_encoder'}
+    
+    ordinal_encode_map : dict, default=None
+        Custom mapping of columns to category order for ordinal encoding.
+        Example usage: {'column_name': ['low', 'medium', 'high']}
+    
+    normalize_numerical : str, default=None
+        Standardize the data using StandardScaler. Options:
+        * 'standard_scaler': Standardize the data.
+        * 'normalize_scaler': Normalize the data.
+        * 'robust_scaler': Scale the data using RobustScaler.
+        * 'quantile_transformer': Transform the data using QuantileTransformer.
+
     shuffle: bool, (default=True)
         If True, the data will be shuffled before the model training process
 
@@ -45,7 +97,18 @@ class SupervisedBase:
         self,
         data: pd.DataFrame,
         target_col: str,
-        random_state: Optional[int] = None,
+        random_state: int = 42,
+        drop_columns: Optional[List[str]] = None,
+        categorical_imputation_method: str = "mode",
+        numerical_imputation_method: str = "mean", 
+        column_imputation_map: Optional[Dict[str, str]] = None,
+        numerical_imputation_constant: float = 0.0,
+        categorical_imputation_constant: str = "Unknown", 
+        encoding_method: str = "label_encoder",
+        onehot_limit: int = 25,
+        encoding_method_map: Optional[Dict[str, str]] = None,
+        ordinal_encode_map: Optional[Dict[str, List[str]]] = None,
+        normalize_numerical: Optional[str] = None,
         shuffle: bool = True,
         logging_to_file: str = False,
     ):
@@ -60,6 +123,21 @@ class SupervisedBase:
         self.logging_to_file = logging_to_file
         self.shuffle = shuffle
         self._current_data_processing_random_state = random_state
+        feature_engineering_params = {
+            'data': data,
+            'target_col': target_col,
+            'drop_columns': drop_columns,
+            'categorical_imputation_method': categorical_imputation_method,
+            'numerical_imputation_method': numerical_imputation_method,
+            'column_imputation_map': column_imputation_map,
+            'numerical_imputation_constant': numerical_imputation_constant,
+            'categorical_imputation_constant': categorical_imputation_constant,
+            'encoding_method': encoding_method,
+            'onehot_limit': onehot_limit,
+            'encoding_method_map': encoding_method_map,
+            'ordinal_encode_map': ordinal_encode_map,
+            'normalize_numerical': normalize_numerical,
+        }
 
         # Data Preparation
         self.__validate_data()
@@ -68,6 +146,7 @@ class SupervisedBase:
         self.__model_stats_df = None
         self.__sorted_model_stats_df = None
         self.__data_is_prepared = False # Since _prepare_data() is going to be called in the start_experiment() method, data shouldn't be prepared again when start_experiment() is called again to test other scenarios
+        self.feature_engineer = FeatureEngineering(**feature_engineering_params)
 
         # Model Preparation
         self.__ML_MODELS = []
@@ -97,12 +176,7 @@ class SupervisedBase:
             error_msg = f"Dataframe should be a pandas DataFrame, but you've passed {type(self.data)}"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
-        
-        if self.data.select_dtypes(include=[np.number]).shape[1] != self.data.shape[1]:
-            error_msg = "Dataframe should include only numeric values, did you forget to encode the categorical variables?"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
-        
+
         if self.data.shape[0] == 0:
             error_msg = "Dataframe should include at least one row, is your dataframe empty?"
             self.__logger.error(error_msg)
@@ -180,15 +254,14 @@ class SupervisedBase:
             CV iterator object that includes the train and test indices for each fold
         """
         try:
+            if apply_feature_engineering:
+                self.data = self.feature_engineer.start_feature_engineering()
+                self.__logger.info("[PROCESS] Data is prepared")
+                self.__data_is_prepared = True
+            
             self.X = self.data.drop(columns=[self.target_col])
             self.y = self.data[self.target_col]
 
-            if apply_feature_engineering:
-                self.__logger.info("[PROCESS] Data is prepared")
-                self.__data_is_prepared = True
-                # TODO: Feature Engineering steps will be added here
-                pass
-            
             return get_cv_splits(
                 df=self.data,
                 cv_method=cv_method,
