@@ -1,7 +1,6 @@
 import unittest
 from parameterized import parameterized
-from sklearn.datasets import load_diabetes
-from sklearn.datasets import load_breast_cancer
+from sklearn.datasets import load_diabetes, load_breast_cancer
 from flexml.regression import Regression
 from flexml.classification import Classification
 from flexml.logger.logger import get_logger
@@ -14,46 +13,53 @@ class TestMLModels(unittest.TestCase):
     logger = get_logger(__name__, "TEST", logging_to_file=False)
     logger.setLevel("DEBUG")
 
-    reg_df = load_diabetes(as_frame=True)['frame']
-    classification_df = load_breast_cancer(as_frame=True)['frame']
+    test_config = {
+        'Regression': {
+            'data': load_diabetes(as_frame=True)['frame'],
+            'target_col': 'target',
+            'exp_class': Regression,
+            'models': WIDE_REGRESSION_MODELS
+        },
+        'Classification': {
+            'data': load_breast_cancer(as_frame=True)['frame'],
+            'target_col': 'target',
+            'exp_class': Classification,
+            'models': WIDE_CLASSIFICATION_MODELS
+        }
+    }
 
-    reg_exp = Regression(
-        data = reg_df,
-        target_col = "target",
-        logging_to_file = False
-    )
-    reg_cv_splitter = list(reg_exp._prepare_data(
-        cv_method="hold-out",
-        test_size = 0.5, # Keeping test_size high to make the training faster
-        random_state = 42
-    ))
+    experiments = {}
+    cv_splitters = {}
+    
+    for objective, config in test_config.items():
+        exp = config['exp_class'](
+            data=config['data'],
+            target_col=config['target_col'],
+            logging_to_file=False
+        )
+        experiments[objective] = exp
+        
+        cv_splitters[objective] = exp._prepare_data(
+            cv_method="holdout",
+            test_size=0.5 # Keeping test_size high to make the training faster
+        )
 
-    classification_exp = Classification(
-        data = classification_df,
-        target_col = "target",
-        logging_to_file = False
-    )
-    classification_cv_splitter = list(classification_exp._prepare_data(
-        cv_method="hold-out",
-        test_size = 0.5, # Keeping test_size high to make the training faster
-        random_state = 42
-    ))
+    @parameterized.expand([
+        (objective, model_pack['name'], model_pack['model'], model_pack['tuning_param_grid'])
+        for objective, config in test_config.items()
+        for model_pack in config['models']
+    ])
+    def test_ml_models(self, objective, model_name, model, model_tuning_params):
+        exp = self.experiments[objective]
+        cv_splitter = self.cv_splitters[objective]
 
-    @parameterized.expand([(model_pack['name'], model_pack['model'], model_pack['tuning_param_grid']) for model_pack in WIDE_REGRESSION_MODELS])
-    def test_regression_ml_models(
-        self,
-        model_name: str,
-        model: object,
-        model_tuning_params: dict
-    ):
         try:
-            X = self.reg_exp.X
-            y = self.reg_exp.y
-            
-            for train_idx, test_idx in self.reg_cv_splitter:
-                X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-                y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+            X, y = exp.X, exp.y
+            train_idx = cv_splitter[0][0] # holdout validation returns in [(train_index, test_index)] format
 
+            X_train = X.iloc[train_idx]
+            y_train = y.iloc[train_idx]
+            
             model.fit(X_train, y_train)
 
         except Exception as e:
@@ -62,7 +68,7 @@ class TestMLModels(unittest.TestCase):
             raise Exception(error_msg)
 
         try:
-            self.reg_exp.tune_model(
+            exp.tune_model(
                 model=model,
                 tuning_method="randomized_search",
                 param_grid=model_tuning_params,
@@ -70,6 +76,7 @@ class TestMLModels(unittest.TestCase):
                 n_folds=3,
                 n_jobs=-1
             )
+
         except Exception as e:
             if 'Invalid top_n_models value' in str(e):
                 # Since we don't use the start_experiment() function, there will be no saved models and this error will be raised --
@@ -77,46 +84,6 @@ class TestMLModels(unittest.TestCase):
                 pass
             else:
                 # Handle other exceptions
-                error_msg = f"An error occurred while tuning {model_name} model with the following param_grid {model_tuning_params}. Error: {e}"
-                self.logger.error(error_msg)
-                raise Exception(error_msg)
-
-    @parameterized.expand([(model_pack['name'], model_pack['model'], model_pack['tuning_param_grid']) for model_pack in WIDE_CLASSIFICATION_MODELS])
-    def test_classification_ml_models(
-        self,
-        model_name: str,
-        model: object, 
-        model_tuning_params: dict
-    ):
-        try:
-            X = self.classification_exp.X
-            y = self.classification_exp.y
-            
-            for train_idx, test_idx in self.classification_cv_splitter:
-                X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-                y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-
-            model.fit(X_train, y_train)
-
-        except Exception as e:
-            error_msg = f"An error occurred while fitting {model_name} model. Error: {e}"
-            self.logger.error(error_msg)
-            raise Exception(error_msg)
-
-        try:
-            self.classification_exp.tune_model(
-                model=model,
-                tuning_method="randomized_search",
-                param_grid=model_tuning_params,
-                n_iter=3,
-                n_folds=3,
-                n_jobs=-1
-            )
-        except Exception as e:
-            if 'Invalid top_n_models value' in str(e):
-                # Same as in 'test_regression_ml_models' function
-                pass
-            else:
                 error_msg = f"An error occurred while tuning {model_name} model with the following param_grid {model_tuning_params}. Error: {e}"
                 self.logger.error(error_msg)
                 raise Exception(error_msg)

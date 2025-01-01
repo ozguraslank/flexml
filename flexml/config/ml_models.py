@@ -259,10 +259,9 @@ WIDE_CLASSIFICATION_MODELS = QUICK_CLASSIFICATION_MODELS + [
         "name": SVM_CLASSIFIER.__class__.__name__,
         "model": SVM_CLASSIFIER,
         "tuning_param_grid": {
-            "kernel": ["linear", "poly", "rbf", "sigmoid"],
+            "kernel": ["linear", "rbf", "sigmoid"],
             "C": [0.1, 1, 10, 100],
-            "gamma": ["scale", "auto", 0.01, 0.1, 1],
-            "degree": [2, 3, 4, 5]
+            "gamma": ["scale", "auto", 0.01, 0.1, 1]
         }
     },
     {
