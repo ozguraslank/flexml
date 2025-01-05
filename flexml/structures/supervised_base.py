@@ -13,7 +13,8 @@ from flexml.helpers import (
     random_state_checker,
     cross_validation_checker,
     get_cv_splits,
-    evaluate_model_perf
+    evaluate_model_perf,
+    validate_inputs
 )
 from flexml._model_tuner import ModelTuner
 from flexml._feature_engineer import FeatureEngineering
@@ -37,55 +38,55 @@ class SupervisedBase:
         If None, It uses the global random state instance from numpy.random. Thus, It will produce different results in every execution
 
     drop_columns : list, default=None
-        Columns that will be dropped from the data.
+        Columns that will be dropped from the data
     
     categorical_imputation_method : str, default='mode'
         Imputation method for categorical columns. Options:
-        * 'mode': Replace missing values with the most frequent value.
-        * 'constant': Replace missing values with a constant value.
-        * 'drop': Drop rows with missing values.
+        * 'mode': Replace missing values with the most frequent value
+        * 'constant': Replace missing values with a constant value
+        * 'drop': Drop rows with missing values
 
     numerical_imputation_method : str, default='mean'
         Imputation method for numerical columns. Options:
-        * 'mean': Replace missing values with the column mean.
-        * 'median': Replace missing values with the column median.
-        * 'mode': Replace missing values with the column mode.
-        * 'constant': Replace missing values with a constant value.
-        * 'drop': Drop rows with missing values.
+        * 'mean': Replace missing values with the column mean
+        * 'median': Replace missing values with the column median
+        * 'mode': Replace missing values with the column mode
+        * 'constant': Replace missing values with a constant value
+        * 'drop': Drop rows with missing values
 
     column_imputation_map : dict, default=None
-        Custom mapping of columns to specific imputation methods.
+        Custom mapping of columns to specific imputation methods
         Example usage: {'column_name': 'mean', 'column_name2': 'mode'}
 
     numerical_imputation_constant : float, default=0.0
-        The constant value for imputing numerical columns when 'constant' is selected.
+        The constant value for imputing numerical columns when 'constant' is selected
 
     categorical_imputation_constant : str, default='Unknown'
-        The constant value for imputing categorical columns when 'constant' is selected.
+        The constant value for imputing categorical columns when 'constant' is selected
 
     encoding_method : str, default='label_encoder'
         Encoding method for categorical columns. Options:
-        * 'label_encoder': Use label encoding.
-        * 'onehot_encoder': Use one-hot encoding.
-        * 'ordinal_encoder': Use ordinal encoding.
+        * 'label_encoder': Use label encoding
+        * 'onehot_encoder': Use one-hot encoding
+        * 'ordinal_encoder': Use ordinal encoding
         
     onehot_limit : int, default=25
-        Maximum number of categories to use for one-hot encoding.
+        Maximum number of categories to use for one-hot encoding
 
     encoding_method_map : dict, default=None
-        Custom mapping of columns to encoding methods.
+        Custom mapping of columns to encoding methods
         Example usage: {'column_name': 'onehot_encoder', 'column_name2': 'label_encoder'}
     
     ordinal_encode_map : dict, default=None
-        Custom mapping of columns to category order for ordinal encoding.
+        Custom mapping of columns to category order for ordinal encoding
         Example usage: {'column_name': ['low', 'medium', 'high']}
     
-    normalize_numerical : str, default=None
+    normalize : str, default=None
         Standardize the data using StandardScaler. Options:
-        * 'standard_scaler': Standardize the data.
-        * 'normalize_scaler': Normalize the data.
-        * 'robust_scaler': Scale the data using RobustScaler.
-        * 'quantile_transformer': Transform the data using QuantileTransformer.
+        * 'standard_scaler': Standardize the data
+        * 'normalize_scaler': Normalize the data
+        * 'robust_scaler': Scale the data using RobustScaler
+        * 'quantile_transformer': Transform the data using QuantileTransformer
 
     shuffle: bool, (default=True)
         If True, the data will be shuffled before the model training process
@@ -108,7 +109,7 @@ class SupervisedBase:
         onehot_limit: int = 25,
         encoding_method_map: Optional[Dict[str, str]] = None,
         ordinal_encode_map: Optional[Dict[str, List[str]]] = None,
-        normalize_numerical: Optional[str] = None,
+        normalize: Optional[str] = None,
         shuffle: bool = True,
         logging_to_file: str = False,
     ):
@@ -136,11 +137,12 @@ class SupervisedBase:
             'onehot_limit': onehot_limit,
             'encoding_method_map': encoding_method_map,
             'ordinal_encode_map': ordinal_encode_map,
-            'normalize_numerical': normalize_numerical,
+            'normalize': normalize,
         }
 
         # Data Preparation
         self.__validate_data()
+        validate_inputs(**feature_engineering_params)
         self.feature_names = self.data.drop(columns=[self.target_col]).columns
         self.__model_training_info = []
         self.__model_stats_df = None
@@ -165,7 +167,26 @@ class SupervisedBase:
         self._current_experiment_size = None
 
     def __repr__(self):
-        return f"SupervisedBase(\ndata={self.data.head()},\ntarget_col={self.target_col},\nlogging_to_file={self.logging_to_file})"
+        return (
+            f"SupervisedBase(\n"
+            f"data={self.data.head()},\n"
+            f"target_col={self.target_col},\n"
+            f"random_state={self.random_state},\n"
+            f"drop_columns={self.drop_columns},\n"
+            f"categorical_imputation_method={self.categorical_imputation_method},\n"
+            f"numerical_imputation_method={self.numerical_imputation_method},\n"
+            f"column_imputation_map={self.column_imputation_map},\n"
+            f"numerical_imputation_constant={self.numerical_imputation_constant},\n"
+            f"categorical_imputation_constant={self.categorical_imputation_constant},\n"
+            f"encoding_method={self.encoding_method},\n"
+            f"onehot_limit={self.onehot_limit},\n"
+            f"encoding_method_map={self.encoding_method_map},\n"
+            f"ordinal_encode_map={self.ordinal_encode_map},\n"
+            f"normalize={self.normalize},\n"
+            f"shuffle={self.shuffle},\n"
+            f"logging_to_file={self.logging_to_file}\n"
+            f")"
+        )
     
     def __validate_data(self):
         """

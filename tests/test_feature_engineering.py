@@ -3,11 +3,10 @@ import pandas as pd
 import numpy as np
 from flexml.classification import Classification
 
-class TestClassification(unittest.TestCase):
-    # categorical_imputation_methods = ["mode","constant"]
-    # numerical_imputation_methods = ["mean","constant","median","mode"]
-    # encoding_methods = ["label_encoder", "onehot_encoder"]
-
+class TestFeatureEngineering(unittest.TestCase):
+    """
+    Test cases for the feature engineering pipeline in the Classification class
+    """
     np.random.seed(42)
     n_rows = 100
 
@@ -32,17 +31,17 @@ class TestClassification(unittest.TestCase):
         """
         End-to-end test for feature engineering pipeline through Classification class
         """
-
-        classification_exp = Classification(self.df, 
-                            target_col='target',
-                            drop_columns=['id'],
-                            column_imputation_map={'status': 'constant','amount': 'constant'},
-                            categorical_imputation_constant='test_constant',
-                            numerical_imputation_constant=-1,
-                            encoding_method_map={'category_default': 'ordinal_encoder', 'priority': 'onehot_encoder'},
-                            ordinal_encode_map={'category_default': ['A', 'C', 'B']},
-                            onehot_limit=3,
-                            normalize_numerical='normalize_scaler'
+        classification_exp = Classification(
+                                self.df, 
+                                target_col='target',
+                                drop_columns=['id'],
+                                column_imputation_map={'status': 'constant','amount': 'constant'},
+                                categorical_imputation_constant='test_constant',
+                                numerical_imputation_constant=-1,
+                                encoding_method_map={'category_default': 'ordinal_encoder', 'priority': 'onehot_encoder'},
+                                ordinal_encode_map={'category_default': ['A', 'C', 'B']},
+                                onehot_limit=3,
+                                normalize='normalize_scaler'
                             )
         
         
@@ -51,22 +50,21 @@ class TestClassification(unittest.TestCase):
 
         # Check if all columns are numerical, including target
         self.assertFalse(
-        processed_data.select_dtypes(exclude=[np.number]).columns.tolist(),
-        "Not all columns are numerical."
+            processed_data.select_dtypes(exclude=[np.number]).columns.tolist(),
+            "Not all columns are numerical"
         )
 
         # Check for total number of columns
         self.assertEqual(
             processed_data.shape[1],
             9,
-            "The processed data with inputs does not have 7 columns including the target."
+            "The processed data with inputs does not have 7 columns including the target"
         )
 
     def test_feature_engineering_without_inputs(self):
         """
         End-to-end test for feature engineering pipeline through Classification class
         """
-
         classification_exp = Classification(self.df, target_col='target')
         
         classification_exp.start_experiment()
@@ -75,13 +73,13 @@ class TestClassification(unittest.TestCase):
 
         # Check if all columns are numerical, including target
         self.assertFalse(
-        processed_data.select_dtypes(exclude=[np.number]).columns.tolist(),
-        "Not all columns are numerical."
+            processed_data.select_dtypes(exclude=[np.number]).columns.tolist(),
+            "Not all columns are numerical"
         )
 
         # Check for total number of columns
         self.assertEqual(
             processed_data.shape[1],
             8,
-            "The default processed data does not have 8 columns including the target."
+            "The default processed data does not have 8 columns including the target"
         )

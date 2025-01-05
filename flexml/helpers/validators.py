@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import Optional, List, Any
-from flexml.config.supervised_config import EVALUATION_METRICS
+from flexml.config.supervised_config import EVALUATION_METRICS, FEATURE_ENGINEERING_METHODS
 from flexml.logger.logger import get_logger
 
 def eval_metric_checker(
@@ -181,8 +181,8 @@ def cross_validation_checker(
     return cv_method
 
 def validate_inputs(
-    data,
-    target_col,
+    data: pd.DataFrame,
+    target_col: str, 
     drop_columns=None,
     categorical_imputation_method="mode",
     numerical_imputation_method="mean",
@@ -193,7 +193,7 @@ def validate_inputs(
     onehot_limit=25,
     encoding_method_map=None,
     ordinal_encode_map=None,
-    normalize_numerical=None
+    normalize=None
 ):
     """
     Validates the input parameters for the feature engineering process
@@ -250,7 +250,7 @@ def validate_inputs(
         Custom mapping of columns to category order for ordinal encoding.
         Example usage: {'column_name': ['low', 'medium', 'high']}
     
-    normalize_numerical : str, default=None
+    normalize : str, default=None
         Standardize the data using StandardScaler. Options:
         * 'standard_scaler': Standardize the data.
         * 'normalize_scaler': Normalize the data.
@@ -259,7 +259,7 @@ def validate_inputs(
     """
     # Check if any of the columns in drop_columns match the target_col
     if drop_columns is not None and target_col in drop_columns:
-        error_msg = f"The target column '{target_col}' cannot be in the drop_columns list."
+        error_msg = f"The target column '{target_col}' cannot be in the drop_columns list"
         raise ValueError(error_msg)
     
     # Check if categorical_imputation_method is valid
@@ -286,14 +286,14 @@ def validate_inputs(
     if drop_columns is not None:
         for col in drop_columns:
             if col not in data.columns:
-                error_msg = f"The column '{col}' in drop_columns is not in the data."
+                error_msg = f"The column '{col}' in drop_columns is not in the data"
                 raise ValueError(error_msg)
         
     # Check if columns in column_imputation_map are in data and methods are valid
     if column_imputation_map is not None:
         for col, method in column_imputation_map.items():
             if col not in data.columns:
-                error_msg = f"The column '{col}' in column_imputation_map is not in the data."
+                error_msg = f"The column '{col}' in column_imputation_map is not in the data"
                 raise ValueError(error_msg)
             
             if col in data.select_dtypes(include=['number']).columns:
@@ -307,32 +307,53 @@ def validate_inputs(
 
     # Check if numerical_imputation_constant is a number
     if not isinstance(numerical_imputation_constant, (int, float)):
-        error_msg = f"numerical_imputation_constant should be a number, got {numerical_imputation_constant}"
+        error_msg = f"numerical_imputation_constant should be a number, got {type(numerical_imputation_constant)}"
         raise ValueError(error_msg)
 
     # Check if categorical_imputation_constant is a string
     if not isinstance(categorical_imputation_constant, str):
-        error_msg = f"categorical_imputation_constant should be a string, got {categorical_imputation_constant}"
+        error_msg = f"categorical_imputation_constant should be a string, got {type(categorical_imputation_constant)}"
         raise ValueError(error_msg)
+
+    # Check if encoding_method is ordinal_encoder and ordinal_encoder_map is provided for every categorical column
+    if encoding_method == "ordinal_encoder":
+        if ordinal_encode_map is None:
+            error_msg = "Ordinal encoding is selected but no ordinal_encode_map is provided"
+            raise ValueError(error_msg)
+        # Check if ordinal_encode_map is provided for every categorical column
+        for col in data.select_dtypes(include=['object', 'category']).columns:
+            if col not in ordinal_encode_map:
+                error_msg = f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+                raise ValueError(error_msg)
 
     # Check if methods inside encoding_method_map are valid and columns are in data
     if encoding_method_map is not None:
         for col, method in encoding_method_map.items():
             if col not in data.columns:
-                error_msg = f"The column '{col}' in encoding_method_map is not in the data."
+                error_msg = f"The column '{col}' in encoding_method_map is not in the data"
                 raise ValueError(error_msg)
             
+            if col in drop_columns:
+                error_msg = f"The column '{col}' in encoding_method_map is in drop_columns"
+                raise ValueError(error_msg)
+
             if method not in FEATURE_ENGINEERING_METHODS["accepted_encoding_methods"]:
                 error_msg = f"The encoding method '{method}' for column '{col}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_encoding_methods']}"
                 raise ValueError(error_msg)
-        
-        if method not in FEATURE_ENGINEERING_METHODS["accepted_encoding_methods"]:
-            error_msg = f"The encoding method '{method}' for column '{col}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_encoding_methods']}"
-            raise ValueError(error_msg)
-        
-    # Check if normalize_numerical is valid
-    if normalize_numerical is not None and normalize_numerical not in FEATURE_ENGINEERING_METHODS["accepted_standardization_methods"]:
-        error_msg = f"The normalize_numerical method '{normalize_numerical}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_standardization_methods']}"
+
+            # Check if there is a ordinal_encoder between methods and ordinal_encode_map is provided
+            if method == "ordinal_encoder":
+                if ordinal_encode_map is None:
+                    error_msg = f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+                    raise ValueError(error_msg)
+                # Check if map for col is provided within ordinal_encode_map
+                if col not in ordinal_encode_map:
+                    error_msg = f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+                    raise ValueError(error_msg)
+
+    # Check if normalize is valid
+    if normalize is not None and normalize not in FEATURE_ENGINEERING_METHODS["accepted_standardization_methods"]:
+        error_msg = f"The normalize method '{normalize}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_standardization_methods']}"
         raise ValueError(error_msg)
-    
+
     return True
