@@ -45,8 +45,11 @@ class Regression(SupervisedBase):
     encoding_method : str, default='label_encoder'
         Encoding method for categorical columns. Options:
         * 'label_encoder': Use label encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html
         * 'onehot_encoder': Use one-hot encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OneHotEncoder.html
         * 'ordinal_encoder': Use ordinal encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OrdinalEncoder.html
         
     onehot_limit : int, default=25
         Maximum number of categories to use for one-hot encoding
@@ -61,10 +64,18 @@ class Regression(SupervisedBase):
     
     normalize : str, default=None
         Standardize the data using StandardScaler. Options:
-        * 'standard_scaler': Standardize the data
-        * 'normalize_scaler': Normalize the data
+        * 'standard_scaler': Standardize the data using StandardScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html
+        * 'minmax_scaler': Scale the data using MinMaxScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MinMaxScaler.html
         * 'robust_scaler': Scale the data using RobustScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.RobustScaler.html
         * 'quantile_transformer': Transform the data using QuantileTransformer
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.QuantileTransformer.html
+        * 'maxabs_scaler': Scale the data using MaxAbsScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MaxAbsScaler.html
+        * 'normalize_scaler': Normalize the data to unit length
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html
         
     shuffle: bool, (default=True)
         If True, the data will be shuffled before the model training process

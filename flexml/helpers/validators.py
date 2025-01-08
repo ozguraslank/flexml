@@ -200,7 +200,7 @@ def validate_inputs(
 
     Parameters
     ----------
-        data : pd.DataFrame
+    data : pd.DataFrame
         The input data for the model training process
     
     target_col : str
@@ -235,9 +235,12 @@ def validate_inputs(
 
     encoding_method : str, default='label_encoder'
         Encoding method for categorical columns. Options:
-        * 'label_encoder': Use label encoding.
-        * 'onehot_encoder': Use one-hot encoding.
-        * 'ordinal_encoder': Use ordinal encoding.
+        * 'label_encoder': Use label encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html
+        * 'onehot_encoder': Use one-hot encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OneHotEncoder.html
+        * 'ordinal_encoder': Use ordinal encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OrdinalEncoder.html
         
     onehot_limit : int, default=25
         Maximum number of categories to use for one-hot encoding.
@@ -252,14 +255,34 @@ def validate_inputs(
     
     normalize : str, default=None
         Standardize the data using StandardScaler. Options:
-        * 'standard_scaler': Standardize the data.
-        * 'normalize_scaler': Normalize the data.
-        * 'robust_scaler': Scale the data using RobustScaler.
-        * 'quantile_transformer': Transform the data using QuantileTransformer.
+        * 'standard_scaler': Standardize the data using StandardScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html
+        * 'minmax_scaler': Scale the data using MinMaxScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MinMaxScaler.html
+        * 'robust_scaler': Scale the data using RobustScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.RobustScaler.html
+        * 'quantile_transformer': Transform the data using QuantileTransformer
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.QuantileTransformer.html
+        * 'maxabs_scaler': Scale the data using MaxAbsScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MaxAbsScaler.html
+        * 'normalize_scaler': Normalize the data to unit length
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html
     """
     # Check if any of the columns in drop_columns match the target_col
     if drop_columns is not None and target_col in drop_columns:
         error_msg = f"The target column '{target_col}' cannot be in the drop_columns list"
+        raise ValueError(error_msg)
+    
+    if drop_columns is None:
+        drop_columns = []
+    remaining_columns = set(data.columns) - set(drop_columns)
+
+    # Ensure the target column is in the remaining columns and there's at least one feature column
+    if target_col not in remaining_columns or len(remaining_columns) < 2:
+        error_msg = (
+            f"After dropping columns, only {remaining_columns} remain. "
+            f"There should be at least one feature column and the target column '{target_col}' remaining."
+        )
         raise ValueError(error_msg)
     
     # Check if categorical_imputation_method is valid
@@ -355,5 +378,81 @@ def validate_inputs(
     if normalize is not None and normalize not in FEATURE_ENGINEERING_METHODS["accepted_standardization_methods"]:
         error_msg = f"The normalize method '{normalize}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_standardization_methods']}"
         raise ValueError(error_msg)
+
+    # Check if encoding_method is ordinal_encoder
+    if encoding_method == "ordinal_encoder":
+        if ordinal_encode_map is None:
+            error_msg = "Ordinal encoding is selected, but no ordinal_encode_map is provided."
+            raise ValueError(error_msg)
+        
+        # Get all categorical columns
+        categorical_columns = data.select_dtypes(include=['object', 'category']).columns.tolist()
+        
+        # Check that all categorical columns are in ordinal_encode_map
+        for col in categorical_columns:
+            if col not in ordinal_encode_map:
+                error_msg = f"Ordinal encoding is selected, but column '{col}' is missing in ordinal_encode_map."
+                raise ValueError(error_msg)
+            
+            # Get distinct values in the column
+            distinct_values = set(data[col].dropna().unique())
+            map_values = set(ordinal_encode_map[col])
+            
+            # Check if the values in ordinal_encode_map match exactly with the distinct values
+            if distinct_values != map_values:
+                error_msg = (
+                    f"Distinct values in column '{col}' do not match "
+                    f"Ensure they match exactly."
+                )
+                raise ValueError(error_msg)
+        
+        # Check that ordinal_encode_map does not include extra columns
+        extra_columns = set(ordinal_encode_map.keys()) - set(categorical_columns)
+        if extra_columns:
+            error_msg = (
+                f"Ordinal_encode_map includes extra columns not in the categorical columns: {extra_columns}. "
+                f"Remove these columns from the mapping."
+            )
+            raise ValueError(error_msg)
+
+    # Check if encoding_method_map is provided and has ordinal_encoder
+    if encoding_method_map:
+        ordinal_columns = [
+            col for col, method in encoding_method_map.items() if method == "ordinal_encoder"
+        ]
+    else:
+        ordinal_columns = []
+
+    if ordinal_columns:
+        if not ordinal_encode_map:
+            raise ValueError(
+                "Ordinal encoding is specified in encoding_method_map, but no ordinal_encode_map is provided."
+            )
+        
+        # Validate only the columns specified for ordinal encoding
+        for col in ordinal_columns:
+            if col not in ordinal_encode_map:
+                raise ValueError(
+                    f"Column '{col}' is marked for ordinal encoding but is missing in ordinal_encode_map."
+                )
+            
+            # Get distinct values in the column
+            distinct_values = set(data[col].dropna().unique())
+            map_values = set(ordinal_encode_map[col])
+            
+            # Check if the values in ordinal_encode_map match exactly with the distinct values
+            if distinct_values != map_values:
+                raise ValueError(
+                    f"Unique values in '{col}' do not match with the ones given in ordinal_encode_map. "
+                    f"Ensure they match exactly."
+                )
+        
+        # Ensure ordinal_encode_map does not include extra columns
+        extra_columns = set(ordinal_encode_map.keys()) - set(ordinal_columns)
+        if extra_columns:
+            raise ValueError(
+                f"Ordinal_encode_map includes extra columns not specified for ordinal encoding."
+                f"Remove these columns from the mapping."
+            )
 
     return True

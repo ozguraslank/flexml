@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, OrdinalEncoder
 from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, QuantileTransformer
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, QuantileTransformer, MaxAbsScaler, normalize 
 from typing import List, Optional, Dict, Any
 
 
@@ -168,7 +168,7 @@ class NumericalNormalizer(BaseEstimator, TransformerMixin):
             if method == "standard_scaler":
                 scaler = StandardScaler()
 
-            elif method == "normalize_scaler":
+            elif method == "minmax_scaler":
                 scaler = MinMaxScaler()
 
             elif method == "robust_scaler":
@@ -177,18 +177,30 @@ class NumericalNormalizer(BaseEstimator, TransformerMixin):
             elif method == "quantile_transformer":
                 scaler = QuantileTransformer()
 
+            elif method == "maxabs_scaler":
+                scaler = MaxAbsScaler()
+
+            elif method == "normalize_scaler":
+                scaler = None
+
             else:
                 print(f"Warning: Unknown method '{method}' for column '{column}'. Skipping.") # This shouldn't be needed after validator but just in case
                 continue
 
-            scaler.fit(X[[column]])
-            self.scalers[column] = scaler
+            if scaler is not None:
+                scaler.fit(X[[column]])
+                self.scalers[column] = scaler
+            else:
+                self.scalers[column] = None
 
         return self
 
     def transform(self, X):
         for column, scaler in self.scalers.items():
-            X[column] = scaler.transform(X[[column]])
+            if scaler is None:  # Directly use sklearn's normalize method
+                X[column] = normalize(X[[column]], axis=0).flatten()  # Normalize to unit length
+            else:
+                X[column] = scaler.transform(X[[column]])
 
         return X
 
@@ -235,8 +247,11 @@ class FeatureEngineering:
     encoding_method : str, default='label_encoder'
         Encoding method for categorical columns. Options:
         * 'label_encoder': Use label encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html
         * 'onehot_encoder': Use one-hot encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OneHotEncoder.html
         * 'ordinal_encoder': Use ordinal encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OrdinalEncoder.html
         
     onehot_limit : int, default=25
         Maximum number of categories to use for one-hot encoding
@@ -251,10 +266,18 @@ class FeatureEngineering:
     
     normalize : str, default=None
         Standardize the data using StandardScaler. Options:
-        * 'standard_scaler': Standardize the data
-        * 'normalize_scaler': Normalize the data
+        * 'standard_scaler': Standardize the data using StandardScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html
+        * 'minmax_scaler': Scale the data using MinMaxScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MinMaxScaler.html
         * 'robust_scaler': Scale the data using RobustScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.RobustScaler.html
         * 'quantile_transformer': Transform the data using QuantileTransformer
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.QuantileTransformer.html
+        * 'maxabs_scaler': Scale the data using MaxAbsScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MaxAbsScaler.html
+        * 'normalize_scaler': Normalize the data to unit length
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html
     """
     def __init__(
         self, 

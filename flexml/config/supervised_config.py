@@ -76,5 +76,5 @@ FEATURE_ENGINEERING_METHODS = {
     "accepted_numeric_imputations_methods": ['median', 'mean', 'mode', 'constant', 'drop'],
     "accepted_categorical_imputations_methods": ['mode', 'constant', 'drop'],
     "accepted_encoding_methods": ['label_encoder', 'onehot_encoder', 'ordinal_encoder'],
-    "accepted_standardization_methods": ['standard_scaler', 'normalize_scaler', 'robust_scaler', 'quantile_transformer']
+    "accepted_standardization_methods": ['standard_scaler', 'normalize_scaler', 'robust_scaler', 'quantile_transformer', 'minmax_scaler', 'maxabs_scaler']
 }
