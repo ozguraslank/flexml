@@ -5,6 +5,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, QuantileTransformer, MaxAbsScaler, normalize 
 from typing import List, Optional, Dict, Any
+import logging
 
 
 class ColumnDropper(BaseEstimator, TransformerMixin):
@@ -162,6 +163,7 @@ class NumericalNormalizer(BaseEstimator, TransformerMixin):
     def __init__(self, normalization_method_map: Dict[str, str]): 
         self.normalization_method_map = normalization_method_map or {}
         self.scalers = {}
+        self.logger = logging.getLogger(__name__)
 
     def fit(self, X, y=None):
         for column, method in self.normalization_method_map.items():
@@ -184,7 +186,7 @@ class NumericalNormalizer(BaseEstimator, TransformerMixin):
                 scaler = None
 
             else:
-                print(f"Warning: Unknown method '{method}' for column '{column}'. Skipping.") # This shouldn't be needed after validator but just in case
+                self.logger.warning(f"Unknown method '{method}' for column '{column}'. Skipping.")
                 continue
 
             if scaler is not None:
@@ -378,6 +380,67 @@ class FeatureEngineering:
         # Create the pipeline
         self.pipeline = Pipeline(pipeline_steps)
 
+        self.logger = logging.getLogger(__name__)
+
+        id_columns = self._id_finder()
+        if id_columns:
+            for column in id_columns:
+                self.logger.warning(f"Column '{column}' seems like an ID column. Consider dropping it if it is not a feature")
+
+        columns_to_consider = self._anomaly_unique_values_finder(threshold=0.5)
+        if columns_to_consider:
+            for column, ratio in columns_to_consider.items():
+                self.logger.warning(
+                    f"Column '{column}' has too many unique values ({ratio:.2%}). "
+                    "Recommended to either process or drop this column"
+                )
+
+    def _id_finder(self) -> list:
+        """
+        Identifies potential ID columns by checking if values in the first 100 rows 
+        match their respective index values
+        
+        Returns
+        -------
+        list 
+            List of column names that could be ID columns
+        """
+        potential_ids = []
+
+        for column in self.data.columns:
+            # Check if the first 100 rows match the index values
+            if (self.data[column].iloc[:100] == self.data.index[:100]).all():
+                potential_ids.append(column)
+        
+        return potential_ids
+
+    def _anomaly_unique_values_finder(self, threshold: float = 0.5) -> list:
+        """
+        Identifies categorical columns where the ratio of unique values to non-null rows
+        exceeds the given threshold
+
+        Parameters
+        ----------
+        threshold : float 
+            Threshold for the ratio (default is 0.5, e.g., 50%)
+
+        Returns
+        -------
+        list
+            List of column names that meet the condition
+        """
+        columns_above_threshold = {}
+
+        for column in self.categorical_columns:
+            # Calculate the ratio using non-null data
+            non_null_count = self.data[column].notnull().sum()
+            if non_null_count > 0:  # Avoid division by zero
+                unique_ratio = self.data[column].nunique() / non_null_count
+                if unique_ratio > threshold:
+                    columns_above_threshold[column] = unique_ratio
+
+        return columns_above_threshold
+    
     def start_feature_engineering(self) -> pd.DataFrame:
         """
         Perform feature engineering on the training data

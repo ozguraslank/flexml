@@ -26,6 +26,7 @@ class TestFeatureEngineering(unittest.TestCase):
         'target': np.random.choice([0, 1], n_rows)
     })
 
+    # This will create artificial null values within dataframe
     for column in df.columns:
         if column not in ['id', 'target']:
             mask = np.random.random(n_rows) < 0.2
@@ -77,7 +78,6 @@ class TestFeatureEngineering(unittest.TestCase):
         
         classification_exp.start_experiment()
         processed_data = classification_exp.data
-        print(processed_data)
 
         # Check if all columns are numerical, including target
         self.assertFalse(
