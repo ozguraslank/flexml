@@ -1,8 +1,8 @@
 import unittest
 import pandas as pd
 import numpy as np
+from flexml._feature_engineer import FeatureEngineering
 from sklearn.linear_model import LogisticRegression
-from flexml.classification import Classification
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -40,7 +40,7 @@ class TestFeatureEngineering(unittest.TestCase):
         """
         End-to-end test for feature engineering pipeline through Classification class
         """
-        classification_exp = Classification(
+        feature_exp = FeatureEngineering(
                                 self.df, 
                                 target_col='target',
                                 drop_columns=['id'],
@@ -53,43 +53,40 @@ class TestFeatureEngineering(unittest.TestCase):
                                 normalize='normalize_scaler'
                             )
         
-        
-        classification_exp.start_experiment()
-        processed_data = classification_exp.data
+        data = feature_exp.start_feature_engineering()
+        lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])
 
         # Check if all columns are numerical, including target
         self.assertFalse(
-            processed_data.select_dtypes(exclude=[np.number]).columns.tolist(),
+            data.select_dtypes(exclude=[np.number]).columns.tolist(),
             "Not all columns are numerical"
         )
 
-        # Check for total number of columns
-        self.assertEqual(
-            processed_data.shape[1],
-            9,
-            "The processed data with inputs does not have 7 columns including the target"
+        # Check if there are any null values
+        self.assertFalse(
+            data.isnull().any().any(),
+            "There are null values in the processed data"
         )
 
     def test_feature_engineering_without_inputs(self):
         """
         End-to-end test for feature engineering pipeline through Classification class
         """
-        classification_exp = Classification(self.df, target_col='target')
+        feature_exp = FeatureEngineering(self.df, target_col='target')
         
-        classification_exp.start_experiment()
-        processed_data = classification_exp.data
+        data = feature_exp.start_feature_engineering()
+        lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])
 
         # Check if all columns are numerical, including target
         self.assertFalse(
-            processed_data.select_dtypes(exclude=[np.number]).columns.tolist(),
+            data.select_dtypes(exclude=[np.number]).columns.tolist(),
             "Not all columns are numerical"
         )
 
-        # Check for total number of columns
-        self.assertEqual(
-            processed_data.shape[1],
-            8,
-            "The default processed data does not have 8 columns including the target"
+        # Check if there are any null values
+        self.assertFalse(
+            data.isnull().any().any(),
+            "There are null values in the processed data"
         )
 
     def test_feature_engineering_with_dynamic_inputs(self):
@@ -114,7 +111,7 @@ class TestFeatureEngineering(unittest.TestCase):
                         column_imputation_map = {'status': 'mode', 'amount': imputation_method}
 
                     with self.subTest(encoding_method=encoding_method, imputation_method=imputation_method, normalization_method=normalization_method):
-                        classification_exp = Classification(
+                        feature_test = FeatureEngineering(
                             data=self.df, 
                             target_col='target',
                             drop_columns=['id'],
@@ -126,18 +123,24 @@ class TestFeatureEngineering(unittest.TestCase):
                             onehot_limit=3,
                             normalize=normalization_method
                         )
+                        
+                        data = feature_test.start_feature_engineering()
+                        lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])
 
-                        # Prepare cross-validation splits
-                        cv_splits = list(classification_exp._prepare_data(cv_method="kfold", n_folds=3, apply_feature_engineering=True)).copy()
-                        preds = None
+                        # Check if all columns are numerical, including target
+                        self.assertFalse(
+                            data.select_dtypes(exclude=[np.number]).columns.tolist(),
+                            f"Not all columns are numerical. Failed parameters are: "
+                            f"Encoding method: {encoding_method}, "
+                            f"Imputation method: {imputation_method}, "
+                            f"Normalization method: {normalization_method}"
+                        )
 
-                        # Train-test split and logistic regression model
-                        for train_idx, test_idx in cv_splits:
-                            X_train, X_test = classification_exp.X.iloc[train_idx], classification_exp.X.iloc[test_idx]
-                            y_train, y_test = classification_exp.y.iloc[train_idx], classification_exp.y.iloc[test_idx]
-
-                            logistic = LogisticRegression(max_iter=500).fit(X_train, y_train)
-                            preds = logistic.predict(X_test)
-
-                        if preds is None:
-                            raise Exception("Logistic regression failed to produce predictions")
+                        # Check if there are any null values
+                        self.assertFalse(
+                            data.isnull().any().any(),
+                            f"There are null values in the processed data. Failed parameters are: "
+                            f"Encoding method: {encoding_method}, "
+                            f"Imputation method: {imputation_method}, "
+                            f"Normalization method: {normalization_method}"
+                        )

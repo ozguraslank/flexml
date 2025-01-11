@@ -4,6 +4,7 @@ import optuna
 from typing import Optional, Union
 from time import time
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.pipeline import Pipeline
 from flexml.config.supervised_config import TUNING_METRIC_TRANSFORMATIONS
 from flexml.logger.logger import get_logger
 from flexml.helpers import evaluate_model_perf
@@ -66,7 +67,8 @@ class ModelTuner:
     def _param_grid_validator(
         self,
         model_available_params: dict,
-        param_grid: dict
+        param_grid: dict,
+        prefix_param_grid_flag: bool = True
     ) -> dict:
         """
         This method is used to validate the param_grid dictionary for the model
@@ -78,12 +80,18 @@ class ModelTuner:
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values
+
+        prefix_param_grid_flag : bool
+            Indicates If param_grid keys will be modified to be suitable for Pipeline object, adds model__ prefix to the begining of them
         """
         param_amount = len(param_grid)
         if param_amount == 0:
             error_msg = "Error while validating the param_grid for the model. The param_grid should not be empty"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
+
+        if prefix_param_grid_flag:
+            param_grid = {f"model__{key}": value for key, value in param_grid.items()}
          
         # Check if all params that param_grid has are available in the model's params
         for param_name in param_grid.keys():
@@ -101,7 +109,8 @@ class ModelTuner:
         model: object,
         param_grid: dict,
         n_iter: Optional[int] = None,
-        n_jobs: int = -1
+        n_jobs: int = -1,
+        prefix_param_grid_flag = True
     ):
         """
         Sets up the tuning process by creating the model_stats dictionary
@@ -126,6 +135,9 @@ class ModelTuner:
         n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
 
+        prefix_param_grid_flag : bool
+            Indicates If param_grid keys will be modified to be suitable for Pipeline object, adds model__ prefix to the begining of them
+
         Returns
         -------
         model_stats: dict
@@ -147,12 +159,20 @@ class ModelTuner:
         """
         model_params = None
 
-        if "CatBoost" in model.__class__.__name__:
-            model_params = model.get_all_params()
+        if "CatBoost" in model.named_steps['model'].__class__.__name__:
+            model_params = model.named_steps['model'].get_all_params()
         else:
-            model_params = model.get_params()
+            model_params = model.named_steps['model'].get_params()
+        
+        if prefix_param_grid_flag:
+            model_params = {f"model__{key}": value for key, value in model_params.items()}
 
-        param_grid = self._param_grid_validator(model_params, param_grid)
+        param_grid = self._param_grid_validator(
+            model_available_params=model_params,
+            param_grid=param_grid,
+            prefix_param_grid_flag=prefix_param_grid_flag
+        )
+
         model_stats = {
             "tuning_method": tuning_method,
             "tuning_param_grid": param_grid,
@@ -167,7 +187,7 @@ class ModelTuner:
             
     def grid_search(
         self,
-        model: object,
+        pipeline: Pipeline,
         param_grid: dict,
         eval_metric: str,
         cv: object,
@@ -179,8 +199,8 @@ class ModelTuner:
 
         Parameters
         ----------
-        model : object
-            The model object that will be tuned
+        pipeline : Pipeline
+            The pipeline object includes feature engineering and model object that will be tuned
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values
@@ -240,12 +260,12 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("GridSearchCV", model, param_grid, n_iter=None, n_jobs=n_jobs)
+        model_stats = self._setup_tuning("GridSearchCV", pipeline, param_grid, n_iter=None, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
         
         try:
             t_start = time()
-            search_result = GridSearchCV(model, param_grid, scoring=self.eval_metrics_in_tuning_format, refit=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X, self.y)
+            search_result = GridSearchCV(pipeline, param_grid, scoring=self.eval_metrics_in_tuning_format, refit=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X, self.y)
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
@@ -258,7 +278,7 @@ class ModelTuner:
                 for metric in list(self.eval_metrics_in_tuning_format.keys())
             }
 
-            model_stats['tuned_model'] = search_result.best_estimator_
+            model_stats['tuned_model'] = search_result.best_estimator_.named_steps['model'] 
             model_stats['tuned_model_score'] = round(search_result.best_estimator_.score, 6)
             model_stats['model_perf'] = scores
             model_stats['time_taken_sec'] = time_taken
@@ -271,7 +291,7 @@ class ModelTuner:
     
     def random_search(
         self,
-        model: object,
+        pipeline: Pipeline,
         param_grid: dict,
         eval_metric: str,
         cv: object,
@@ -284,8 +304,8 @@ class ModelTuner:
 
         Parameters
         ----------
-        model : object
-            The model object that will be tuned
+        pipeline : Pipeline
+            The pipeline object includes feature engineering and model object that will be tuned
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values
@@ -337,12 +357,12 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("randomized_search", model, param_grid, n_iter=n_iter, n_jobs=n_jobs)
+        model_stats = self._setup_tuning("randomized_search", pipeline, param_grid, n_iter=n_iter, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
 
         try:
             t_start = time()
-            search_result = RandomizedSearchCV(estimator=model, param_distributions=param_grid, n_iter=n_iter, scoring=self.eval_metrics_in_tuning_format, refit=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X, self.y)
+            search_result = RandomizedSearchCV(estimator=pipeline, param_distributions=param_grid, n_iter=n_iter, scoring=self.eval_metrics_in_tuning_format, refit=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X, self.y)
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
@@ -355,7 +375,7 @@ class ModelTuner:
                 for metric in list(self.eval_metrics_in_tuning_format.keys())
             }
 
-            model_stats['tuned_model'] = search_result.best_estimator_
+            model_stats['tuned_model'] = search_result.best_estimator_.named_steps['model']
             model_stats['tuned_model_score'] = search_result.best_estimator_.score
             model_stats['model_perf'] = scores
             model_stats['time_taken_sec'] = time_taken
@@ -368,7 +388,7 @@ class ModelTuner:
         
     def optuna_search(
         self,
-        model: object,
+        pipeline: Pipeline,
         param_grid: dict,
         eval_metric: str,
         cv: object,
@@ -378,12 +398,12 @@ class ModelTuner:
         verbose: int = 0
     ) -> Optional[dict]:
         """
-        Implements Optuna hyperparameter optimization on the giveen machine learning model
+        Implements Optuna hyperparameter optimization on the given machine learning model
 
         Parameters
         ----------
-        model : object
-            The model object that will be tuned
+        pipeline : Pipeline
+            The pipeline object includes feature engineering and model object that will be tuned
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values
@@ -453,7 +473,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("optuna", model, param_grid, n_iter=n_iter, n_jobs=n_jobs)
+        model_stats = self._setup_tuning("optuna", pipeline, param_grid, n_iter=n_iter, n_jobs=n_jobs, prefix_param_grid_flag=False)
         param_grid = model_stats['tuning_param_grid']
 
         # Set verbosity levels
@@ -471,47 +491,61 @@ class ModelTuner:
         study_direction = "maximize" if eval_metric in ['R2', 'Accuracy', 'Precision', 'Recall', 'F1 Score'] else "minimize"
 
         def objective(trial):
-            # Generate parameters for the trial
-            params = {}
-            for param_name, param_values in param_grid.items():
-                first_element = param_values[0]
+            try:
+                # Generate parameters for the trial
+                params = {}
+                for param_name, param_values in param_grid.items():
+                    first_element = param_values[0]
 
-                if isinstance(first_element, (str, bool)):
-                    params[param_name] = trial.suggest_categorical(param_name, param_values)
-                elif isinstance(first_element, int):
-                    params[param_name] = trial.suggest_int(param_name, param_values[0], param_values[-1])
-                elif isinstance(first_element, float):
-                    params[param_name] = trial.suggest_float(param_name, param_values[0], param_values[-1])
-                else:
-                    info_msg = f"{param_name} parameter is not added to tuning since its type is not supported by Optuna."
-                    self.logger.info(info_msg)
+                    if isinstance(first_element, (str, bool)):
+                        params[param_name] = trial.suggest_categorical(param_name, param_values)
+                    elif isinstance(first_element, int):
+                        params[param_name] = trial.suggest_int(param_name, param_values[0], param_values[-1])
+                    elif isinstance(first_element, float):
+                        params[param_name] = trial.suggest_float(param_name, param_values[0], param_values[-1])
+                    else:
+                        info_msg = f"{param_name} parameter is not added to tuning since its type is not supported by Optuna."
+                        self.logger.info(info_msg)
 
-            # Initialize the model with the trial's parameters
-            test_model = type(model)()
-            test_model.set_params(**params)
+                # Extract the model from the pipeline
+                test_model = type(pipeline.named_steps['model'])()
+                test_model.set_params(**params)
 
-            # Perform cross-validation and calculate the score
-            scores = []
-            for train_idx, test_idx in cv:  # Use custom splitter object
-                X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
-                y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
+                # Decompose the pipeline by removing the model from it to use it for only feature engineering
+                processing_pipeline = Pipeline(steps=[
+                    (name, step) for name, step in pipeline.steps if name != 'model'
+                ])
 
-                test_model.fit(X_train, y_train)
-                y_pred = test_model.predict(X_test)
+                # Perform cross-validation and calculate the score
+                scores = []
+                for train_idx, test_idx in cv:  # Use custom splitter object
+                    X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
+                    y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
 
-                scores.append(evaluate_model_perf(self.ml_problem_type, y_test, y_pred))
+                    processing_pipeline.fit(X_train)
+                    X_train_processed = processing_pipeline.transform(X_train)
+                    X_test_processed = processing_pipeline.transform(X_test)
 
-            # Calculate the mean score across all folds
-            avg_metrics = {k: np.mean([m[k] for m in scores]) for k in scores[0]}
-            mean_score = avg_metrics.get(eval_metric, float('inf'))
+                    # Fit and predict using the model
+                    test_model.fit(X_train_processed, y_train)
+                    y_pred = test_model.predict(X_test_processed)
 
-            # Update the best score and model
-            if model_stats['tuned_model_score'] is None or mean_score > model_stats['tuned_model_score']:
-                model_stats['tuned_model_score'] = round(mean_score, 6)
-                model_stats['tuned_model'] = test_model
-                model_stats['model_perf'] = avg_metrics
+                    scores.append(evaluate_model_perf(self.ml_problem_type, y_test, y_pred))
 
-            return mean_score
+                # Calculate the mean score across all folds
+                avg_metrics = {k: np.mean([m[k] for m in scores]) for k in scores[0]}
+                mean_score = avg_metrics.get(eval_metric, float('inf'))
+
+                # Update the best score and model
+                if model_stats['tuned_model_score'] is None or mean_score > model_stats['tuned_model_score']:
+                    model_stats['tuned_model_score'] = round(mean_score, 6)
+                    model_stats['tuned_model'] = test_model
+                    model_stats['model_perf'] = avg_metrics
+
+                return mean_score
+            
+            except Exception as e:
+                print(f"error in optuna: {e}")
 
         try:
             # Perform Optuna optimization

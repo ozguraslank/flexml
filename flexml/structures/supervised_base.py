@@ -2,10 +2,12 @@ import pickle
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from collections import defaultdict
 from time import time
 from typing import Any, Union, Optional, Iterator, List, Dict
 from tqdm import tqdm
 from IPython import get_ipython
+from sklearn.pipeline import Pipeline
 from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
 from flexml.logger.logger import get_logger
 from flexml.helpers import (
@@ -18,6 +20,9 @@ from flexml.helpers import (
 )
 from flexml._model_tuner import ModelTuner
 from flexml._feature_engineer import FeatureEngineering
+
+import warnings
+warnings.filterwarnings("ignore")
 
 
 class SupervisedBase:
@@ -135,7 +140,7 @@ class SupervisedBase:
         self.logging_to_file = logging_to_file
         self.shuffle = shuffle
         self._current_data_processing_random_state = random_state
-        feature_engineering_params = {
+        self.feature_engineering_params = {
             'data': data,
             'target_col': target_col,
             'drop_columns': drop_columns,
@@ -153,13 +158,12 @@ class SupervisedBase:
 
         # Data Preparation
         self.__validate_data()
-        validate_inputs(**feature_engineering_params)
+        validate_inputs(**self.feature_engineering_params)
         self.feature_names = self.data.drop(columns=[self.target_col]).columns
         self.__model_training_info = []
         self.__model_stats_df = None
         self.__sorted_model_stats_df = None
         self.__data_is_prepared = False # Since _prepare_data() is going to be called in the start_experiment() method, data shouldn't be prepared again when start_experiment() is called again to test other scenarios
-        self.feature_engineer = FeatureEngineering(**feature_engineering_params)
 
         # Model Preparation
         self.__ML_MODELS = []
@@ -287,7 +291,6 @@ class SupervisedBase:
         """
         try:
             if apply_feature_engineering:
-                self.data = self.feature_engineer.start_feature_engineering()
                 self.__logger.info("[PROCESS] Data is prepared")
                 self.__data_is_prepared = True
             
@@ -356,6 +359,39 @@ class SupervisedBase:
             raise ValueError(error_msg)
         
         return top_n_models
+    
+    def __process_experiment_result(self, experiment_stats: dict):
+        """
+        Processes and aggregates the results of an experiment, calculating average metrics and selecting the best model.
+
+        Parameters
+        ----------
+        experiment_stats : dict
+            A dictionary containing experiment results. The keys are model names, and the values are lists of model entries, 
+            where each entry is a dictionary containing "model_stats" (a dictionary of metrics) and the trained "model"
+        """
+        for model_name, model_entries in experiment_stats.items():
+            # Aggregate metrics across all entries for this model
+            aggregated_metrics = defaultdict(list)
+
+            for entry in model_entries:
+                for key, value in entry["model_stats"].items():
+                    aggregated_metrics[key].append(value)
+            
+            # Calculate the average for all aggregated metrics, with a special case for "Time Taken (sec)"
+            averaged_metrics = {
+                key: np.sum(value) if key == "Time Taken (sec)" else np.mean(value) if isinstance(value[0], (int, float)) else value[0]
+                for key, value in aggregated_metrics.items()
+            }
+            
+            best_model_entry = max(model_entries, key=lambda x: x["model_stats"][self.eval_metric])
+            
+            self.__model_training_info.append({
+                model_name: {
+                    "model": best_model_entry["model"],  # Use the best model based on the max metric value
+                    "model_stats": averaged_metrics
+                }
+            })
     
     def start_experiment(
         self,
@@ -471,46 +507,60 @@ class SupervisedBase:
         cv_splits_copy = self.cv_splits.copy() # Will be used for trainings
 
         self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} cross-validation")
+        
+        all_model_stats = defaultdict(list)
+        total_iterations = len(cv_splits_copy) * len(self.__ML_MODELS)
 
-        for model_idx in tqdm(range(len(self.__ML_MODELS))):
-            model_info = self.__ML_MODELS[model_idx]
-            model_name = model_info['name']
-            model = model_info['model']
-            try:
-                all_metrics = []
-                all_times = []
+        with tqdm(total=total_iterations, desc="INFO | Training Progress", bar_format="{desc}:  | {bar} | {percentage:.0f}%") as pbar:
+            for train_idx, test_idx in cv_splits_copy:
+                X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
+                y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
 
-                for train_idx, test_idx in cv_splits_copy:
-                    X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
-                    y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
+                self.feature_engineering_params['data'] = pd.concat([X_train, y_train], axis=1)
+                feature_engineer = FeatureEngineering(**self.feature_engineering_params)
+                X_train = feature_engineer.start_feature_engineering().drop(self.target_col, axis=1)
+                X_test = feature_engineer.transform_new_data(X_test)
 
-                    t_start = time()
-                    model.fit(X_train, y_train)
-                    t_end = time()
+                for model_idx in range(len(self.__ML_MODELS)):
+                    model_info = self.__ML_MODELS[model_idx]
+                    model_name = model_info['name']
+                    model = model_info['model']
+                    try:
+                        all_metrics = []
+                        all_times = []
 
-                    time_taken = round(t_end - t_start, 2)
-                    y_pred = model.predict(X_test)
-                    model_perf = evaluate_model_perf(self.__ML_TASK_TYPE, y_test, y_pred)
+                        t_start = time()
+                        model.fit(X_train, y_train)
+                        t_end = time()
 
-                    all_metrics.append(model_perf)
-                    all_times.append(time_taken)
+                        time_taken = round(t_end - t_start, 2)
+                        y_pred = model.predict(X_test)
+                        model_perf = evaluate_model_perf(self.__ML_TASK_TYPE, y_test, y_pred)
 
-                # Aggregate metrics across all folds
-                avg_metrics = {k: np.mean([m[k] for m in all_metrics]) for k in all_metrics[0]}
-                total_time_taken = np.sum(all_times)
+                        all_metrics.append(model_perf)
+                        all_times.append(time_taken)
 
-                self.__model_training_info.append({
-                    model_name: {
-                        "model": model,
-                        "model_stats": {
-                            "model_name": model_name,
-                            **avg_metrics,
-                            "Time Taken (sec)": total_time_taken}
-                    }
-                })
+                        # Aggregate metrics across all folds
+                        avg_metrics = {k: np.mean([m[k] for m in all_metrics]) for k in all_metrics[0]}
+                        total_time_taken = np.sum(all_times)
 
-            except Exception as e:
-                self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
+                        # Store results temporarily in a defaultdict to group by model name
+                        all_model_stats[model_name].append({
+                            "model": model,
+                            "model_stats": {
+                                "model_name": model_name,
+                                **avg_metrics,
+                                "Time Taken (sec)": total_time_taken
+                            }
+                        })
+
+                    except Exception as e:
+                        self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
+
+                    finally:
+                        pbar.update(1)
+
+        self.__process_experiment_result(all_model_stats)
 
         self.__logger.info("[PROCESS] Model training is finished!")
         self.get_best_models(eval_metric)
@@ -579,6 +629,7 @@ class SupervisedBase:
                 model_stats.append(model_data["model_stats"])
     
         self.__model_stats_df = pd.DataFrame(model_stats)
+        # self.__model_stats_df = self.__model_stats_df.groupby(self.__model_stats_df.columns[0]).mean().reset_index()
         self.__sorted_model_stats_df = self.__sort_models(eval_metric)
 
         for i in range(top_n_models):
@@ -947,11 +998,14 @@ class SupervisedBase:
         if not hasattr(self, 'model_tuner'):
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, self.y, self.logging_to_file)
 
+        pipeline = FeatureEngineering(**self.feature_engineering_params).pipeline
+        pipeline = Pipeline(steps=pipeline.steps + [('model', model)])
+
         self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")
         tuning_method = tuning_method.lower()
         if tuning_method == "grid_search":
             tuning_result = self.model_tuner.grid_search(
-                model=model,
+                pipeline=pipeline,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 cv=cv_obj,
@@ -961,7 +1015,7 @@ class SupervisedBase:
             
         elif tuning_method == "randomized_search":
             tuning_result = self.model_tuner.random_search(
-                model=model,
+                pipeline=pipeline,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 n_iter=n_iter,
@@ -972,7 +1026,7 @@ class SupervisedBase:
                 
         elif tuning_method == "optuna":
             tuning_result = self.model_tuner.optuna_search(
-                model=model,
+                pipeline=pipeline,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 cv=cv_obj,
