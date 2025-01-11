@@ -95,11 +95,11 @@ QUICK_REGRESSION_MODELS = [
         "name": DECISION_TREE_REGRESSION.__class__.__name__,
         "model": DECISION_TREE_REGRESSION,
         "tuning_param_grid": {
-            "max_depth": [None, 5, 10, 15, 20],
+            "max_depth": [5, 10, 15, 20],
             "min_samples_split": [2, 5, 10, 15],
             "min_samples_leaf": [1, 2, 4, 6],
             "max_features": ["sqrt", "log2"],
-            "max_leaf_nodes": [None, 10, 20, 30, 40],
+            "max_leaf_nodes": [10, 20, 30, 40],
             "criterion": ["friedman_mse", "poisson", "absolute_error", "squared_error"]
         }
     },
@@ -108,7 +108,7 @@ QUICK_REGRESSION_MODELS = [
         "model": RANDOM_FOREST_REGRESSION,
         "tuning_param_grid": {
             "n_estimators": [100, 200, 500, 1000],
-            "max_depth": [None, 5, 10, 15, 20],
+            "max_depth": [5, 10, 15, 20],
             "min_samples_split": [2, 5, 10, 15],
             "min_samples_leaf": [1, 2, 4, 6],
             "max_features": ["sqrt", "log2"],
@@ -165,7 +165,7 @@ WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
         "model": EXTRA_TREES_REGRESSION,
         "tuning_param_grid": {
             'n_estimators': [100, 200, 500, 1000],
-            'max_depth': [None, 3, 5, 10],
+            'max_depth': [3, 5, 10],
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4],
             'max_features': ["sqrt", "log2"],
@@ -180,7 +180,7 @@ QUICK_CLASSIFICATION_MODELS = [
         "name": LOGISTIC_REGRESSION.__class__.__name__,
         "model": LOGISTIC_REGRESSION,
         "tuning_param_grid": {
-            "penalty": ["l2", None],
+            "penalty": ["l2"],
             "C": [0.01, 0.1, 1, 10, 100],
             "max_iter": [100, 200, 300, 400, 500]
         }
@@ -231,11 +231,11 @@ QUICK_CLASSIFICATION_MODELS = [
         "name": DECISION_TREE_CLASSIFIER.__class__.__name__,
         "model": DECISION_TREE_CLASSIFIER,
         "tuning_param_grid": {
-            "max_depth": [None, 5, 10, 15, 20],
+            "max_depth": [5, 10, 15, 20],
             "min_samples_split": [2, 5, 10, 15],
             "min_samples_leaf": [1, 2, 4, 6],
             "max_features": ["sqrt", "log2"],
-            "max_leaf_nodes": [None, 10, 20, 30, 40],
+            "max_leaf_nodes": [10, 20, 30, 40],
             "criterion": ["gini", "entropy"]
         }
     },
@@ -244,7 +244,7 @@ QUICK_CLASSIFICATION_MODELS = [
         "model": RANDOM_FOREST_CLASSIFIER,
         "tuning_param_grid": {
             "n_estimators": [100, 200, 500, 1000],
-            "max_depth": [None, 5, 10, 15, 20],
+            "max_depth": [5, 10, 15, 20],
             "min_samples_split": [2, 5, 10, 15],
             "min_samples_leaf": [1, 2, 4, 6],
             "max_features": ["sqrt", "log2"],
@@ -300,7 +300,7 @@ WIDE_CLASSIFICATION_MODELS = QUICK_CLASSIFICATION_MODELS + [
         "model": EXTRA_TREES_CLASSIFIER,
         "tuning_param_grid": {
             'n_estimators': [100, 200, 500],
-            'max_depth': [None, 5, 10],
+            'max_depth': [5, 10],
             'min_samples_split': [2, 5, 10],
             'min_samples_leaf': [1, 2, 4],
             'max_features': ["sqrt", "log2"],

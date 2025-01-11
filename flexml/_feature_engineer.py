@@ -1,0 +1,501 @@
+import pandas as pd
+import numpy as np
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, OrdinalEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.base import BaseEstimator, TransformerMixin
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, QuantileTransformer, MaxAbsScaler, normalize 
+from typing import List, Optional, Dict, Any
+import logging
+
+
+class ColumnDropper(BaseEstimator, TransformerMixin):
+    """
+    A transformer to drop specified columns from a dataset
+    """
+    def __init__(self, drop_columns: Optional[List[str]] = None):
+        self.drop_columns = drop_columns or []
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        """
+        Drops specified columns from the input DataFrame
+        
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with the specified columns dropped
+        """
+        return X.drop(columns=self.drop_columns, axis=1, errors='ignore')
+    
+
+class ColumnImputer(BaseEstimator, TransformerMixin):
+    """
+    A transformer to impute missing values in a dataset
+    """
+    def __init__(
+        self, 
+        column_imputation_mapper: Dict[str, str],
+        numerical_imputation_constant: float = 0.0, 
+        categorical_imputation_constant: str = "Unknown"
+    ):
+        self.column_imputation_mapper = column_imputation_mapper
+        self.numerical_imputation_constant = numerical_imputation_constant
+        self.categorical_imputation_constant = categorical_imputation_constant
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X) -> pd.DataFrame:
+        for column, method in self.column_imputation_mapper.items():
+            X[column] = X[column].replace("nan", pd.NA)
+            if method == "mean":
+                mean_value = X[column].mean()
+                X[column] = X[column].fillna(mean_value)
+
+            elif method == "median":
+                median_value = X[column].median()
+                X[column] = X[column].fillna(median_value)
+
+            elif method == "mode":
+                mode_values = X[column].mode()
+                if len(mode_values) > 0:
+                    mode_value = mode_values[0]
+                else:
+                    # TODO: Notify user that mode is not available
+                    mode_value = self.categorical_imputation_constant
+                X[column] = X[column].replace("nan", np.nan).fillna(mode_value)
+
+            elif method == "constant":
+                if X[column].dtype != 'object':
+                    constant = self.numerical_imputation_constant
+                else:
+                    constant = self.categorical_imputation_constant
+                X[column] = X[column].replace("nan", np.nan).fillna(constant)
+
+            elif method == "drop":
+                X = X.dropna(subset=[column])
+
+            else:
+                raise ValueError(f"Invalid imputation method: {method}")
+            
+        return X
+
+
+class CategoricalEncoder(BaseEstimator, TransformerMixin):
+    """
+    A transformer to encode categorical columns in a dataset
+    """
+    def __init__(
+        self, 
+        encoding_method_mapper: Dict[str, str], 
+        ordinal_map: Dict[str, List[str]],
+        onehot_limit: int = 25
+    ):
+        self.encoding_method_mapper = encoding_method_mapper
+        self.ordinal_map = ordinal_map
+        self.onehot_limit = onehot_limit
+        self.label_encoders = {}
+        self.onehot_encoders = {}
+        self.ordinal_encoders = {}
+
+    def fit(self, X, y=None):
+        for col, method in self.encoding_method_mapper.items():
+            if method == "label_encoder":
+                encoder = LabelEncoder()
+                encoder.fit(X[col].fillna("Unknown"))
+                self.label_encoders[col] = encoder
+
+            elif method == "onehot_encoder":
+                encoder = OneHotEncoder(
+                    sparse_output=False, 
+                    handle_unknown="ignore", 
+                    max_categories=self.onehot_limit
+                )
+                encoder.fit(X[[col]])
+                self.onehot_encoders[col] = encoder
+
+            elif method == "ordinal_encoder":
+                if col in self.ordinal_map:
+                    categories = [self.ordinal_map[col]]
+                    encoder = OrdinalEncoder(categories=categories)
+                    encoder.fit(X[[col]])
+                    self.ordinal_encoders[col] = encoder
+
+        return self
+
+    def transform(self, X) -> pd.DataFrame:
+        for col, method in self.encoding_method_mapper.items():
+            if method == "label_encoder":
+                if col in self.label_encoders:
+                    encoder = self.label_encoders[col]
+                    X[col] = X[col].apply(
+                        lambda x: encoder.transform([x])[0] if x in encoder.classes_ else -1
+                    )
+
+            elif method == "onehot_encoder":
+                if col in self.onehot_encoders:
+                    encoder = self.onehot_encoders[col]
+                    one_hot_encoded = encoder.transform(X[[col]])
+                    one_hot_df = pd.DataFrame(
+                        one_hot_encoded,
+                        columns=encoder.get_feature_names_out([col]),
+                        index=X.index
+                    )
+                    X = pd.concat([X.drop(columns=[col]), one_hot_df], axis=1)
+
+            elif method == "ordinal_encoder":
+                if col in self.ordinal_encoders:
+                    encoder = self.ordinal_encoders[col]
+                    categories = encoder.categories_[0]
+                    X[col] = X[col].apply(
+                        lambda x: encoder.transform(pd.DataFrame([[x]], columns=[col]))[0][0] if x in categories else -1
+                    )
+
+        return X
+
+
+class NumericalNormalizer(BaseEstimator, TransformerMixin):
+    """
+    A transformer to normalize numerical columns in a dataset
+    """
+    def __init__(self, normalization_method_map: Dict[str, str]): 
+        self.normalization_method_map = normalization_method_map or {}
+        self.scalers = {}
+        self.logger = logging.getLogger(__name__)
+
+    def fit(self, X, y=None):
+        for column, method in self.normalization_method_map.items():
+            if method == "standard_scaler":
+                scaler = StandardScaler()
+
+            elif method == "minmax_scaler":
+                scaler = MinMaxScaler()
+
+            elif method == "robust_scaler":
+                scaler = RobustScaler()
+
+            elif method == "quantile_transformer":
+                scaler = QuantileTransformer()
+
+            elif method == "maxabs_scaler":
+                scaler = MaxAbsScaler()
+
+            elif method == "normalize_scaler":
+                scaler = None
+
+            else:
+                self.logger.warning(f"Unknown method '{method}' for column '{column}'. Skipping.")
+                continue
+
+            if scaler is not None:
+                scaler.fit(X[[column]])
+                self.scalers[column] = scaler
+            else:
+                self.scalers[column] = None
+
+        return self
+
+    def transform(self, X):
+        for column, scaler in self.scalers.items():
+            if scaler is None:  # Directly use sklearn's normalize method
+                X[column] = normalize(X[[column]], axis=0).flatten()  # Normalize to unit length
+            else:
+                X[column] = scaler.transform(X[[column]])
+
+        return X
+
+
+class FeatureEngineering:
+    """
+    A class for performing feature engineering on a dataset
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        The input data for the model training process
+    
+    target_col : str
+        The target column name in the data
+
+    drop_columns : list, default=None
+        Columns that will be dropped from the data
+    
+    categorical_imputation_method : str, default='mode'
+        Imputation method for categorical columns. Options:
+        * 'mode': Replace missing values with the most frequent value
+        * 'constant': Replace missing values with a constant value
+        * 'drop': Drop rows with missing values
+
+    numerical_imputation_method : str, default='mean'
+        Imputation method for numerical columns. Options:
+        * 'mean': Replace missing values with the column mean
+        * 'median': Replace missing values with the column median
+        * 'mode': Replace missing values with the column mode
+        * 'constant': Replace missing values with a constant value
+        * 'drop': Drop rows with missing values
+
+    column_imputation_map : dict, default=None
+        Custom mapping of columns to specific imputation methods
+        Example usage: {'column_name1': 'mean', 'column_name2': 'mode'}
+
+    numerical_imputation_constant : float, default=0.0
+        The constant value for imputing numerical columns when 'constant' is selected
+
+    categorical_imputation_constant : str, default='Unknown'
+        The constant value for imputing categorical columns when 'constant' is selected
+
+    encoding_method : str, default='label_encoder'
+        Encoding method for categorical columns. Options:
+        * 'label_encoder': Use label encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html
+        * 'onehot_encoder': Use one-hot encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OneHotEncoder.html
+        * 'ordinal_encoder': Use ordinal encoding
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.OrdinalEncoder.html
+        
+    onehot_limit : int, default=25
+        Maximum number of categories to use for one-hot encoding
+
+    encoding_method_map : dict, default=None
+        Custom mapping of columns to encoding methods
+        Example usage: {'column_name': 'onehot_encoder', 'column_name2': 'label_encoder'}
+    
+    ordinal_encode_map : dict, default=None
+        Custom mapping of columns to category order for ordinal encoding
+        Example usage: {'column_name': ['low', 'medium', 'high']}
+    
+    normalize : str, default=None
+        Standardize the data using StandardScaler. Options:
+        * 'standard_scaler': Standardize the data using StandardScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.StandardScaler.html
+        * 'minmax_scaler': Scale the data using MinMaxScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MinMaxScaler.html
+        * 'robust_scaler': Scale the data using RobustScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.RobustScaler.html
+        * 'quantile_transformer': Transform the data using QuantileTransformer
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.QuantileTransformer.html
+        * 'maxabs_scaler': Scale the data using MaxAbsScaler
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.MaxAbsScaler.html
+        * 'normalize_scaler': Normalize the data to unit length
+            * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html
+    """
+    def __init__(
+        self, 
+        data: pd.DataFrame, 
+        target_col: str, 
+        drop_columns: Optional[List[str]] = None,
+        categorical_imputation_method: str = "mode",
+        numerical_imputation_method: str = "mean", 
+        column_imputation_map: Optional[Dict[str, str]] = None,
+        numerical_imputation_constant: float = 0.0,
+        categorical_imputation_constant: str = "Unknown", 
+        encoding_method: str = "label_encoder",
+        onehot_limit: int = 25,
+        encoding_method_map: Optional[Dict[str, str]] = None,
+        ordinal_encode_map: Optional[Dict[str, List[str]]] = None,
+        normalize: Optional[str] = None
+    ):
+
+        # Initialize attributes
+        self.data = data
+        self.target_col = target_col
+        self.drop_columns = drop_columns or []
+        self.categorical_imputation_method = categorical_imputation_method
+        self.numerical_imputation_method = numerical_imputation_method
+        self.column_imputation_map = column_imputation_map or {}
+        self.numerical_imputation_constant = numerical_imputation_constant
+        self.categorical_imputation_constant = categorical_imputation_constant
+        self.encoding_method = encoding_method
+        self.onehot_limit = onehot_limit
+        self.encoding_method_map = encoding_method_map or {}
+        self.ordinal_encode_map = ordinal_encode_map or {}
+        self.normalize = normalize
+        # Initialize encoder for target column
+        self.target_encoder = LabelEncoder()
+        # Separate features and target column
+        self.feature_data = self.data.drop(columns=[self.target_col, *self.drop_columns], errors='ignore')
+        self.numerical_columns = self.feature_data.select_dtypes(include=['number']).columns.tolist()
+        self.categorical_columns = self.feature_data.columns.difference(self.numerical_columns).tolist()
+        self.feature_data[self.categorical_columns] = self.feature_data[self.categorical_columns].astype(str)
+
+        # Separate imputation mapping for numerical and categorical columns
+        self.numerical_column_imputation_mapper = {
+            col: self.numerical_imputation_method for col in self.numerical_columns
+        }
+
+        # For categorical columns, handle imputation separately
+        self.categorical_column_imputation_mapper = {
+            col: self.categorical_imputation_method for col in self.categorical_columns
+        }
+
+        # Combine both mappers to have a comprehensive imputation mapping
+        self.column_imputation_mapper = {**self.numerical_column_imputation_mapper, 
+                                         **self.categorical_column_imputation_mapper}
+        
+        # Update the mappers with any custom map provided
+        if self.column_imputation_map:
+            self.column_imputation_mapper.update(self.column_imputation_map)
+        
+        # Initialize encoding method mapper with default value and update with custom map
+        self.encoding_method_mapper = {col: self.encoding_method for col in self.categorical_columns}
+        if self.encoding_method_map:
+            self.encoding_method_mapper.update(encoding_method_map)
+        
+        # Initialize numerical normalization map
+        if self.normalize:
+            self.normalization_map = {
+                col: self.normalize for col in self.numerical_columns
+            }
+
+
+        pipeline_steps = []
+
+        # Add drop_columns step if drop_columns is not empty
+        if self.drop_columns:
+            pipeline_steps.append(("drop_columns", ColumnDropper(drop_columns=self.drop_columns)))
+
+        # Add imputer step
+        pipeline_steps.append(
+            ("imputer", ColumnImputer(
+                self.column_imputation_mapper, 
+                self.numerical_imputation_constant, 
+                self.categorical_imputation_constant
+                )
+            )
+        )
+        
+        # Add normalization step if not None
+        if self.normalize:
+            pipeline_steps.append(("normalizer", NumericalNormalizer(self.normalization_map)))
+
+        # Add encoding step
+        pipeline_steps.append(("encoder", CategoricalEncoder(
+            self.encoding_method_mapper, 
+            self.ordinal_encode_map,
+            onehot_limit=self.onehot_limit
+        )))
+        
+        # Create the pipeline
+        self.pipeline = Pipeline(pipeline_steps)
+
+        self.logger = logging.getLogger(__name__)
+
+        id_columns = self._id_finder()
+        if id_columns:
+            for column in id_columns:
+                self.logger.warning(f"Column '{column}' seems like an ID column. Consider dropping it if it is not a feature")
+
+        columns_to_consider = self._anomaly_unique_values_finder(threshold=0.5)
+        if columns_to_consider:
+            for column, ratio in columns_to_consider.items():
+                self.logger.warning(
+                    f"Column '{column}' has too many unique values ({ratio:.2%}). "
+                    "Recommended to either process or drop this column"
+                )
+
+    def _id_finder(self) -> list:
+        """
+        Identifies potential ID columns by checking if values in the first 100 rows 
+        match their respective index values
+        
+        Returns
+        -------
+        list 
+            List of column names that could be ID columns
+        """
+        potential_ids = []
+
+        for column in self.data.columns:
+            # Check if the first 100 rows match the index values
+            if (self.data[column].iloc[:100] == self.data.index[:100]).all():
+                potential_ids.append(column)
+        
+        return potential_ids
+
+    def _anomaly_unique_values_finder(self, threshold: float = 0.5) -> list:
+        """
+        Identifies categorical columns where the ratio of unique values to non-null rows
+        exceeds the given threshold
+
+        Parameters
+        ----------
+        threshold : float 
+            Threshold for the ratio (default is 0.5, e.g., 50%)
+
+        Returns
+        -------
+        list
+            List of column names that meet the condition
+        """
+        columns_above_threshold = {}
+
+        for column in self.categorical_columns:
+            # Calculate the ratio using non-null data
+            non_null_count = self.data[column].notnull().sum()
+            if non_null_count > 0:  # Avoid division by zero
+                unique_ratio = self.data[column].nunique() / non_null_count
+                if unique_ratio > threshold:
+                    columns_above_threshold[column] = unique_ratio
+
+        return columns_above_threshold
+    
+    def start_feature_engineering(self) -> pd.DataFrame:
+        """
+        Perform feature engineering on the training data
+
+        Processes features and the target column by:
+        - Dropping specified columns from the data
+        - Imputing missing values for numerical and categorical columns
+        - Encoding categorical features
+        - Encoding the target column if it is categorical
+        - Normalizing numerical columns if specified
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing the processed features and target column
+        """
+        # Process features
+        processed_features = self.pipeline.fit_transform(self.feature_data)
+        
+        # Process if target column is categorical
+        target_data = self.data[self.target_col]
+        if target_data.dtype == 'object':
+            target_data = self.target_encoder.fit_transform(target_data)
+
+        processed_features[self.target_col] = target_data
+
+        return processed_features
+
+    def transform_new_data(self, test_data: pd.DataFrame) -> pd.DataFrame:
+        """
+        Perform feature engineering on test data using the fitted pipeline
+
+        Processes features by:
+        - Imputing missing values for numerical and categorical columns
+        - Encoding categorical features
+        - Normalizing numerical columns if specified
+
+        Parameters
+        ----------
+        test_data : pd.DataFrame
+            The test dataset to process
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame containing the processed test features
+        """
+        test_features = test_data.drop(columns=[self.target_col], errors='ignore')
+        processed_test_features = self.pipeline.transform(test_features)
+        
+        # Add target column if it exists in test data
+        if self.target_col in test_data.columns:
+            target_data = test_data[self.target_col]
+            if target_data.dtype == 'object':
+                target_data = self.target_encoder.transform(target_data)
+            processed_test_features[self.target_col] = target_data
+
+        return processed_test_features
