@@ -37,10 +37,10 @@ class SupervisedBase:
     target_col : str
         The target column name in the data
 
-    random_state : int, optional (default=None)
+    random_state : int, optional (default=42)
         The random state value for the data processing process (Ignored If 'shuffle' is set to False)
 
-        If None, It uses the global random state instance from numpy.random. Thus, It will produce different results in every execution
+        If None, It uses the global random state instance from numpy.random. Thus, It will produce different results in every execution of start_experiment()
 
     drop_columns : list, default=None
         Columns that will be dropped from the data
@@ -114,7 +114,7 @@ class SupervisedBase:
         self,
         data: pd.DataFrame,
         target_col: str,
-        random_state: int = 42,
+        random_state: Optional[int] = 42,
         drop_columns: Optional[List[str]] = None,
         categorical_imputation_method: str = "mode",
         numerical_imputation_method: str = "mean", 
@@ -134,12 +134,13 @@ class SupervisedBase:
         self.__logger = get_logger(__name__, "PROD", logging_to_file)
 
         random_state = random_state_checker(random_state)
+        self._data_processing_random_state = random_state
         
         self.data = data
         self.target_col = target_col
         self.logging_to_file = logging_to_file
         self.shuffle = shuffle
-        self._current_data_processing_random_state = random_state
+
         self.feature_engineering_params = {
             'data': data,
             'target_col': target_col,
@@ -169,17 +170,21 @@ class SupervisedBase:
         self.__ML_MODELS = []
         self.__ML_TASK_TYPE = "Regression" if "Regression" in self.__class__.__name__ else "Classification"
         self.__ALL_EVALUATION_METRICS = EVALUATION_METRICS[self.__ML_TASK_TYPE]["ALL"]
+        self.__existing_model_names = [] # To keep the existing model names in the experiment
 
         # Cross-Validation Settings
         self.__AVAILABLE_CV_METHODS = CROSS_VALIDATION_METHODS[self.__ML_TASK_TYPE]
 
         # Keep the start_experiment params in memory to avoid re-creating cv_splits again for no-data-change conditions in start_experiment and tune_model
-        self._current_training_random_state = None
-        self._current_cv_method = None
-        self._current_n_folds = None
-        self._current_test_size = None
-        self._current_groups_col = None
-        self._current_experiment_size = None
+        self._last_training_random_state = None
+        self._last_cv_method = None
+        self._last_n_folds = None
+        self._last_test_size = None
+        self._last_groups_col = None
+        self._last_experiment_size = None
+
+        # Track experiment history
+        self._experiment_history = []
 
     def __repr__(self):
         return (
@@ -240,7 +245,7 @@ class SupervisedBase:
         n_folds: int = 5,
         test_size: Optional[float] = None, 
         groups_col: Optional[str] = None,
-        random_state: Optional[int] = None,
+        random_state: Optional[int] = 42,
         shuffle: bool = True,
         apply_feature_engineering: bool = False
     ) -> Iterator[Any]:
@@ -400,7 +405,7 @@ class SupervisedBase:
         n_folds: Optional[int] = None,
         test_size: Optional[float] = None,
         eval_metric: Optional[str] = None,
-        random_state: Optional[int] = None,
+        random_state: Optional[int] = 42,
         groups_col: Optional[str] = None
     ):
         """
@@ -441,7 +446,7 @@ class SupervisedBase:
         eval_metric : str (default='R2' for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation
 
-        random_state : int, optional (default=None)
+        random_state : int, optional (default=42)
             The random state value for the model training process
             # TODO: Not implemented yet, will be implemented in 1.1.0 release
 
@@ -456,11 +461,7 @@ class SupervisedBase:
         """
         self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         random_state = random_state_checker(random_state)
-
-        self.__model_training_info = []  # Reset model training info
-        self.__model_stats_df = None     # Reset model stats DataFrame
-        apply_feature_engineering = True if not self.__data_is_prepared else False # If It's the first time to execute start_experiment(), apply feature engineering, otherwise don't apply it
-        self._current_experiment_size = experiment_size
+        apply_feature_engineering = True if not self.__data_is_prepared else False
 
         # Check cross-validation method params
         cv_method = cross_validation_checker(
@@ -475,30 +476,35 @@ class SupervisedBase:
 
         # Check if the cross-validation parameters are changed or not, If they are changed, re-create the cv_splits
         params_changed_flag = (
-            self._current_training_random_state != random_state
-            or self._current_cv_method != cv_method
-            or self._current_n_folds != n_folds
-            or self._current_test_size != test_size
-            or self._current_groups_col != groups_col
+            self._last_cv_method != cv_method
+            or self._last_n_folds != n_folds
+            or self._last_test_size != test_size
+            or self._last_groups_col != groups_col
         )
 
-        # Check if the shuffle is True and random_state is None, If It's the case, re-create the cv_splits
-        shuffle_with_no_random_state_flag = self.shuffle and random_state is None
+        shuffle_with_no_random_state_flag = self.shuffle and self._data_processing_random_state is None
+        # If the user selected random_state as None in class definition, cv_splits should be re-created in each experiment --
+        # since None value for random_state means different random seed in each execution
+
+        reset_the_experiment = params_changed_flag or shuffle_with_no_random_state_flag
+        quick_to_wide_flag = self._last_experiment_size == 'quick' and experiment_size == 'wide'
+        
+        # Set the current experiment size
+        self._last_experiment_size = experiment_size
 
         # if any cross-validation related parameter is changed, re-create the cv_splits
-        if params_changed_flag or shuffle_with_no_random_state_flag:
-            self._current_training_random_state = random_state
-            self._current_cv_method = cv_method
-            self._current_n_folds = n_folds
-            self._current_test_size = test_size
-            self._current_groups_col = groups_col
+        if reset_the_experiment:
+            self._last_cv_method = cv_method
+            self._last_n_folds = n_folds
+            self._last_test_size = test_size
+            self._last_groups_col = groups_col
 
             self.cv_splits = list(self._prepare_data(
                 cv_method=cv_method,
                 n_folds=n_folds,
                 test_size=test_size,
                 groups_col=groups_col,
-                random_state=self._current_training_random_state,
+                random_state=self._data_processing_random_state,
                 shuffle=self.shuffle,
                 apply_feature_engineering=apply_feature_engineering
             ))
@@ -506,7 +512,15 @@ class SupervisedBase:
         self.__prepare_models(experiment_size)
         cv_splits_copy = self.cv_splits.copy() # Will be used for trainings
 
-        self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} cross-validation")
+        self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} validation")
+
+        # Train only the models that haven't been trained yet
+        if not reset_the_experiment and quick_to_wide_flag: 
+            self.__existing_model_names = self.__model_stats_df['model_name'].unique() if self.__model_stats_df is not None else []
+        else:
+            self.__model_training_info = []
+            self.__model_stats_df = None
+            self.__existing_model_names = []
         
         all_model_stats = defaultdict(list)
         total_iterations = len(cv_splits_copy) * len(self.__ML_MODELS)
@@ -524,6 +538,11 @@ class SupervisedBase:
                 for model_idx in range(len(self.__ML_MODELS)):
                     model_info = self.__ML_MODELS[model_idx]
                     model_name = model_info['name']
+                    
+                    if model_name in self.__existing_model_names:
+                        pbar.update(1)
+                        continue  # Skip already trained models
+
                     model = model_info['model']
                     try:
                         all_metrics = []
@@ -739,7 +758,9 @@ class SupervisedBase:
                 A list of strings containing the green background color for the best value so we can highlight it while showing the model stats
             """
             if s.name in ['MAE', 'MSE', 'RMSE', 'MAPE']:
-                is_best = s == s.min()
+                s_nonneg = s.where(s >= 0, np.nan)
+                best_val = s_nonneg.min()
+                is_best = s == best_val
             else:
                 is_best = s == s.max()
             return ['background-color: green' if v else '' for v in is_best]
@@ -758,9 +779,13 @@ class SupervisedBase:
             print(20*'-')
 
         else:
-            # Apply the highlighting to all metric columns and display the dataframe
-            styler = sorted_model_stats_df.style.apply(highlight_best, subset=self.__ALL_EVALUATION_METRICS)
-            display(styler) # display is only supported in interactive kernels such as Jupyter Notebook, for details check the comment block a couple of lines above
+            # Apply the highlighting to all metric columns and display the dataframe If It has more than 1 row so that we can compare the models
+            if len(sorted_model_stats_df) < 2:
+                display(sorted_model_stats_df)
+            
+            else:
+                styler = sorted_model_stats_df.style.apply(highlight_best, subset=self.__ALL_EVALUATION_METRICS)
+                display(styler) # display is only supported in interactive kernels such as Jupyter Notebook, for details check the comment block a couple of lines above
 
     def plot_feature_importance(self, model: Optional[object] = None):
         """
@@ -979,10 +1004,20 @@ class SupervisedBase:
             self.__logger.info(info_msg)
 
         # If tune_model cross validation params are same, get the current one
-        if hasattr(self, 'cv_splits') and cv_method == self._current_cv_method and n_folds == self._current_n_folds and test_size == self._current_test_size and groups_col == self._current_groups_col:
-            self.__logger.info("[INFO] Using the latest cross-validation splits that created in the last start_experiment() run for the tuning process")
+        if hasattr(self, 'cv_splits') and cv_method == self._last_cv_method and n_folds == self._last_n_folds and test_size == self._last_test_size and groups_col == self._last_groups_col:
             cv_obj = self.cv_splits
         else:
+            if self.__model_stats_df is not None:
+                self.__logger.warning("[WARNING] Validation params you've provided are different than the last run. Model performance table will be erased")
+                self.__model_stats_df = None
+                self.__model_training_info = []
+                self.__existing_model_names = []
+
+                self._last_cv_method = cv_method
+                self._last_n_folds = n_folds
+                self._last_test_size = test_size
+                self._last_groups_col = groups_col
+
             cv_obj = list(get_cv_splits(
                 df=self.data,
                 cv_method=cv_method,
