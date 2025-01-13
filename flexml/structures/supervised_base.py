@@ -191,7 +191,7 @@ class SupervisedBase:
             f"SupervisedBase(\n"
             f"data={self.data.head()},\n"
             f"target_col={self.target_col},\n"
-            f"random_state={self.random_state},\n"
+            f"random_state={self._data_processing_random_state},\n"
             f"drop_columns={self.drop_columns},\n"
             f"categorical_imputation_method={self.categorical_imputation_method},\n"
             f"numerical_imputation_method={self.numerical_imputation_method},\n"
