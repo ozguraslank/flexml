@@ -8,8 +8,8 @@ from typing import Any, Union, Optional, Iterator, List, Dict
 from tqdm import tqdm
 from IPython import get_ipython
 from sklearn.pipeline import Pipeline
-from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
-from flexml.logger.logger import get_logger
+from flexml.config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
+from flexml.logger import get_logger
 from flexml.helpers import (
     eval_metric_checker,
     random_state_checker,

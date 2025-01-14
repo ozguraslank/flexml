@@ -5,8 +5,8 @@ from typing import Optional, Union
 from time import time
 from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
 from sklearn.pipeline import Pipeline
-from flexml.config.supervised_config import TUNING_METRIC_TRANSFORMATIONS
-from flexml.logger.logger import get_logger
+from flexml.config import TUNING_METRIC_TRANSFORMATIONS
+from flexml.logger import get_logger
 from flexml.helpers import evaluate_model_perf
 
 

@@ -3,8 +3,8 @@ from parameterized import parameterized
 from sklearn.datasets import load_diabetes, load_breast_cancer
 from flexml.regression import Regression
 from flexml.classification import Classification
-from flexml.logger.logger import get_logger
-from flexml.config.ml_models import WIDE_REGRESSION_MODELS, WIDE_CLASSIFICATION_MODELS
+from flexml.logger import get_logger
+from flexml.config import WIDE_REGRESSION_MODELS, WIDE_CLASSIFICATION_MODELS
 
 import warnings
 warnings.filterwarnings("ignore")
