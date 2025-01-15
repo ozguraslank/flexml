@@ -3,9 +3,9 @@ from typing import Optional, Any, Iterator
 from sklearn.model_selection import (KFold, StratifiedKFold, ShuffleSplit, 
                                      StratifiedShuffleSplit, train_test_split,
                                      GroupKFold, GroupShuffleSplit)
-from flexml.config.supervised_config import CROSS_VALIDATION_METHODS
+from flexml.config import CROSS_VALIDATION_METHODS
 from flexml.helpers import cross_validation_checker
-from flexml.logger.logger import get_logger
+from flexml.logger import get_logger
 
 
 def get_cv_splits(

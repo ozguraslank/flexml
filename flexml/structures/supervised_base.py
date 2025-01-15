@@ -8,8 +8,8 @@ from typing import Any, Union, Optional, Iterator, List, Dict
 from tqdm import tqdm
 from IPython import get_ipython
 from sklearn.pipeline import Pipeline
-from flexml.config.supervised_config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
-from flexml.logger.logger import get_logger
+from flexml.config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
+from flexml.logger import get_logger
 from flexml.helpers import (
     eval_metric_checker,
     random_state_checker,
@@ -160,17 +160,30 @@ class SupervisedBase:
         # Data Preparation
         self.__validate_data()
         validate_inputs(**self.feature_engineering_params)
+        self.X = self.data.drop(columns=[self.target_col])
+        self.y = self.data[self.target_col] 
+
+        self.drop_columns = drop_columns
+        self.categorical_imputation_method = categorical_imputation_method
+        self.numerical_imputation_method = numerical_imputation_method
+        self.column_imputation_map = column_imputation_map
+        self.numerical_imputation_constant = numerical_imputation_constant
+        self.categorical_imputation_constant = categorical_imputation_constant
+        self.encoding_method = encoding_method
+        self.onehot_limit = onehot_limit
+        self.encoding_method_map = encoding_method_map
+        self.ordinal_encode_map = ordinal_encode_map
+        self.normalize = normalize
         self.feature_names = self.data.drop(columns=[self.target_col]).columns
-        self.__model_training_info = []
-        self.__model_stats_df = None
-        self.__sorted_model_stats_df = None
-        self.__data_is_prepared = False # Since _prepare_data() is going to be called in the start_experiment() method, data shouldn't be prepared again when start_experiment() is called again to test other scenarios
 
         # Model Preparation
         self.__ML_MODELS = []
         self.__ML_TASK_TYPE = "Regression" if "Regression" in self.__class__.__name__ else "Classification"
         self.__ALL_EVALUATION_METRICS = EVALUATION_METRICS[self.__ML_TASK_TYPE]["ALL"]
         self.__existing_model_names = [] # To keep the existing model names in the experiment
+        self.__model_training_info = []
+        self.__model_stats_df = None
+        self.__sorted_model_stats_df = None
 
         # Cross-Validation Settings
         self.__AVAILABLE_CV_METHODS = CROSS_VALIDATION_METHODS[self.__ML_TASK_TYPE]
@@ -238,87 +251,6 @@ class SupervisedBase:
             error_msg = "Target column should not include null values"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
-        
-    def _prepare_data(
-        self,
-        cv_method: str,
-        n_folds: int = 5,
-        test_size: Optional[float] = None, 
-        groups_col: Optional[str] = None,
-        random_state: Optional[int] = 42,
-        shuffle: bool = True,
-        apply_feature_engineering: bool = False
-    ) -> Iterator[Any]:
-        """
-        Prepares the data for the model training process
-
-        Parameters
-        ----------
-        cv_method : str, (default='kfold' for Regression, 'stratified_kfold' for Classification)
-            Cross-validation method to use. Options:
-            - For Regression:
-                - "kfold" (default) (Provide `n_folds`)
-                - "holdout" (Provide `test_size`)
-                - "shuffle_split" (Provide `n_folds` and `test_size`)
-                - "group_kfold" (Provide `n_folds` and `groups_col`)
-                - "group_shuffle_split" (Provide `n_folds`, `test_size`, and `groups_col`)
-            
-            - For Classification:
-                - "kfold" (default) (Provide `n_folds`)
-                - "stratified_kfold" (default) (Provide `n_folds`)
-                - "holdout" (Provide `test_size`)
-                - "stratified_shuffle_split" (Provide `n_folds`, `test_size`)
-                - "group_kfold" (Provide `n_folds` and `groups_col`)
-                - "group_shuffles_plit" (Provide `n_folds`, `test_size`, and `groups_col`)
-
-        n_folds : int, optional (default=None for hold-out validation, 5 for other cv methods)
-            Number of folds for cross-validation methods
-
-        test_size : float, (default=0.25 for hold-out cv, None for other methods)
-            The size of the test data if using hold-out or shuffle-based splits
-
-        groups_col : str, optional
-            Column name for group-based cross-validation methods
-
-        random_state : int, (default=42)
-            The random state value for the data processing process
-
-        shuffle: bool, (default=True)
-            If True, the data will be shuffled before the model training process
-
-        apply_feature_engineering : bool, (default=False)
-            If True, the feature engineering steps will be applied to the data
-
-        Returns
-        -------
-        cv_object: Iterator
-            CV iterator object that includes the train and test indices for each fold
-        """
-        try:
-            if apply_feature_engineering:
-                self.__logger.info("[PROCESS] Data is prepared")
-                self.__data_is_prepared = True
-            
-            self.X = self.data.drop(columns=[self.target_col])
-            self.y = self.data[self.target_col]
-
-            return get_cv_splits(
-                df=self.data,
-                cv_method=cv_method,
-                n_folds=n_folds,
-                test_size=test_size,
-                y_array=self.data[self.target_col], 
-                groups_col=groups_col,
-                random_state=random_state,
-                shuffle=shuffle,
-                ml_task_type=self.__ML_TASK_TYPE,
-                logging_to_file=self.logging_to_file
-            )
-        
-        except Exception as e:
-            error_msg = f"An error occurred while preparing the data: {str(e)}"
-            self.__logger.error(error_msg)
-            raise Exception(error_msg)
         
     def __prepare_models(self, experiment_size: str):
         """
@@ -461,7 +393,6 @@ class SupervisedBase:
         """
         self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         random_state = random_state_checker(random_state)
-        apply_feature_engineering = True if not self.__data_is_prepared else False
 
         # Check cross-validation method params
         cv_method = cross_validation_checker(
@@ -499,14 +430,17 @@ class SupervisedBase:
             self._last_test_size = test_size
             self._last_groups_col = groups_col
 
-            self.cv_splits = list(self._prepare_data(
+            self.cv_splits = list(get_cv_splits(
+                df=self.data,
                 cv_method=cv_method,
                 n_folds=n_folds,
                 test_size=test_size,
                 groups_col=groups_col,
                 random_state=self._data_processing_random_state,
                 shuffle=self.shuffle,
-                apply_feature_engineering=apply_feature_engineering
+                ml_task_type=self.__ML_TASK_TYPE,
+                logging_to_file=self.logging_to_file,
+                y_array = self.data[self.target_col]
             ))
 
         self.__prepare_models(experiment_size)
@@ -525,13 +459,17 @@ class SupervisedBase:
         all_model_stats = defaultdict(list)
         total_iterations = len(cv_splits_copy) * len(self.__ML_MODELS)
 
+        feature_engineer = FeatureEngineering(**self.feature_engineering_params)
+        feature_engineer.setup()
+        feature_engineer.check_column_anomalies()
+
         with tqdm(total=total_iterations, desc="INFO | Training Progress", bar_format="{desc}:  | {bar} | {percentage:.0f}%") as pbar:
             for train_idx, test_idx in cv_splits_copy:
                 X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
                 y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
 
-                self.feature_engineering_params['data'] = pd.concat([X_train, y_train], axis=1)
-                feature_engineer = FeatureEngineering(**self.feature_engineering_params)
+                feature_engineer.data = pd.concat([X_train, y_train], axis=1)
+                feature_engineer.setup()
                 X_train = feature_engineer.start_feature_engineering().drop(self.target_col, axis=1)
                 X_test = feature_engineer.transform_new_data(X_test)
 
@@ -1033,7 +971,9 @@ class SupervisedBase:
         if not hasattr(self, 'model_tuner'):
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, self.y, self.logging_to_file)
 
-        pipeline = FeatureEngineering(**self.feature_engineering_params).pipeline
+        feature_engineer = FeatureEngineering(**self.feature_engineering_params)
+        feature_engineer.setup()
+        pipeline = feature_engineer.pipeline
         pipeline = Pipeline(steps=pipeline.steps + [('model', model)])
 
         self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")

@@ -53,6 +53,8 @@ class TestFeatureEngineering(unittest.TestCase):
                                 normalize='normalize_scaler'
                             )
         
+        feature_exp.setup()
+        
         data = feature_exp.start_feature_engineering()
         lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])
 
@@ -73,6 +75,7 @@ class TestFeatureEngineering(unittest.TestCase):
         End-to-end test for feature engineering pipeline through Classification class
         """
         feature_exp = FeatureEngineering(self.df, target_col='target')
+        feature_exp.setup()
         
         data = feature_exp.start_feature_engineering()
         lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])
@@ -123,6 +126,7 @@ class TestFeatureEngineering(unittest.TestCase):
                             onehot_limit=3,
                             normalize=normalization_method
                         )
+                        feature_test.setup()
                         
                         data = feature_test.start_feature_engineering()
                         lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])

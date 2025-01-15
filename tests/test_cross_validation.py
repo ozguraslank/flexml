@@ -1,7 +1,7 @@
 import unittest
 from parameterized import parameterized
 from sklearn.datasets import load_breast_cancer, load_diabetes
-from flexml.logger.logger import get_logger
+from flexml.logger import get_logger
 from flexml import Regression, Classification
 
 import warnings

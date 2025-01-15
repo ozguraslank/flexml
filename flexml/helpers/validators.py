@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import Optional, List, Any
-from flexml.config.supervised_config import EVALUATION_METRICS, FEATURE_ENGINEERING_METHODS
-from flexml.logger.logger import get_logger
+from flexml.config import EVALUATION_METRICS, FEATURE_ENGINEERING_METHODS
+from flexml.logger import get_logger
 
 def eval_metric_checker(
     ml_task_type: str,

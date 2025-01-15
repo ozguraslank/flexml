@@ -5,8 +5,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, QuantileTransformer, MaxAbsScaler, normalize 
 from typing import List, Optional, Dict, Any
-import logging
-
+from flexml.logger import get_logger
 
 class ColumnDropper(BaseEstimator, TransformerMixin):
     """
@@ -163,7 +162,7 @@ class NumericalNormalizer(BaseEstimator, TransformerMixin):
     def __init__(self, normalization_method_map: Dict[str, str]): 
         self.normalization_method_map = normalization_method_map or {}
         self.scalers = {}
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(__name__, "PROD")
 
     def fit(self, X, y=None):
         for column, method in self.normalization_method_map.items():
@@ -186,7 +185,7 @@ class NumericalNormalizer(BaseEstimator, TransformerMixin):
                 scaler = None
 
             else:
-                self.logger.warning(f"Unknown method '{method}' for column '{column}'. Skipping.")
+                self.logger.warning(f"[WARNING] Unknown method '{method}' for column '{column}'. Skipping.")
                 continue
 
             if scaler is not None:
@@ -297,6 +296,7 @@ class FeatureEngineering:
         ordinal_encode_map: Optional[Dict[str, List[str]]] = None,
         normalize: Optional[str] = None
     ):
+        self.logger = get_logger(__name__, "PROD")
 
         # Initialize attributes
         self.data = data
@@ -312,6 +312,11 @@ class FeatureEngineering:
         self.encoding_method_map = encoding_method_map or {}
         self.ordinal_encode_map = ordinal_encode_map or {}
         self.normalize = normalize
+
+    def setup(self):
+        """
+        Setup the feature engineering pipeline
+        """
         # Initialize encoder for target column
         self.target_encoder = LabelEncoder()
         # Separate features and target column
@@ -341,7 +346,7 @@ class FeatureEngineering:
         # Initialize encoding method mapper with default value and update with custom map
         self.encoding_method_mapper = {col: self.encoding_method for col in self.categorical_columns}
         if self.encoding_method_map:
-            self.encoding_method_mapper.update(encoding_method_map)
+            self.encoding_method_mapper.update(self.encoding_method_map)
         
         # Initialize numerical normalization map
         if self.normalize:
@@ -378,20 +383,29 @@ class FeatureEngineering:
         )))
         
         # Create the pipeline
-        self.pipeline = Pipeline(pipeline_steps)
+        self.pipeline = Pipeline(pipeline_steps, memory=None)
 
-        self.logger = logging.getLogger(__name__)
+    def check_column_anomalies(self, threshold: float = 0.5):
+        """
+        Identifies columns that are likely to be ID columns or have too many unique values
+
+        Parameters
+        ----------
+        threshold : float 
+            Threshold for the ratio (default is 0.5, e.g., 50%)
+        """
 
         id_columns = self._id_finder()
         if id_columns:
             for column in id_columns:
-                self.logger.warning(f"Column '{column}' seems like an ID column. Consider dropping it if it is not a feature")
+                if column not in self.drop_columns:
+                    self.logger.warning(f"[WARNING] Column '{column}' seems like an ID column. Consider dropping it if it is not a feature")
 
-        columns_to_consider = self._anomaly_unique_values_finder(threshold=0.5)
+        columns_to_consider = self._anomaly_unique_values_finder(threshold=threshold)
         if columns_to_consider:
             for column, ratio in columns_to_consider.items():
                 self.logger.warning(
-                    f"Column '{column}' has too many unique values ({ratio:.2%}). "
+                    f"[WARNING] Column '{column}' has too many unique values ({ratio:.2%}). "
                     "Recommended to either process or drop this column"
                 )
 
