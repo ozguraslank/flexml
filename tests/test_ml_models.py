@@ -3,6 +3,7 @@ from parameterized import parameterized
 from sklearn.datasets import load_diabetes, load_breast_cancer
 from flexml.regression import Regression
 from flexml.classification import Classification
+from flexml.helpers import get_cv_splits
 from flexml.logger import get_logger
 from flexml.config import WIDE_REGRESSION_MODELS, WIDE_CLASSIFICATION_MODELS
 
@@ -39,7 +40,8 @@ class TestMLModels(unittest.TestCase):
         )
         experiments[objective] = exp
         
-        cv_splitters[objective] = exp._prepare_data(
+        cv_splitters[objective] = get_cv_splits(
+            df=config['data'],
             cv_method="holdout",
             test_size=0.5 # Keeping test_size high to make the training faster
         )
