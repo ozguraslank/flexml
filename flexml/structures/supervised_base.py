@@ -181,6 +181,7 @@ class SupervisedBase:
         self.__ML_TASK_TYPE = "Regression" if "Regression" in self.__class__.__name__ else "Classification"
         self.__ALL_EVALUATION_METRICS = EVALUATION_METRICS[self.__ML_TASK_TYPE]["ALL"]
         self.__existing_model_names = [] # To keep the existing model names in the experiment
+        self.__models_raised_error = []   # To keep the models that raised error in the experiment to avoid running them again in the next cv splits
         self.__model_training_info = []
         self.__model_stats_df = None
         self.__sorted_model_stats_df = None
@@ -455,6 +456,7 @@ class SupervisedBase:
             self.__model_training_info = []
             self.__model_stats_df = None
             self.__existing_model_names = []
+            self.__models_raised_error = []
         
         all_model_stats = defaultdict(list)
         total_iterations = len(cv_splits_copy) * len(self.__ML_MODELS)
@@ -477,9 +479,9 @@ class SupervisedBase:
                     model_info = self.__ML_MODELS[model_idx]
                     model_name = model_info['name']
                     
-                    if model_name in self.__existing_model_names:
+                    if model_name in self.__existing_model_names or model_name in self.__models_raised_error:
                         pbar.update(1)
-                        continue  # Skip already trained models
+                        continue  # Skip already trained or raised error models
 
                     model = model_info['model']
                     try:
@@ -513,6 +515,7 @@ class SupervisedBase:
 
                     except Exception as e:
                         self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
+                        self.__models_raised_error.append(model_name)
 
                     finally:
                         pbar.update(1)
