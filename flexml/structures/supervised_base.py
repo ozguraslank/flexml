@@ -883,10 +883,18 @@ class SupervisedBase:
         tuned_model: object
             The tuned model object
         """
-        def _show_tuning_report(tuning_report: dict):
+        def _show_tuning_report(tuning_report: Optional[dict] = None):
             """
             Shows the tuning report of the model tuning process
+
+            Parameters
+            ----------
+            tuning_report: dict (default = None)
+                The tuning report of the model tuning process
             """
+            if tuning_report is None:
+                return
+            
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
             tuned_time_taken = tuning_report['time_taken_sec']
