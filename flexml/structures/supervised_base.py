@@ -286,11 +286,6 @@ class SupervisedBase:
         if top_n_models is None:
             return 1
         
-        if not isinstance(top_n_models, int):
-            error_msg = f"top_n_models expected to be an integer, got {type(top_n_models)}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
-        
         if top_n_models < 1 or top_n_models > len(self.__ML_MODELS):
             error_msg = f"Invalid top_n_models value. Expected a value between 1 and {len(self.__ML_MODELS)}, got {top_n_models}"
             self.__logger.error(error_msg)
