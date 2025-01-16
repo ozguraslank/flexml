@@ -589,7 +589,6 @@ class SupervisedBase:
                 model_stats.append(model_data["model_stats"])
     
         self.__model_stats_df = pd.DataFrame(model_stats)
-        # self.__model_stats_df = self.__model_stats_df.groupby(self.__model_stats_df.columns[0]).mean().reset_index()
         self.__sorted_model_stats_df = self.__sort_models(eval_metric)
 
         for i in range(top_n_models):
