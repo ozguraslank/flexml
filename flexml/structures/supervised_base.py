@@ -181,6 +181,7 @@ class SupervisedBase:
         self.__ML_TASK_TYPE = "Regression" if "Regression" in self.__class__.__name__ else "Classification"
         self.__ALL_EVALUATION_METRICS = EVALUATION_METRICS[self.__ML_TASK_TYPE]["ALL"]
         self.__existing_model_names = [] # To keep the existing model names in the experiment
+        self.__models_raised_error = []   # To keep the models that raised error in the experiment to avoid running them again in the next cv splits
         self.__model_training_info = []
         self.__model_stats_df = None
         self.__sorted_model_stats_df = None
@@ -284,11 +285,6 @@ class SupervisedBase:
         """
         if top_n_models is None:
             return 1
-        
-        if not isinstance(top_n_models, int):
-            error_msg = f"top_n_models expected to be an integer, got {type(top_n_models)}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
         
         if top_n_models < 1 or top_n_models > len(self.__ML_MODELS):
             error_msg = f"Invalid top_n_models value. Expected a value between 1 and {len(self.__ML_MODELS)}, got {top_n_models}"
@@ -455,6 +451,7 @@ class SupervisedBase:
             self.__model_training_info = []
             self.__model_stats_df = None
             self.__existing_model_names = []
+            self.__models_raised_error = []
         
         all_model_stats = defaultdict(list)
         total_iterations = len(cv_splits_copy) * len(self.__ML_MODELS)
@@ -477,9 +474,9 @@ class SupervisedBase:
                     model_info = self.__ML_MODELS[model_idx]
                     model_name = model_info['name']
                     
-                    if model_name in self.__existing_model_names:
+                    if model_name in self.__existing_model_names or model_name in self.__models_raised_error:
                         pbar.update(1)
-                        continue  # Skip already trained models
+                        continue  # Skip already trained or raised error models
 
                     model = model_info['model']
                     try:
@@ -513,6 +510,7 @@ class SupervisedBase:
 
                     except Exception as e:
                         self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
+                        self.__models_raised_error.append(model_name)
 
                     finally:
                         pbar.update(1)
@@ -586,7 +584,6 @@ class SupervisedBase:
                 model_stats.append(model_data["model_stats"])
     
         self.__model_stats_df = pd.DataFrame(model_stats)
-        # self.__model_stats_df = self.__model_stats_df.groupby(self.__model_stats_df.columns[0]).mean().reset_index()
         self.__sorted_model_stats_df = self.__sort_models(eval_metric)
 
         for i in range(top_n_models):
@@ -595,6 +592,8 @@ class SupervisedBase:
                 model_name = list(model_info.keys())[0]
                 if model_name == searched_model_name:
                     best_models.append(model_info[model_name]["model"])
+                    if top_n_models == 1: # If top_n_models is 1 and there are more than 1 model with the same name, avoid user to get multiple models by stopping the loop
+                        break
         
         if len(best_models) == 1:
             return best_models[0]
@@ -880,10 +879,18 @@ class SupervisedBase:
         tuned_model: object
             The tuned model object
         """
-        def _show_tuning_report(tuning_report: dict):
+        def _show_tuning_report(tuning_report: Optional[dict] = None):
             """
             Shows the tuning report of the model tuning process
+
+            Parameters
+            ----------
+            tuning_report: dict (default = None)
+                The tuning report of the model tuning process
             """
+            if tuning_report is None:
+                return
+            
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
             tuned_time_taken = tuning_report['time_taken_sec']
