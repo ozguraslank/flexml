@@ -592,6 +592,8 @@ class SupervisedBase:
                 model_name = list(model_info.keys())[0]
                 if model_name == searched_model_name:
                     best_models.append(model_info[model_name]["model"])
+                    if top_n_models == 1: # If top_n_models is 1 and there are more than 1 model with the same name, avoid user to get multiple models by stopping the loop
+                        break
         
         if len(best_models) == 1:
             return best_models[0]
