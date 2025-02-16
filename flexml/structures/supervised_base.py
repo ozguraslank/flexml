@@ -69,7 +69,7 @@ class SupervisedBase:
     categorical_imputation_constant : str, default='Unknown'
         The constant value for imputing categorical columns when 'constant' is selected
 
-    encoding_method : str, default='label_encoder'
+    encoding_method : str, default='onehot_encoder'
         Encoding method for categorical columns. Options:
         * 'label_encoder': Use label encoding
             * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html
@@ -121,7 +121,7 @@ class SupervisedBase:
         column_imputation_map: Optional[Dict[str, str]] = None,
         numerical_imputation_constant: float = 0.0,
         categorical_imputation_constant: str = "Unknown", 
-        encoding_method: str = "label_encoder",
+        encoding_method: str = "onehot_encoder",
         onehot_limit: int = 25,
         encoding_method_map: Optional[Dict[str, str]] = None,
         ordinal_encode_map: Optional[Dict[str, List[str]]] = None,
@@ -175,6 +175,7 @@ class SupervisedBase:
         self.ordinal_encode_map = ordinal_encode_map
         self.normalize = normalize
         self.feature_names = self.data.drop(columns=[self.target_col]).columns
+        self.full_data_feature_engineer = None
 
         # Model Preparation
         self.__ML_MODELS = []
@@ -600,13 +601,11 @@ class SupervisedBase:
         
         return best_models
     
-    
     def save_model(
             self,
-            model: Optional[object] = None,
+            model: Optional[Union[str, object]] = None,
             save_path: Optional[str] = None,
-            include_model: bool = True,
-            include_feature_pipeline: bool = False,
+            model_only: bool = False,
             full_train: bool = True
         ):
         """
@@ -619,8 +618,6 @@ class SupervisedBase:
             The model to save. If None, the best model will be fetched
         save_path : str, optional
             The path to save the pipeline
-        include_model : bool, optional
-            Whether to include the trained model in the pipeline
         include_feature_pipeline : bool, optional
             Whether to include the feature engineering pipeline in the saved pipeline
         full_train : bool, optional
@@ -628,55 +625,73 @@ class SupervisedBase:
             
         Returns
         -------
-        Pipeline
-            A pipeline object that includes the feature engineering and/or the trained model
+        Pipeline or object
         """
-        if not include_model and not include_feature_pipeline:
-            error_msg = "Both 'include_model' and 'include_feature_pipeline' cannot be False"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
+        # Ensure save_path is defined
+        if save_path is None:
+            save_path = "pipeline.pkl" if not model_only else "model.pkl"
+            self.__logger.info(f"No save path provided. Using default: {save_path}")
+
+        if not save_path.endswith(".pkl"):
+            self.__logger.warning(f"Only .pkl files are supported. Changing '{save_path}' to '{save_path.rsplit('.', 1)[0]}.pkl'.")
+            save_path = save_path.rsplit('.', 1)[0] + ".pkl"
 
         # Initialize pipeline steps
         pipeline_steps = []
-        
+
         # Initialize and setup feature engineering if needed
-        if include_feature_pipeline or full_train:
-            feature_engineer = FeatureEngineering(**self.feature_engineering_params)
-            feature_engineer.setup()
+        if not model_only or full_train:
+            if self.full_data_feature_engineer is None:
+                self.full_data_feature_engineer = FeatureEngineering(**self.feature_engineering_params)
+                self.full_data_feature_engineer.setup()
             
-            if include_feature_pipeline:
+            if not model_only:
                 # Add the feature engineering pipeline directly
-                pipeline_steps.extend(feature_engineer.pipeline.steps)
-        
-        # Include the trained model in the pipeline if requested
-        if include_model:
-            # Fetch the best model if no specific model is provided
-            if model is None:
-                try:
-                    model = self.get_best_models()
-                except ValueError as e:
-                    error_msg = "No models have been evaluated yet, and no model was specified to save."
-                    self.__logger.error(error_msg)
-                    raise ValueError(error_msg) from e
+                pipeline_steps.extend(self.full_data_feature_engineer.pipeline.steps)
+
+        # Fetch the best model if no specific model is provided
+        if model is None:
+            try:
+                model = self.get_best_models()
+            except ValueError as e:
+                error_msg = "No models have been evaluated yet, and no model was specified to save."
+                self.__logger.error(error_msg)
+                raise ValueError(error_msg) from e
+        elif isinstance(model, str):
+            try:
+                model = self.get_model_by_name(model)
+            except KeyError:
+                error_msg = f"Model with name '{model}' not found."
+                self.__logger.error(error_msg)
+                raise ValueError(error_msg)
+
+        # Handle full training scenario if required
+        if full_train:
+            transformed_data = self.full_data_feature_engineer.start_feature_engineering()
+            self.__logger.info("Training the model using the fully feature-engineered data")
+            model.fit(
+                transformed_data.drop(columns=[self.target_col]), 
+                transformed_data[self.target_col]
+            )
+
+        # If no feature pipeline is included, return the model directly
+        if model_only:
+            try:
+                with open(save_path, 'wb') as f:
+                    pickle.dump(model, f)
+                self.__logger.info(f"Model saved successfully at {save_path}")
+            except Exception as e:
+                self.__logger.error(f"Failed to save model: {e}")
+                raise
             
-            # Handle full training scenario if required
-            if full_train:
-                transformed_data = feature_engineer.start_feature_engineering()
-                model.fit(
-                    transformed_data.drop(columns=[self.target_col]), 
-                    transformed_data[self.target_col]
-                )
-            
-            # Add the model to the pipeline
-            pipeline_steps.append(('model', model))
-        
+            return model
+
+        # Add the model to the pipeline
+        pipeline_steps.append(('model', model))
+
         # Create the pipeline
         pipeline = Pipeline(pipeline_steps)
-        
-        # Ensure save_path is defined
-        if save_path is None:
-            save_path = "best_model_pipeline.pkl"  # Default save path
-        
+
         # Save the pipeline
         try:
             with open(save_path, 'wb') as f:
@@ -685,24 +700,25 @@ class SupervisedBase:
         except Exception as e:
             self.__logger.error(f"Failed to save pipeline: {e}")
             raise
-        
+
         return pipeline
 
     def predict(
             self,
             test_data: pd.DataFrame,
-            model: Optional[object] = None
+            model: Optional[Union[str, object]] = None
         ) -> np.ndarray:
         """
         Predicts the target column using the fully trained model
-        
+
         Parameters
         ----------
         test_data : pd.DataFrame
             The input data to predict the target column
-        model : object, optional
-            The trained model to use for prediction. If None, the best model will be fetched
-            
+        model : str or object, optional
+            The trained model or model name to fetch for prediction. 
+            If None, the best model will be fetched.
+
         Returns
         -------
         np.ndarray
@@ -711,26 +727,45 @@ class SupervisedBase:
         # Validate test data
         if test_data is None or test_data.empty:
             raise ValueError("test_data must be provided and non-empty")
+
+        # Check if test_data has the same columns as self.X
+        expected_columns = set(self.X.columns)
+        test_columns = set(test_data.columns)
         
-        # Get model if not provided
+        if expected_columns != test_columns:
+            missing_cols = expected_columns - test_columns
+            extra_cols = test_columns - expected_columns
+            error_msg = "Mismatch in test_data columns."
+            if missing_cols:
+                error_msg += f" Missing columns: {missing_cols}."
+            if extra_cols:
+                error_msg += f" Extra columns: {extra_cols}."
+            raise ValueError(error_msg)
+
+        # Get the best model if none is provided
         if model is None:
             model = self.get_best_models()
-            
+
+        # If model is a string, fetch the model object
+        if isinstance(model, str):
+            model = self.get_model_by_name(model)
+
         # Initialize and setup feature engineering
-        feature_engineer = FeatureEngineering(**self.feature_engineering_params)
-        feature_engineer.setup()
-        
+        if self.full_data_feature_engineer is None:
+            self.full_data_feature_engineer = FeatureEngineering(**self.feature_engineering_params)
+            self.full_data_feature_engineer.setup()
+
         # Transform training data and fit model
-        transformed_train_data = feature_engineer.start_feature_engineering()
+        transformed_train_data = self.full_data_feature_engineer.start_feature_engineering()
+        self.__logger.info("Training the model using the fully feature-engineered data")
         model.fit(
             transformed_train_data.drop(columns=[self.target_col]),
             transformed_train_data[self.target_col]
         )
 
         # Transform test data and predict
-        transformed_test_data = feature_engineer.transform_new_data(test_data)
+        transformed_test_data = self.full_data_feature_engineer.transform_new_data(test_data)
         return model.predict(transformed_test_data)
-    
 
     def __sort_models(self, eval_metric: Optional[str] = None):
         """

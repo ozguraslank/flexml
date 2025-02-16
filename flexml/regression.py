@@ -42,7 +42,7 @@ class Regression(SupervisedBase):
     categorical_imputation_constant : str, default='Unknown'
         The constant value for imputing categorical columns when 'constant' is selected
 
-    encoding_method : str, default='label_encoder'
+    encoding_method : str, default='onehot_encoder'
         Encoding method for categorical columns. Options:
         * 'label_encoder': Use label encoding
             * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html
