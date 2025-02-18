@@ -602,12 +602,12 @@ class SupervisedBase:
         return best_models
     
     def save_model(
-            self,
-            model: Optional[Union[str, object]] = None,
-            save_path: Optional[str] = None,
-            model_only: bool = False,
-            full_train: bool = True
-        ):
+        self,
+        model: Optional[Union[str, object]] = None,
+        save_path: Optional[str] = None,
+        model_only: bool = False,
+        full_train: bool = True
+    ):
         """
         Saves a specified model or the best model based on evaluation metrics
         and integrates feature engineering into the pipeline
@@ -704,20 +704,23 @@ class SupervisedBase:
         return pipeline
 
     def predict(
-            self,
-            test_data: pd.DataFrame,
-            model: Optional[Union[str, object]] = None
-        ) -> np.ndarray:
+        self,
+        test_data: pd.DataFrame,
+        model: Optional[Union[str, object]] = None,
+        full_train: bool = True
+    ) -> np.ndarray:
         """
-        Predicts the target column using the fully trained model
+        Predicts the target column using the specified or best model
 
         Parameters
         ----------
         test_data : pd.DataFrame
             The input data to predict the target column
         model : str or object, optional
-            The trained model or model name to fetch for prediction. 
-            If None, the best model will be fetched.
+            The trained model or model name to fetch for prediction
+            If None, the best model will be fetched
+        full_train : bool, optional
+            Whether to train the model using the fully feature-engineered data before prediction
 
         Returns
         -------
@@ -745,7 +748,7 @@ class SupervisedBase:
         # Get the best model if none is provided
         if model is None:
             model = self.get_best_models()
-
+        
         # If model is a string, fetch the model object
         if isinstance(model, str):
             model = self.get_model_by_name(model)
@@ -754,15 +757,16 @@ class SupervisedBase:
         if self.full_data_feature_engineer is None:
             self.full_data_feature_engineer = FeatureEngineering(**self.feature_engineering_params)
             self.full_data_feature_engineer.setup()
-
-        # Transform training data and fit model
         transformed_train_data = self.full_data_feature_engineer.start_feature_engineering()
-        self.__logger.info("Training the model using the fully feature-engineered data")
-        model.fit(
-            transformed_train_data.drop(columns=[self.target_col]),
-            transformed_train_data[self.target_col]
-        )
-
+        
+        # Perform full training if requested
+        if full_train:
+            self.__logger.info("Training the model using the fully feature-engineered data")
+            model.fit(
+                transformed_train_data.drop(columns=[self.target_col]),
+                transformed_train_data[self.target_col]
+            )
+        
         # Transform test data and predict
         transformed_test_data = self.full_data_feature_engineer.transform_new_data(test_data)
         return model.predict(transformed_test_data)
