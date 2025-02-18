@@ -245,7 +245,7 @@ class FeatureEngineering:
     categorical_imputation_constant : str, default='Unknown'
         The constant value for imputing categorical columns when 'constant' is selected
 
-    encoding_method : str, default='label_encoder'
+    encoding_method : str, default='onehot_encoder'
         Encoding method for categorical columns. Options:
         * 'label_encoder': Use label encoding
             * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.LabelEncoder.html
@@ -290,7 +290,7 @@ class FeatureEngineering:
         column_imputation_map: Optional[Dict[str, str]] = None,
         numerical_imputation_constant: float = 0.0,
         categorical_imputation_constant: str = "Unknown", 
-        encoding_method: str = "label_encoder",
+        encoding_method: str = "onehot_encoder",
         onehot_limit: int = 25,
         encoding_method_map: Optional[Dict[str, str]] = None,
         ordinal_encode_map: Optional[Dict[str, List[str]]] = None,

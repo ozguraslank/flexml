@@ -1,6 +1,7 @@
 import os
 import pickle
 import unittest
+import numpy as np
 from parameterized import parameterized
 from sklearn.datasets import load_diabetes, load_breast_cancer
 from flexml import Regression, Classification
@@ -8,6 +9,7 @@ from flexml.logger import get_logger
 
 import warnings
 warnings.filterwarnings("ignore")
+
 
 class TestRegression(unittest.TestCase):
     logger = get_logger(__name__, "TEST")
@@ -123,3 +125,70 @@ class TestRegression(unittest.TestCase):
         finally:
             if os.path.exists(save_path):
                 os.remove(save_path)
+            
+    def test_03_save_model(self):
+        try:
+            exp_obj = self.test_config['Regression']['exp_obj']
+            
+            # Thanks to function naming, test_01_supervised will run first and exp_obj will be created --
+            # But let's check it in just case and create a new experiment object if it's None
+            if exp_obj is None:
+                df = self.test_config['Regression'].get('data')
+                target_col = self.test_config['Regression'].get('target_col')
+
+                exp_obj = Regression(
+                    data = df,
+                    target_col = target_col
+                ).start_experiment()
+
+            # Test saving model with full_train=True and model_only=True (only the model object, not a pipeline)
+            save_path = "test_classification_model_full_train_model_only.pkl"
+            exp_obj.save_model(save_path=save_path, full_train=True, model_only=True)
+
+            # Check if the model is saved
+            self.assertTrue(os.path.exists(save_path))
+
+            # Load the saved model and check if it's the model object (not a pipeline)
+            with open(save_path, 'rb') as f:
+                saved_model = pickle.load(f)
+                self.assertFalse(hasattr(saved_model, 'named_steps'))
+
+            # Clean up saved model
+            os.remove(save_path)
+
+            # Test saving model with full_train=False and model_only=False (should return a pipeline)
+            save_path = "test_classification_model_no_full_train_model_only_false.pkl"
+            exp_obj.save_model(save_path=save_path, full_train=False, model_only=False)
+
+            # Check if the model is saved
+            self.assertTrue(os.path.exists(save_path))
+
+            # Load the saved model and check if it's a pipeline
+            with open(save_path, 'rb') as f:
+                saved_model = pickle.load(f)
+                self.assertTrue(hasattr(saved_model, 'named_steps'))
+
+            # Clean up saved model
+            os.remove(save_path)
+        finally:
+            if os.path.exists(save_path):
+                os.remove(save_path)
+
+    def test_04_predict_model(self):
+        # Setup for Classification experiment
+        exp_obj = self.test_config['Regression']['exp_obj']
+        
+        # Thanks to function naming, test_01_supervised will run first and exp_obj will be created --
+        # But let's check it in just case and create a new experiment object if it's None
+        if exp_obj is None:
+            df = self.test_config['Regression'].get('data')
+            target_col = self.test_config['Regression'].get('target_col')
+
+            exp_obj = Regression(
+                data = df,
+                target_col = target_col
+            ).start_experiment()
+
+        # Make predictions
+        predictions = exp_obj.predict(self.test_config['Regression'].get('data').drop(columns=['target']), full_train=False)
+        self.assertIsInstance(predictions, np.ndarray)
