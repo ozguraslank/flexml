@@ -703,6 +703,47 @@ class SupervisedBase:
 
         return pipeline
 
+    def _predict_helper(
+        self,
+        test_data: pd.DataFrame,
+        model: Optional[Union[str, object]] = None,
+        full_train: bool = True
+    ) -> tuple:
+        """Inner handler for prediction methods that returns prepared model and transformed data"""
+        if test_data is None or test_data.empty:
+            raise ValueError("test_data must be provided and non-empty")
+
+        # Check column consistency
+        expected_columns = set(self.X.columns)
+        test_columns = set(test_data.columns)
+        if expected_columns != test_columns:
+            missing = expected_columns - test_columns
+            extra = test_columns - expected_columns
+            error_msg = "Mismatch in test_data columns."
+            if missing: error_msg += f" Missing: {missing}."
+            if extra: error_msg += f" Extra: {extra}."
+            raise ValueError(error_msg)
+
+        if model is None:
+            model = self.get_best_models()
+        elif isinstance(model, str):
+            model = self.get_model_by_name(model)
+
+        if self.full_data_feature_engineer is None:
+            self.full_data_feature_engineer = FeatureEngineering(**self.feature_engineering_params)
+            self.full_data_feature_engineer.setup()
+        
+        # Prepare training data if needed
+        transformed_train_data = self.full_data_feature_engineer.start_feature_engineering()
+        if full_train:
+            self.__logger.info("Training model with full feature-engineered data")
+            model.fit(transformed_train_data.drop(columns=[self.target_col]), 
+                     transformed_train_data[self.target_col])
+
+        # Transform test data
+        transformed_test = self.full_data_feature_engineer.transform_new_data(test_data)
+        return model, transformed_test
+
     def predict(
         self,
         test_data: pd.DataFrame,
@@ -727,49 +768,35 @@ class SupervisedBase:
         np.ndarray
             The predicted target column
         """
-        # Validate test data
-        if test_data is None or test_data.empty:
-            raise ValueError("test_data must be provided and non-empty")
+        model, transformed_test = self._predict_helper(test_data, model, full_train)
+        return model.predict(transformed_test)
+    
+    def predict_proba(
+        self,
+        test_data: pd.DataFrame,
+        model: Optional[Union[str, object]] = None,
+        full_train: bool = True
+    ) -> np.ndarray:
+        """
+        Predicts the target column probabilities using the specified or best model
 
-        # Check if test_data has the same columns as self.X
-        expected_columns = set(self.X.columns)
-        test_columns = set(test_data.columns)
-        
-        if expected_columns != test_columns:
-            missing_cols = expected_columns - test_columns
-            extra_cols = test_columns - expected_columns
-            error_msg = "Mismatch in test_data columns."
-            if missing_cols:
-                error_msg += f" Missing columns: {missing_cols}."
-            if extra_cols:
-                error_msg += f" Extra columns: {extra_cols}."
-            raise ValueError(error_msg)
+        Parameters
+        ----------
+        test_data : pd.DataFrame
+            The input data to predict the target column
+        model : str or object, optional
+            The trained model or model name to fetch for prediction
+            If None, the best model will be fetched
+        full_train : bool, optional
+            Whether to train the model using the fully feature-engineered data before prediction
 
-        # Get the best model if none is provided
-        if model is None:
-            model = self.get_best_models()
-        
-        # If model is a string, fetch the model object
-        if isinstance(model, str):
-            model = self.get_model_by_name(model)
-
-        # Initialize and setup feature engineering
-        if self.full_data_feature_engineer is None:
-            self.full_data_feature_engineer = FeatureEngineering(**self.feature_engineering_params)
-            self.full_data_feature_engineer.setup()
-        transformed_train_data = self.full_data_feature_engineer.start_feature_engineering()
-        
-        # Perform full training if requested
-        if full_train:
-            self.__logger.info("Training the model using the fully feature-engineered data")
-            model.fit(
-                transformed_train_data.drop(columns=[self.target_col]),
-                transformed_train_data[self.target_col]
-            )
-        
-        # Transform test data and predict
-        transformed_test_data = self.full_data_feature_engineer.transform_new_data(test_data)
-        return model.predict(transformed_test_data)
+        Returns
+        -------
+        np.ndarray
+            The predicted probabilities for each class
+        """
+        model, transformed_test = self._predict_helper(test_data, model, full_train)
+        return model.predict_proba(transformed_test)
 
     def __sort_models(self, eval_metric: Optional[str] = None):
         """
