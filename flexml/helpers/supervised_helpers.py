@@ -15,7 +15,8 @@ from sklearn.metrics import (
 def _evaluate_preds(
     y_true: Union[pd.Series, np.ndarray],
     y_pred: Union[pd.Series, np.ndarray],
-    eval_metric: str
+    eval_metric: str,
+    average: str = 'macro'
 ) -> float:
     """
     Evaluates the model with the given evaluation metric by using the test set
@@ -29,27 +30,13 @@ def _evaluate_preds(
         The predicted values of the target column
 
     eval_metric : str
-        The evaluation metric that will be used to evaluate the model. It can be one of the following:
+        The evaluation metric that will be used to evaluate the model.
         
-        * 'R2' for R^2 score
-        
-        * 'MAE' for Mean Absolute Error
-        
-        * 'MSE' for Mean Squared Error
-        
-        * 'RMSE' for Root Mean Squared Error
-
-        * 'MAPE' for Mean Absolute Percentage Error
-        
-        * 'Accuracy' for Accuracy
-        
-        * 'Precision' for Precision
-        
-        * 'Recall' for Recall
-        
-        * 'F1 Score' for F1 score
-        
-        * 'ROC-AUC' for Receiver Operating Characteristic Area Under Curve
+    average : str, default='macro'
+        The averaging method to use for multiclass classification metrics.
+        Options are ['binary', 'micro', 'macro', 'weighted'].
+        For binary classification, 'binary' is recommended.
+        For multiclass, 'macro' treats all classes equally.
 
     Returns
     -------
@@ -69,12 +56,14 @@ def _evaluate_preds(
     elif eval_metric == 'Accuracy':
         return round(accuracy_score(y_true, y_pred), 6)
     elif eval_metric == 'Precision':
-        return round(precision_score(y_true, y_pred), 6)
+        return round(precision_score(y_true, y_pred, average=average), 6)
     elif eval_metric == 'Recall':
-        return round(recall_score(y_true, y_pred), 6)
+        return round(recall_score(y_true, y_pred, average=average), 6)
     elif eval_metric == 'F1 Score':
-        return round(f1_score(y_true, y_pred), 6)
+        return round(f1_score(y_true, y_pred, average=average), 6)
     elif eval_metric == 'ROC-AUC':
+        if len(np.unique(y_true)) > 2:
+            return round(roc_auc_score(y_true, y_pred, average=average, multi_class='ovr'), 6)
         return round(roc_auc_score(y_true, y_pred), 6)
     else:
         raise ValueError(f"Error while evaluating the current model. The eval_metric should be one of the following: 'R2', 'MAE', 'MSE', 'RMSE', 'MAPE', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'ROC-AUC'. Got {eval_metric}")
@@ -123,11 +112,15 @@ def evaluate_model_perf(
         }
     
     elif ml_task_type == "Classification":
+        # Determine appropriate averaging method based on number of classes
+        n_classes = len(np.unique(y_test))
+        avg_method = 'binary' if n_classes == 2 else 'macro'
+        
         accuracy = _evaluate_preds(y_test, y_pred, 'Accuracy')
-        precision = _evaluate_preds(y_test, y_pred, 'Precision')
-        recall = _evaluate_preds(y_test, y_pred, 'Recall')
-        f1 = _evaluate_preds(y_test, y_pred, 'F1 Score')
-        roc_auc = _evaluate_preds(y_test, y_pred, 'ROC-AUC')
+        precision = _evaluate_preds(y_test, y_pred, 'Precision', average=avg_method)
+        recall = _evaluate_preds(y_test, y_pred, 'Recall', average=avg_method)
+        f1 = _evaluate_preds(y_test, y_pred, 'F1 Score', average=avg_method)
+        roc_auc = _evaluate_preds(y_test, y_pred, 'ROC-AUC', average=avg_method)
         return {
             "Accuracy": accuracy,
             "Precision": precision,

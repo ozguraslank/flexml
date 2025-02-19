@@ -176,19 +176,21 @@ class TestRegression(unittest.TestCase):
 
     def test_04_predict_model(self):
         # Setup for Classification experiment
-        exp_obj = self.test_config['Regression']['exp_obj']
+        exp_obj = self.test_config['Classification']['exp_obj']
         
         # Thanks to function naming, test_01_supervised will run first and exp_obj will be created --
         # But let's check it in just case and create a new experiment object if it's None
         if exp_obj is None:
-            df = self.test_config['Regression'].get('data')
-            target_col = self.test_config['Regression'].get('target_col')
+            df = self.test_config['Classification'].get('data')
+            target_col = self.test_config['Classification'].get('target_col')
 
-            exp_obj = Regression(
+            exp_obj = Classification(
                 data = df,
                 target_col = target_col
             ).start_experiment()
 
         # Make predictions
-        predictions = exp_obj.predict(self.test_config['Regression'].get('data').drop(columns=['target']), full_train=False)
+        predictions = exp_obj.predict(self.test_config['Classification'].get('data').drop(columns=['target']), full_train=False)
+        predictions_probabilities = exp_obj.predict_proba(self.test_config['Classification'].get('data').drop(columns=['target']), full_train=False)
         self.assertIsInstance(predictions, np.ndarray)
+        self.assertIsInstance(predictions_probabilities, np.ndarray)

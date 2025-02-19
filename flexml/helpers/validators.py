@@ -2,6 +2,7 @@ import pandas as pd
 from typing import Optional, List, Any
 from flexml.config import EVALUATION_METRICS, FEATURE_ENGINEERING_METHODS
 from flexml.logger import get_logger
+import re
 
 def eval_metric_checker(
     ml_task_type: str,
@@ -55,10 +56,22 @@ def eval_metric_checker(
     if ml_task_type == "Regression":
         eval_metric = eval_metric.upper()
     else:
-        eval_metric = eval_metric.lower().capitalize()
+        # Normalize input for flexible matching
+        original_metric = eval_metric
+        normalized_input = re.sub(r'[^a-zA-Z0-9]', '', eval_metric).lower()
+        normalized_config = {re.sub(r'[^a-zA-Z0-9]', '', m).lower(): m 
+                            for m in all_evaluation_metrics}
+        
+        if normalized_input in normalized_config:
+            eval_metric = normalized_config[normalized_input]
+        else:
+            error_msg = (f"'{original_metric}' is not a valid evaluation metric for {ml_task_type}, "
+                        f"expected one of: {all_evaluation_metrics}")
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
     if eval_metric not in all_evaluation_metrics:
-        error_msg = f"{eval_metric} is not a valid evaluation metric for {ml_task_type}, expected one of the following: {all_evaluation_metrics}"
+        error_msg = f"Validation failed for {eval_metric} - not in configured metrics"
         logger.error(error_msg)
         raise ValueError(error_msg)
     
