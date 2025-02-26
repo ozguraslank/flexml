@@ -163,6 +163,10 @@ class SupervisedBase:
         self.X = self.data.drop(columns=[self.target_col])
         self.y = self.data[self.target_col] 
 
+        self.feature_engineer = FeatureEngineering(**self.feature_engineering_params)
+        self.feature_engineer.setup()
+        self.feature_engineer.check_column_anomalies()
+
         self.drop_columns = drop_columns
         self.categorical_imputation_method = categorical_imputation_method
         self.numerical_imputation_method = numerical_imputation_method
@@ -401,6 +405,8 @@ class SupervisedBase:
             available_cv_methods=self.__AVAILABLE_CV_METHODS,
             ml_task_type=self.__ML_TASK_TYPE
         )
+        if cv_method != "holdout" and n_folds is None:
+            n_folds = 5
 
         # Check if the cross-validation parameters are changed or not, If they are changed, re-create the cv_splits
         params_changed_flag = (
@@ -457,19 +463,18 @@ class SupervisedBase:
         all_model_stats = defaultdict(list)
         total_iterations = len(cv_splits_copy) * len(self.__ML_MODELS)
 
-        feature_engineer = FeatureEngineering(**self.feature_engineering_params)
-        feature_engineer.setup()
-        feature_engineer.check_column_anomalies()
-
         with tqdm(total=total_iterations, desc="INFO | Training Progress", bar_format="{desc}:  | {bar} | {percentage:.0f}%") as pbar:
             for train_idx, test_idx in cv_splits_copy:
-                X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
-                y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
-
-                feature_engineer.data = pd.concat([X_train, y_train], axis=1)
-                feature_engineer.setup()
-                X_train = feature_engineer.start_feature_engineering().drop(self.target_col, axis=1)
-                X_test = feature_engineer.transform_new_data(X_test)
+                train_data = pd.concat([self.X.iloc[train_idx], self.y.iloc[train_idx]], axis=1)
+                test_data = pd.concat([self.X.iloc[test_idx], self.y.iloc[test_idx]], axis=1)
+                
+                self.feature_engineer.setup(data=train_data)
+                
+                transformed_train = self.feature_engineer.fit_transform()
+                transformed_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
+                
+                X_train, y_train = transformed_train
+                X_test, y_test = transformed_test
 
                 for model_idx in range(len(self.__ML_MODELS)):
                     model_info = self.__ML_MODELS[model_idx]
@@ -667,12 +672,9 @@ class SupervisedBase:
 
         # Handle full training scenario if required
         if full_train:
-            transformed_data = self.full_data_feature_engineer.start_feature_engineering()
+            X_train, y_train = self.full_data_feature_engineer.fit_transform()
             self.__logger.info("Training the model using the fully feature-engineered data")
-            model.fit(
-                transformed_data.drop(columns=[self.target_col]), 
-                transformed_data[self.target_col]
-            )
+            model.fit(X_train, y_train)
 
         # If no feature pipeline is included, return the model directly
         if model_only:
@@ -734,15 +736,14 @@ class SupervisedBase:
             self.full_data_feature_engineer.setup()
         
         # Prepare training data if needed
-        transformed_train_data = self.full_data_feature_engineer.start_feature_engineering()
         if full_train:
             self.__logger.info("Training model with full feature-engineered data")
-            model.fit(transformed_train_data.drop(columns=[self.target_col]), 
-                     transformed_train_data[self.target_col])
+            X_train, y_train = self.full_data_feature_engineer.fit_transform()
+            model.fit(X_train, y_train)
 
         # Transform test data
-        transformed_test = self.full_data_feature_engineer.transform_new_data(test_data)
-        return model, transformed_test
+        X_test = self.full_data_feature_engineer.transform(test_data)
+        return model, X_test
 
     def predict(
         self,
@@ -768,8 +769,8 @@ class SupervisedBase:
         np.ndarray
             The predicted target column
         """
-        model, transformed_test = self._predict_helper(test_data, model, full_train)
-        return model.predict(transformed_test)
+        model, X_test = self._predict_helper(test_data, model, full_train)
+        return model.predict(X_test)
     
     def predict_proba(
         self,
@@ -795,8 +796,8 @@ class SupervisedBase:
         np.ndarray
             The predicted probabilities for each class
         """
-        model, transformed_test = self._predict_helper(test_data, model, full_train)
-        return model.predict_proba(transformed_test)
+        model, X_test = self._predict_helper(test_data, model, full_train)
+        return model.predict_proba(X_test)
 
     def __sort_models(self, eval_metric: Optional[str] = None):
         """
@@ -1080,6 +1081,8 @@ class SupervisedBase:
             available_cv_methods=self.__AVAILABLE_CV_METHODS,
             ml_task_type=self.__ML_TASK_TYPE
         )
+        if cv_method != "holdout" and n_folds is None:
+            n_folds = 5
 
         # Get the best model If the user doesn't pass any model object
         if model is None:
