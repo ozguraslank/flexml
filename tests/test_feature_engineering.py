@@ -55,18 +55,18 @@ class TestFeatureEngineering(unittest.TestCase):
         
         feature_exp.setup()
         
-        data = feature_exp.start_feature_engineering()
-        lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])
+        X_train, y_train = feature_exp.fit_transform()
+        lr = LogisticRegression(max_iter=500).fit(X_train, y_train)
 
         # Check if all columns are numerical, including target
         self.assertFalse(
-            data.select_dtypes(exclude=[np.number]).columns.tolist(),
+            X_train.select_dtypes(exclude=[np.number]).columns.tolist(),
             "Not all columns are numerical"
         )
 
         # Check if there are any null values
         self.assertFalse(
-            data.isnull().any().any(),
+            X_train.isnull().any().any(),
             "There are null values in the processed data"
         )
 
@@ -77,18 +77,18 @@ class TestFeatureEngineering(unittest.TestCase):
         feature_exp = FeatureEngineering(self.df, target_col='target')
         feature_exp.setup()
         
-        data = feature_exp.start_feature_engineering()
-        lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])
+        X_train, y_train = feature_exp.fit_transform()
+        lr = LogisticRegression(max_iter=500).fit(X_train, y_train)
 
         # Check if all columns are numerical, including target
         self.assertFalse(
-            data.select_dtypes(exclude=[np.number]).columns.tolist(),
+            X_train.select_dtypes(exclude=[np.number]).columns.tolist(),
             "Not all columns are numerical"
         )
 
         # Check if there are any null values
         self.assertFalse(
-            data.isnull().any().any(),
+            X_train.isnull().any().any(),
             "There are null values in the processed data"
         )
 
@@ -128,12 +128,12 @@ class TestFeatureEngineering(unittest.TestCase):
                         )
                         feature_test.setup()
                         
-                        data = feature_test.start_feature_engineering()
-                        lr = LogisticRegression(max_iter=500).fit(data.drop('target',axis=1), data['target'])
+                        X_train, y_train = feature_test.fit_transform()
+                        lr = LogisticRegression(max_iter=500).fit(X_train, y_train)
 
                         # Check if all columns are numerical, including target
                         self.assertFalse(
-                            data.select_dtypes(exclude=[np.number]).columns.tolist(),
+                            X_train.select_dtypes(exclude=[np.number]).columns.tolist(),
                             f"Not all columns are numerical. Failed parameters are: "
                             f"Encoding method: {encoding_method}, "
                             f"Imputation method: {imputation_method}, "
@@ -142,7 +142,7 @@ class TestFeatureEngineering(unittest.TestCase):
 
                         # Check if there are any null values
                         self.assertFalse(
-                            data.isnull().any().any(),
+                            X_train.isnull().any().any(),
                             f"There are null values in the processed data. Failed parameters are: "
                             f"Encoding method: {encoding_method}, "
                             f"Imputation method: {imputation_method}, "

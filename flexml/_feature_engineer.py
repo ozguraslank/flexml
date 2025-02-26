@@ -313,10 +313,18 @@ class FeatureEngineering:
         self.ordinal_encode_map = ordinal_encode_map or {}
         self.normalize = normalize
 
-    def setup(self):
+    def setup(self, data: Optional[pd.DataFrame] = None):
         """
         Setup the feature engineering pipeline
+
+        Parameters
+        ----------
+        data : pd.DataFrame, default=None
+            The data to override the existing data attribute
         """
+        if data is not None:
+            self.data = data
+
         # Initialize encoder for target column
         self.target_encoder = LabelEncoder()
         # Separate features and target column
@@ -455,7 +463,7 @@ class FeatureEngineering:
 
         return columns_above_threshold
     
-    def start_feature_engineering(self) -> pd.DataFrame:
+    def fit_transform(self) -> pd.DataFrame:
         """
         Perform feature engineering on the training data
 
@@ -481,9 +489,9 @@ class FeatureEngineering:
 
         processed_features[self.target_col] = target_data
 
-        return processed_features
+        return processed_features.drop(self.target_col, axis=1), processed_features[self.target_col]
 
-    def transform_new_data(self, test_data: pd.DataFrame) -> pd.DataFrame:
+    def transform(self, test_data: pd.DataFrame, y_included: bool = False) -> pd.DataFrame:
         """
         Perform feature engineering on test data using the fitted pipeline
 
@@ -497,12 +505,19 @@ class FeatureEngineering:
         test_data : pd.DataFrame
             The test dataset to process
 
+        y_included : bool, default=False
+            Whether the target column is included in the test data so It also transforms the target column
+
         Returns
         -------
         pd.DataFrame
             A DataFrame containing the processed test features
         """
-        test_features = test_data.drop(columns=[self.target_col], errors='ignore')
+        if y_included:
+            test_features = test_data
+        else:
+            test_features = test_data.drop(columns=[self.target_col], errors='ignore')
+
         processed_test_features = self.pipeline.transform(test_features)
         
         # Add target column if it exists in test data
@@ -512,4 +527,7 @@ class FeatureEngineering:
                 target_data = self.target_encoder.transform(target_data)
             processed_test_features[self.target_col] = target_data
 
-        return processed_test_features
+        if not y_included:
+            return processed_test_features
+        else:
+            return processed_test_features.drop(self.target_col, axis=1), processed_test_features[self.target_col]
