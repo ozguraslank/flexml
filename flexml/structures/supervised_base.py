@@ -401,7 +401,7 @@ class SupervisedBase:
             available_cv_methods=self.__AVAILABLE_CV_METHODS,
             ml_task_type=self.__ML_TASK_TYPE
         )
-        if cv_method != "holdout":
+        if cv_method != "holdout" and n_folds is None:
             n_folds = 5
 
         # Check if the cross-validation parameters are changed or not, If they are changed, re-create the cv_splits
@@ -1082,7 +1082,7 @@ class SupervisedBase:
             available_cv_methods=self.__AVAILABLE_CV_METHODS,
             ml_task_type=self.__ML_TASK_TYPE
         )
-        if cv_method != "holdout":
+        if cv_method != "holdout" and n_folds is None:
             n_folds = 5
 
         # Get the best model If the user doesn't pass any model object
