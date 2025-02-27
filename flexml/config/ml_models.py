@@ -204,7 +204,7 @@ WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
         "name": BAYESIAN_RIDGE_REGRESSION.__class__.__name__,
         "model": BAYESIAN_RIDGE_REGRESSION,
         "tuning_param_grid": {
-            "n_iter": [100, 200, 300, 400, 500],
+            "max_iter": [100, 200, 300, 400, 500],
             "alpha_1": [1e-6, 1e-5, 1e-4],
             "alpha_2": [1e-6, 1e-5, 1e-4],
             "lambda_1": [1e-6, 1e-5, 1e-4],
