@@ -453,7 +453,7 @@ class SupervisedBase:
 
         # Train only the models that haven't been trained yet
         if not reset_the_experiment and quick_to_wide_flag: 
-            self.__existing_model_names = self.__model_stats_df['model_name'].unique() if self.__model_stats_df is not None else []
+            self.__existing_model_names = self.__model_stats_df['Model Name'].unique() if self.__model_stats_df is not None else []
         else:
             self.__model_training_info = []
             self.__model_stats_df = None
@@ -508,7 +508,7 @@ class SupervisedBase:
                         all_model_stats[model_name].append({
                             "model": model,
                             "model_stats": {
-                                "model_name": model_name,
+                                "Model Name": model_name,
                                 **avg_metrics,
                                 "Time Taken (sec)": total_time_taken
                             }
@@ -593,7 +593,7 @@ class SupervisedBase:
         self.__sorted_model_stats_df = self.__sort_models(eval_metric)
 
         for i in range(top_n_models):
-            searched_model_name = self.__sorted_model_stats_df.iloc[i]["model_name"]
+            searched_model_name = self.__sorted_model_stats_df.iloc[i]["Model Name"]
             for model_info in self.__model_training_info:
                 model_name = list(model_info.keys())[0]
                 if model_name == searched_model_name:
@@ -1082,7 +1082,7 @@ class SupervisedBase:
                 tuned_model_name:{
                     "model": self.tuned_model,
                     "model_stats": {
-                        "model_name": tuned_model_name,
+                        "Model Name": tuned_model_name,
                         **model_perf,
                         "Time Taken (sec)": tuned_time_taken
                     }
