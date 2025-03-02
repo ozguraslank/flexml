@@ -1052,7 +1052,29 @@ class SupervisedBase:
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
             tuned_time_taken = tuning_report['time_taken_sec']
-            tuned_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']})_(n_iter={tuning_report['n_iter']})"
+            base_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']})_(n_iter={tuning_report['n_iter']})"
+            
+            # Find all existing models with same base name (including those with suffixes)
+            max_suffix = 0
+            for key in self.__existing_model_names:
+                # Check if it's the exact base name or a suffixed version
+                if key == base_model_name:
+                    max_suffix = max(max_suffix, 1)
+                elif key.startswith(f"{base_model_name}_"):
+                    try:
+                        suffix_num = int(key.split("_")[-1])
+                        max_suffix = max(max_suffix, suffix_num + 1)
+                    except (ValueError, IndexError):
+                        pass
+            
+            # Determine the model name
+            if max_suffix > 0:
+                tuned_model_name = f"{base_model_name}_{max_suffix}"
+            else:
+                tuned_model_name = base_model_name
+            
+            # Add the model name to existing_model_name dict
+            self.__existing_model_names.append(tuned_model_name)
 
             # Add the tuned model and it's score to the model_training_info list
             model_perf = tuning_report['model_perf']
