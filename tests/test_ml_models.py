@@ -5,7 +5,7 @@ from flexml.regression import Regression
 from flexml.classification import Classification
 from flexml.helpers import get_cv_splits
 from flexml.logger import get_logger
-from flexml.config import WIDE_REGRESSION_MODELS, WIDE_CLASSIFICATION_MODELS
+from flexml.config import get_ml_models
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -19,13 +19,13 @@ class TestMLModels(unittest.TestCase):
             'data': load_diabetes(as_frame=True)['frame'],
             'target_col': 'target',
             'exp_class': Regression,
-            'models': WIDE_REGRESSION_MODELS
+            'models': get_ml_models()['Regression']['WIDE']
         },
         'Classification': {
             'data': load_breast_cancer(as_frame=True)['frame'],
             'target_col': 'target',
             'exp_class': Classification,
-            'models': WIDE_CLASSIFICATION_MODELS
+            'models': get_ml_models()['Classification']['WIDE']
         }
     }
 

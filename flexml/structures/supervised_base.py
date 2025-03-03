@@ -8,7 +8,7 @@ from typing import Any, Union, Optional, Iterator, List, Dict
 from tqdm import tqdm
 from IPython import get_ipython
 from sklearn.pipeline import Pipeline
-from flexml.config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
+from flexml.config import get_ml_models, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
 from flexml.logger import get_logger
 from flexml.helpers import (
     eval_metric_checker,
@@ -162,7 +162,7 @@ class SupervisedBase:
         validate_inputs(**self.feature_engineering_params)
         self.X = self.data.drop(columns=[self.target_col])
         self.y = self.data[self.target_col] 
-
+        self.num_class = len(self.y.unique())
         self.feature_engineer = FeatureEngineering(**self.feature_engineering_params)
         self.feature_engineer.setup()
         self.feature_engineer.check_column_anomalies()
@@ -258,7 +258,7 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-    def __prepare_models(self, experiment_size: str):
+    def __prepare_models(self, experiment_size: str, num_class: int):
         """
         Prepares the models based on the selected experiment size ('quick' or 'wide')
 
@@ -277,7 +277,7 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        self.__ML_MODELS = ML_MODELS.get(self.__ML_TASK_TYPE).get(experiment_size.upper())
+        self.__ML_MODELS = get_ml_models(num_class).get(self.__ML_TASK_TYPE).get(experiment_size.upper())
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
         """
@@ -446,7 +446,7 @@ class SupervisedBase:
                 y_array = self.data[self.target_col]
             ))
 
-        self.__prepare_models(experiment_size)
+        self.__prepare_models(experiment_size, self.num_class)
         cv_splits_copy = self.cv_splits.copy() # Will be used for trainings
 
         self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} validation")
@@ -494,7 +494,11 @@ class SupervisedBase:
                         t_end = time()
 
                         time_taken = round(t_end - t_start, 2)
-                        y_pred = model.predict(X_test)
+                        if self.__ML_TASK_TYPE == "Classification" and hasattr(model, 'predict_proba'):
+                            y_pred = model.predict_proba(X_test)
+                        else:
+                            y_pred = model.predict(X_test)
+
                         model_perf = evaluate_model_perf(self.__ML_TASK_TYPE, y_test, y_pred)
 
                         all_metrics.append(model_perf)
