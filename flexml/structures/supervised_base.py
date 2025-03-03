@@ -8,7 +8,7 @@ from typing import Any, Union, Optional, Iterator, List, Dict
 from tqdm import tqdm
 from IPython import get_ipython
 from sklearn.pipeline import Pipeline
-from flexml.config import ML_MODELS, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
+from flexml.config import get_ml_models, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
 from flexml.logger import get_logger
 from flexml.helpers import (
     eval_metric_checker,
@@ -162,7 +162,7 @@ class SupervisedBase:
         validate_inputs(**self.feature_engineering_params)
         self.X = self.data.drop(columns=[self.target_col])
         self.y = self.data[self.target_col] 
-
+        self.num_class = len(self.y.unique())
         self.feature_engineer = FeatureEngineering(**self.feature_engineering_params)
         self.feature_engineer.setup()
         self.feature_engineer.check_column_anomalies()
@@ -258,7 +258,7 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-    def __prepare_models(self, experiment_size: str):
+    def __prepare_models(self, experiment_size: str, num_class: int):
         """
         Prepares the models based on the selected experiment size ('quick' or 'wide')
 
@@ -277,7 +277,7 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        self.__ML_MODELS = ML_MODELS.get(self.__ML_TASK_TYPE).get(experiment_size.upper())
+        self.__ML_MODELS = get_ml_models(num_class).get(self.__ML_TASK_TYPE).get(experiment_size.upper())
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
         """
@@ -446,14 +446,14 @@ class SupervisedBase:
                 y_array = self.data[self.target_col]
             ))
 
-        self.__prepare_models(experiment_size)
+        self.__prepare_models(experiment_size, self.num_class)
         cv_splits_copy = self.cv_splits.copy() # Will be used for trainings
 
         self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} validation")
 
         # Train only the models that haven't been trained yet
         if not reset_the_experiment and quick_to_wide_flag: 
-            self.__existing_model_names = self.__model_stats_df['model_name'].unique() if self.__model_stats_df is not None else []
+            self.__existing_model_names = self.__model_stats_df['Model Name'].unique() if self.__model_stats_df is not None else []
         else:
             self.__model_training_info = []
             self.__model_stats_df = None
@@ -494,7 +494,11 @@ class SupervisedBase:
                         t_end = time()
 
                         time_taken = round(t_end - t_start, 2)
-                        y_pred = model.predict(X_test)
+                        if self.__ML_TASK_TYPE == "Classification" and hasattr(model, 'predict_proba'):
+                            y_pred = model.predict_proba(X_test)
+                        else:
+                            y_pred = model.predict(X_test)
+
                         model_perf = evaluate_model_perf(self.__ML_TASK_TYPE, y_test, y_pred)
 
                         all_metrics.append(model_perf)
@@ -508,7 +512,7 @@ class SupervisedBase:
                         all_model_stats[model_name].append({
                             "model": model,
                             "model_stats": {
-                                "model_name": model_name,
+                                "Model Name": model_name,
                                 **avg_metrics,
                                 "Time Taken (sec)": total_time_taken
                             }
@@ -593,7 +597,7 @@ class SupervisedBase:
         self.__sorted_model_stats_df = self.__sort_models(eval_metric)
 
         for i in range(top_n_models):
-            searched_model_name = self.__sorted_model_stats_df.iloc[i]["model_name"]
+            searched_model_name = self.__sorted_model_stats_df.iloc[i]["Model Name"]
             for model_info in self.__model_training_info:
                 model_name = list(model_info.keys())[0]
                 if model_name == searched_model_name:
@@ -1052,7 +1056,29 @@ class SupervisedBase:
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
             tuned_time_taken = tuning_report['time_taken_sec']
-            tuned_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']})_(n_iter={tuning_report['n_iter']})"
+            base_model_name = f"{self.tuned_model.__class__.__name__}_({tuning_report['tuning_method']})_(n_iter={tuning_report['n_iter']})"
+            
+            # Find all existing models with same base name (including those with suffixes)
+            max_suffix = 0
+            for key in self.__existing_model_names:
+                # Check if it's the exact base name or a suffixed version
+                if key == base_model_name:
+                    max_suffix = max(max_suffix, 1)
+                elif key.startswith(f"{base_model_name}_"):
+                    try:
+                        suffix_num = int(key.split("_")[-1])
+                        max_suffix = max(max_suffix, suffix_num + 1)
+                    except (ValueError, IndexError):
+                        pass
+            
+            # Determine the model name
+            if max_suffix > 0:
+                tuned_model_name = f"{base_model_name}_{max_suffix}"
+            else:
+                tuned_model_name = base_model_name
+            
+            # Add the model name to existing_model_name dict
+            self.__existing_model_names.append(tuned_model_name)
 
             # Add the tuned model and it's score to the model_training_info list
             model_perf = tuning_report['model_perf']
@@ -1060,7 +1086,7 @@ class SupervisedBase:
                 tuned_model_name:{
                     "model": self.tuned_model,
                     "model_stats": {
-                        "model_name": tuned_model_name,
+                        "Model Name": tuned_model_name,
                         **model_perf,
                         "Time Taken (sec)": tuned_time_taken
                     }

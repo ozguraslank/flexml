@@ -1,12 +1,8 @@
 from flexml.config.ml_models import (
-    QUICK_REGRESSION_MODELS,
-    WIDE_REGRESSION_MODELS,
-    QUICK_CLASSIFICATION_MODELS,
-    WIDE_CLASSIFICATION_MODELS
+    get_ml_models
 )
 
 from flexml.config.supervised_config import (
-    ML_MODELS,
     EVALUATION_METRICS,
     TUNING_METRIC_TRANSFORMATIONS,
     CROSS_VALIDATION_METHODS,

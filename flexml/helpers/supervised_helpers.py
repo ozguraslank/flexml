@@ -27,7 +27,7 @@ def _evaluate_preds(
         The actual values of the target column
 
     y_pred : pd.Series or np.ndarray
-        The predicted values of the target column
+        The predicted values/probabilities of the target column
 
     eval_metric : str
         The evaluation metric that will be used to evaluate the model.
@@ -62,9 +62,13 @@ def _evaluate_preds(
     elif eval_metric == 'F1 Score':
         return round(f1_score(y_true, y_pred, average=average), 6)
     elif eval_metric == 'ROC-AUC':
-        if len(np.unique(y_true)) > 2:
-            return round(roc_auc_score(y_true, y_pred, average=average, multi_class='ovr'), 6)
-        return round(roc_auc_score(y_true, y_pred), 6)
+        if len(y_pred.shape) > 1: # If probabilites are returned 
+            if y_pred.shape[1] >= 3: # If there are 3 or more classes
+                return round(roc_auc_score(y_true, y_pred, average=average, multi_class='ovr'), 6)
+            elif y_pred.shape[1] == 2: # If there are 2 classes
+                return round(roc_auc_score(y_true, y_pred[:, 1]), 6)
+        else: # If class labels are returned, ROC-AUC is not applicable (Some models don't have predict_proba method)
+            return -1.0
     else:
         raise ValueError(f"Error while evaluating the current model. The eval_metric should be one of the following: 'R2', 'MAE', 'MSE', 'RMSE', 'MAPE', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'ROC-AUC'. Got {eval_metric}")
         
@@ -85,7 +89,9 @@ def evaluate_model_perf(
         The actual values of the target column.
     
     y_pred : np.ndarray
-        The predicted values of the target column.
+        For regression tasks: The predicted values of the target column.
+        For classification tasks: The predicted probabilities for each class.
+        Note: Some models like Perceptron, PassiveAggressiveClassifier, etc. don't have predict_proba method, so they return class labels directly.
     
     Returns
     -------
@@ -112,15 +118,25 @@ def evaluate_model_perf(
         }
     
     elif ml_task_type == "Classification":
+        # Convert probabilities to class labels for metrics except ROC-AUC if y_pred is probabilities
+        if len(y_pred.shape) > 1:
+            y_pred_labels = np.argmax(y_pred, axis=1)
+        else:
+            y_pred_labels = (y_pred > 0.5).astype(int)
+
         # Determine appropriate averaging method based on number of classes
         n_classes = len(np.unique(y_test))
         avg_method = 'binary' if n_classes == 2 else 'macro'
         
-        accuracy = _evaluate_preds(y_test, y_pred, 'Accuracy')
-        precision = _evaluate_preds(y_test, y_pred, 'Precision', average=avg_method)
-        recall = _evaluate_preds(y_test, y_pred, 'Recall', average=avg_method)
-        f1 = _evaluate_preds(y_test, y_pred, 'F1 Score', average=avg_method)
+        # Use labels for standard classification metrics
+        accuracy = _evaluate_preds(y_test, y_pred_labels, 'Accuracy')
+        precision = _evaluate_preds(y_test, y_pred_labels, 'Precision', average=avg_method)
+        recall = _evaluate_preds(y_test, y_pred_labels, 'Recall', average=avg_method)
+        f1 = _evaluate_preds(y_test, y_pred_labels, 'F1 Score', average=avg_method)
+        
+        # Use probabilities for ROC-AUC
         roc_auc = _evaluate_preds(y_test, y_pred, 'ROC-AUC', average=avg_method)
+        
         return {
             "Accuracy": accuracy,
             "Precision": precision,
