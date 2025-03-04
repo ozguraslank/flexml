@@ -274,7 +274,7 @@ def get_ml_models(num_class: Optional[int] = None):
             "name": OMP_REGRESSION.__class__.__name__,
             "model": OMP_REGRESSION,
             "tuning_param_grid": {
-                "n_nonzero_coefs": [None, 5, 10, 15, 20],
+                "n_nonzero_coefs": [5, 10, 15, 20],
                 "tol": [1e-4, 1e-3, 1e-2, 1e-1]
             }
         },
@@ -460,14 +460,14 @@ def get_ml_models(num_class: Optional[int] = None):
             "model": LDA_CLASSIFIER,
             "tuning_param_grid": {
                 "solver": ["svd", "lsqr", "eigen"],
-                "shrinkage": [None, "auto", 0.1, 0.5, 1.0]
+                "shrinkage": [0.1, 0.5, 1.0]
             }
         },
         {
             "name": PERCEPTRON_CLASSIFIER.__class__.__name__,
             "model": PERCEPTRON_CLASSIFIER,
             "tuning_param_grid": {
-                "penalty": [None, "l2", "l1", "elasticnet"],
+                "penalty": ["l2", "l1", "elasticnet"],
                 "alpha": [0.0001, 0.001, 0.01, 0.1],
                 "max_iter": [1000, 2000, 3000],
                 "tol": [1e-3, 1e-4, 1e-5],
@@ -511,7 +511,7 @@ def get_ml_models(num_class: Optional[int] = None):
             "model": NEAREST_CENTROID_CLASSIFIER,
             "tuning_param_grid": {
                 "metric": ["euclidean", "manhattan", "cosine"],
-                "shrink_threshold": [None, 0.1, 0.5, 1.0]
+                "shrink_threshold": [0.1, 0.5, 1.0]
             }
         }
     ]
