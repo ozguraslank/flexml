@@ -493,7 +493,9 @@ class ModelTuner:
         def objective(trial):
             try:
                 # Generate parameters for the trial
-                params = {}
+                current_model = pipeline.named_steps['model']
+                params = current_model.get_params()
+
                 for param_name, param_values in param_grid.items():
                     first_element = param_values[0]
 
@@ -508,7 +510,7 @@ class ModelTuner:
                         self.logger.info(info_msg)
 
                 # Extract the model from the pipeline
-                test_model = type(pipeline.named_steps['model'])()
+                test_model = type(current_model)()
                 test_model.set_params(**params)
 
                 # Decompose the pipeline by removing the model from it to use it for only feature engineering
