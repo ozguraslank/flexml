@@ -63,7 +63,14 @@ class ModelTuner:
 
         self.eval_metrics_in_tuning_format = TUNING_METRIC_TRANSFORMATIONS.get(self.ml_problem_type)
         self.reverse_signed_eval_metrics = TUNING_METRIC_TRANSFORMATIONS.get("reverse_signed_eval_metrics")
- 
+
+        # Revise classification metrics for multi-class classification
+        if self.ml_problem_type == "Classification" and self.y.nunique() > 2:
+            self.eval_metrics_in_tuning_format['ROC-AUC'] = 'roc_auc_ovr'
+            self.eval_metrics_in_tuning_format['Precision'] = 'precision_macro'
+            self.eval_metrics_in_tuning_format['Recall'] = 'recall_macro'
+            self.eval_metrics_in_tuning_format['F1 Score'] = 'f1_macro'
+
     def _param_grid_validator(
         self,
         model_available_params: dict,
@@ -106,7 +113,7 @@ class ModelTuner:
     def _setup_tuning(
         self,
         tuning_method: str,
-        model: object,
+        model: Union[object, Pipeline],
         param_grid: dict,
         n_iter: Optional[int] = None,
         n_jobs: int = -1,
@@ -126,8 +133,8 @@ class ModelTuner:
             
             * 'optuna' for Optuna (https://optuna.readthedocs.io/en/stable/)
 
-        model : object
-            The model object that will be tuned.
+        model : object or Pipeline
+            The model or Pipeline object that will be used for tuning
 
         n_iter : int, optional (default=10)
             The number of iterations. The default is 10.
@@ -158,11 +165,14 @@ class ModelTuner:
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
         model_params = None
+        
+        if isinstance(model, Pipeline):
+            model = model.named_steps['model']
 
-        if "CatBoost" in model.named_steps['model'].__class__.__name__:
-            model_params = model.named_steps['model'].get_all_params()
+        if "CatBoost" in model.__class__.__name__:
+            model_params = model.get_all_params()
         else:
-            model_params = model.named_steps['model'].get_params()
+            model_params = model.get_params()
         
         if prefix_param_grid_flag:
             model_params = {f"model__{key}": value for key, value in model_params.items()}
@@ -388,7 +398,8 @@ class ModelTuner:
         
     def optuna_search(
         self,
-        pipeline: Pipeline,
+        model: object,
+        feature_engineer: object,
         param_grid: dict,
         eval_metric: str,
         cv: object,
@@ -402,8 +413,11 @@ class ModelTuner:
 
         Parameters
         ----------
-        pipeline : Pipeline
-            The pipeline object includes feature engineering and model object that will be tuned
+        model: object
+            The model object that will be tuned
+
+        feature_engineer: object
+            The feature engineer object that will be used for feature engineering
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values
@@ -473,7 +487,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("optuna", pipeline, param_grid, n_iter=n_iter, n_jobs=n_jobs, prefix_param_grid_flag=False)
+        model_stats = self._setup_tuning("optuna", model, param_grid, n_iter=n_iter, n_jobs=n_jobs, prefix_param_grid_flag=False)
         param_grid = model_stats['tuning_param_grid']
 
         # Set verbosity levels
@@ -491,64 +505,59 @@ class ModelTuner:
         study_direction = "maximize" if eval_metric in ['R2', 'Accuracy', 'Precision', 'Recall', 'F1 Score'] else "minimize"
 
         def objective(trial):
-            try:
-                # Generate parameters for the trial
-                current_model = pipeline.named_steps['model']
-                params = current_model.get_params()
+            # Generate parameters for the trial
+            params = model.get_params()
+            for param_name, param_values in param_grid.items():
+                first_element = param_values[0]
+                
+                if isinstance(first_element, (str, bool)):
+                    params[param_name] = trial.suggest_categorical(param_name, param_values)
+                elif isinstance(first_element, int):
+                    params[param_name] = trial.suggest_int(param_name, param_values[0], param_values[-1])
+                elif isinstance(first_element, float):
+                    params[param_name] = trial.suggest_float(param_name, param_values[0], param_values[-1])
+                else:
+                    info_msg = f"{param_name} parameter is not added to tuning since its type is not supported by Optuna."
+                    self.logger.info(info_msg)
 
-                for param_name, param_values in param_grid.items():
-                    first_element = param_values[0]
+            # Perform cross-validation and calculate the score
+            scores = []
+            for train_idx, test_idx in cv:  # Use custom splitter object
+                train_data = pd.concat([self.X.iloc[train_idx], self.y.iloc[train_idx]], axis=1)
+                test_data = pd.concat([self.X.iloc[test_idx], self.y.iloc[test_idx]], axis=1)
 
-                    if isinstance(first_element, (str, bool)):
-                        params[param_name] = trial.suggest_categorical(param_name, param_values)
-                    elif isinstance(first_element, int):
-                        params[param_name] = trial.suggest_int(param_name, param_values[0], param_values[-1])
-                    elif isinstance(first_element, float):
-                        params[param_name] = trial.suggest_float(param_name, param_values[0], param_values[-1])
-                    else:
-                        info_msg = f"{param_name} parameter is not added to tuning since its type is not supported by Optuna."
-                        self.logger.info(info_msg)
-
-                # Extract the model from the pipeline
-                test_model = type(current_model)()
-                test_model.set_params(**params)
-
-                # Decompose the pipeline by removing the model from it to use it for only feature engineering
-                processing_pipeline = Pipeline(steps=[
-                    (name, step) for name, step in pipeline.steps if name != 'model'
-                ])
-
-                # Perform cross-validation and calculate the score
-                scores = []
-                for train_idx, test_idx in cv:  # Use custom splitter object
-                    X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
-                    y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
-
-                    processing_pipeline.fit(X_train)
-                    X_train_processed = processing_pipeline.transform(X_train)
-                    X_test_processed = processing_pipeline.transform(X_test)
-
-                    # Fit and predict using the model
-                    test_model.fit(X_train_processed, y_train)
-                    y_pred = test_model.predict(X_test_processed)
-
-                    scores.append(evaluate_model_perf(self.ml_problem_type, y_test, y_pred))
-
-                # Calculate the mean score across all folds
-                avg_metrics = {k: np.mean([m[k] for m in scores]) for k in scores[0]}
-                mean_score = avg_metrics.get(eval_metric, float('inf'))
-
-                # Update the best score and model
-                if model_stats['tuned_model_score'] is None or mean_score > model_stats['tuned_model_score']:
-                    model_stats['tuned_model_score'] = round(mean_score, 6)
-                    model_stats['tuned_model'] = test_model
-                    model_stats['model_perf'] = avg_metrics
-
-                return mean_score
+                feature_engineer.setup(data=train_data)
             
-            except Exception as e:
-                print(f"error in optuna: {e}")
+                transformed_train = feature_engineer.fit_transform()
+                transformed_test = feature_engineer.transform(test_data=test_data, y_included=True)
+                
+                X_train, y_train = transformed_train
+                X_test, y_test = transformed_test
 
+                test_model = type(model)()
+                test_model.set_params(**params)
+                test_model.fit(X_train, y_train)
+
+                if self.ml_problem_type == "Classification" and hasattr(test_model, 'predict_proba'):
+                    y_pred = test_model.predict_proba(X_test)
+                else:   
+                    y_pred = test_model.predict(X_test)
+
+                # Evaluate performance
+                scores.append(evaluate_model_perf(self.ml_problem_type, y_test, y_pred))
+
+            # Calculate the mean score across all folds
+            avg_metrics = {k: np.mean([m[k] if m[k] is not None else -1 for m in scores]) for k in scores[0]}
+            mean_score = avg_metrics.get(eval_metric, float('inf'))
+
+            # Update the best score and model
+            if model_stats['tuned_model_score'] is None or mean_score > model_stats['tuned_model_score']:
+                model_stats['tuned_model_score'] = round(mean_score, 6)
+                model_stats['tuned_model'] = test_model
+                model_stats['model_perf'] = avg_metrics
+
+            return mean_score
+        
         try:
             # Perform Optuna optimization
             t_start = time()
@@ -559,7 +568,7 @@ class ModelTuner:
             # Update model stats
             model_stats['time_taken_sec'] = round(t_end - t_start, 2)
             return model_stats
-
+        
         except Exception as e:
             self.logger.error(f"Error while tuning the model with Optuna, Error: {e}")
             return None
