@@ -12,6 +12,27 @@ from sklearn.metrics import (
     f1_score,
     roc_auc_score)
 
+
+def _safe_mape(y_true: Union[pd.Series, np.ndarray], y_pred: Union[pd.Series, np.ndarray]) -> float:
+    """
+    Computes the Mean Absolute Percentage Error (MAPE) while ignoring zero values in y_true since MAPE is undefined for zero values.
+
+    Parameters
+    ----------
+    y_true : pd.Series or np.ndarray
+        The actual values of the target column
+
+    y_pred : pd.Series or np.ndarray
+        The predicted values of the target column
+
+    Returns
+    -------
+    float
+        The MAPE score for the desired eval metric
+    """
+    mask = y_true != 0  # Ignore zero values in y_true
+    return round(np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])), 6)
+
 def _evaluate_preds(
     y_true: Union[pd.Series, np.ndarray],
     y_pred: Union[pd.Series, np.ndarray],
@@ -52,7 +73,7 @@ def _evaluate_preds(
     elif eval_metric == 'RMSE':
         return round(np.sqrt(mean_squared_error(y_true, y_pred)), 6)
     elif eval_metric == 'MAPE':
-        return round(np.mean(np.abs((y_true - y_pred) / y_true)) * 100, 6)
+        return _safe_mape(y_true, y_pred)
     elif eval_metric == 'Accuracy':
         return round(accuracy_score(y_true, y_pred), 6)
     elif eval_metric == 'Precision':
