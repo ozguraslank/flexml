@@ -1,4 +1,4 @@
-from sklearn.linear_model import LinearRegression, LogisticRegression, ElasticNet, HuberRegressor, Lasso, Ridge, BayesianRidge, OrthogonalMatchingPursuit, RidgeClassifier
+from sklearn.linear_model import LinearRegression, LogisticRegression, ElasticNet, HuberRegressor, Lasso, Ridge, BayesianRidge, OrthogonalMatchingPursuit
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.ensemble import (
     AdaBoostRegressor, AdaBoostClassifier, GradientBoostingRegressor, GradientBoostingClassifier, 
