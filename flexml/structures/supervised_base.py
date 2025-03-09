@@ -859,9 +859,12 @@ class SupervisedBase:
             if s.name in ['MAE', 'MSE', 'RMSE', 'MAPE']:
                 s_nonneg = s.where(s >= 0, np.nan)
                 best_val = s_nonneg.min()
-                is_best = s == best_val
+                if best_val == float('inf'):
+                    is_best = pd.Series([False] * len(s))
+                else:
+                    is_best = (s == best_val) & (s != float('inf')) & (s != -1)
             else:
-                is_best = s == s.max()
+                is_best = (s == s.max()) & (s != float('inf')) & (s != -1)
             return ['background-color: green' if v else '' for v in is_best]
         
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
