@@ -1177,8 +1177,11 @@ class SupervisedBase:
 
         # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
         if not hasattr(self, 'model_tuner'):
-            y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
-            y_encoded.index = self.y.index
+            if self.__ML_TASK_TYPE == 'classification':
+                y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
+                y_encoded.index = self.y.index
+            else:
+                y_encoded = self.y # No need to encode the target for regression
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, y_encoded, self.logging_to_file)
 
         feature_engineer = FeatureEngineering(**self.feature_engineering_params)
