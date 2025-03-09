@@ -64,6 +64,12 @@ class TestMLModels(unittest.TestCase):
             
             model.fit(X_train, y_train)
 
+            # If its classification problem
+            if objective == 'Classification':
+                model.predict_proba(X_train)
+            else:
+                model.predict(X_train)
+
         except Exception as e:
             error_msg = f"An error occurred while fitting {model_name} model. Error: {e}"
             self.logger.error(error_msg)
