@@ -502,7 +502,7 @@ class ModelTuner:
         elif verbose == 4:
             optuna.logging.set_verbosity(optuna.logging.DEBUG)
 
-        study_direction = "maximize" if eval_metric in ['R2', 'Accuracy', 'Precision', 'Recall', 'F1 Score'] else "minimize"
+        study_direction = "maximize" if eval_metric in ['R2', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'ROC-AUC'] else "minimize"
 
         def objective(trial):
             # Generate parameters for the trial
