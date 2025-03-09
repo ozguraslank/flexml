@@ -1050,8 +1050,8 @@ class SupervisedBase:
             tuning_report: dict (default = None)
                 The tuning report of the model tuning process
             """
-            if tuning_report is None:
-                return
+            if tuning_report is None or tuning_report.get('model_perf') is None:
+                return False
             
             self.tuned_model = tuning_report['tuned_model']
             self.tuned_model_score = tuning_report['tuned_model_score']
@@ -1094,7 +1094,8 @@ class SupervisedBase:
             })
             self.get_best_models() # Update the self.__model_stats_df
             self.show_model_stats()
-
+            return True
+        
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Check cross-validation method params
@@ -1162,7 +1163,9 @@ class SupervisedBase:
 
         # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
         if not hasattr(self, 'model_tuner'):
-            self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, self.y, self.logging_to_file)
+            y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
+            y_encoded.index = self.y.index
+            self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, y_encoded, self.logging_to_file)
 
         feature_engineer = FeatureEngineering(**self.feature_engineering_params)
         feature_engineer.setup()
@@ -1194,7 +1197,8 @@ class SupervisedBase:
                 
         elif tuning_method == "optuna":
             tuning_result = self.model_tuner.optuna_search(
-                pipeline=pipeline,
+                model=model,
+                feature_engineer=feature_engineer,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 cv=cv_obj,
@@ -1208,5 +1212,7 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        _show_tuning_report(tuning_result)
-        self.__logger.info("[PROCESS] Model Tuning process is finished")
+        if _show_tuning_report(tuning_result):
+            self.__logger.info("[PROCESS] Model Tuning process is finished successfully")
+        else:
+            self.__logger.warning("[WARNING] Model Tuning process is failed, Please check the error messages appeared")

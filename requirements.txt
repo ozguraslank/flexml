@@ -3,7 +3,7 @@ pandas>=2.0.1
 scikit-learn>=1.5.0,<=1.5.2
 xgboost>=2.0.0
 lightgbm>=4.0.0
-catboost>=1.2.3
+catboost>=1.2.5
 tqdm>=4.60.0
 optuna>=3.0.0  
 ipython>=7.11.0

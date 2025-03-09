@@ -1,11 +1,11 @@
-from sklearn.linear_model import LinearRegression, LogisticRegression, ElasticNet, HuberRegressor, Lasso, Ridge, BayesianRidge, OrthogonalMatchingPursuit, Perceptron, PassiveAggressiveClassifier, SGDRegressor, RidgeClassifier
+from sklearn.linear_model import LinearRegression, LogisticRegression, ElasticNet, HuberRegressor, Lasso, Ridge, BayesianRidge, OrthogonalMatchingPursuit, RidgeClassifier
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.ensemble import (
     AdaBoostRegressor, AdaBoostClassifier, GradientBoostingRegressor, GradientBoostingClassifier, 
     RandomForestRegressor, RandomForestClassifier, ExtraTreesRegressor, ExtraTreesClassifier, HistGradientBoostingRegressor,
     HistGradientBoostingClassifier
 )
-from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier, NearestCentroid
+from sklearn.neighbors import KNeighborsRegressor, KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis, LinearDiscriminantAnalysis
 from sklearn.neural_network import MLPRegressor, MLPClassifier
@@ -48,7 +48,6 @@ def get_ml_models(num_class: Optional[int] = None):
     GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor()
     ELASTIC_NET_REGRESSION = ElasticNet()
     HUBER_REGRESSION = HuberRegressor()
-    SGD_REGRESSION = SGDRegressor()
     KNN_REGRESSION = KNeighborsRegressor() 
 
     # Wide Regression Models
@@ -84,15 +83,12 @@ def get_ml_models(num_class: Optional[int] = None):
     EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier()
     QDA_CLASSIFIER = QuadraticDiscriminantAnalysis()
     LDA_CLASSIFIER = LinearDiscriminantAnalysis()
-    PERCEPTRON_CLASSIFIER = Perceptron()
-    PASSIVE_AGGRESSIVE_CLASSIFIER = PassiveAggressiveClassifier()
     MLP_CLASSIFIER = MLPClassifier(
         hidden_layer_sizes=(100,),
         early_stopping=True,
         tol=0.001,
         learning_rate='adaptive'
     )
-    NEAREST_CENTROID_CLASSIFIER = NearestCentroid()
 
     # Quick Regression Model Configurations
     QUICK_REGRESSION_MODELS = [
@@ -186,17 +182,6 @@ def get_ml_models(num_class: Optional[int] = None):
             }
         },
         {
-            "name": SGD_REGRESSION.__class__.__name__,
-            "model": SGD_REGRESSION,
-            "tuning_param_grid": {
-                "loss": ["squared_error", "huber", "epsilon_insensitive"],
-                "alpha": [0.0001, 0.001, 0.01, 0.1],
-                "learning_rate": ["optimal", "adaptive"],
-                "max_iter": [1000, 2000],
-                "tol": [1e-3, 1e-4]
-            }
-        },
-        {
             "name": KNN_REGRESSION.__class__.__name__,
             "model": KNN_REGRESSION,
             "tuning_param_grid": {
@@ -274,7 +259,7 @@ def get_ml_models(num_class: Optional[int] = None):
             "name": OMP_REGRESSION.__class__.__name__,
             "model": OMP_REGRESSION,
             "tuning_param_grid": {
-                "n_nonzero_coefs": [None, 5, 10, 15, 20],
+                "n_nonzero_coefs": [5, 10, 15, 20],
                 "tol": [1e-4, 1e-3, 1e-2, 1e-1]
             }
         },
@@ -460,38 +445,7 @@ def get_ml_models(num_class: Optional[int] = None):
             "model": LDA_CLASSIFIER,
             "tuning_param_grid": {
                 "solver": ["svd", "lsqr", "eigen"],
-                "shrinkage": [None, "auto", 0.1, 0.5, 1.0]
-            }
-        },
-        {
-            "name": PERCEPTRON_CLASSIFIER.__class__.__name__,
-            "model": PERCEPTRON_CLASSIFIER,
-            "tuning_param_grid": {
-                "penalty": [None, "l2", "l1", "elasticnet"],
-                "alpha": [0.0001, 0.001, 0.01, 0.1],
-                "max_iter": [1000, 2000, 3000],
-                "tol": [1e-3, 1e-4, 1e-5],
-                "shuffle": [True, False],
-                "eta0": [1.0, 0.1, 0.01],
-                "early_stopping": [True, False],
-                "validation_fraction": [0.1, 0.2, 0.3],
-                "n_iter_no_change": [5, 10, 15]
-            }
-        },
-        {
-            "name": PASSIVE_AGGRESSIVE_CLASSIFIER.__class__.__name__,
-            "model": PASSIVE_AGGRESSIVE_CLASSIFIER,
-            "tuning_param_grid": {
-                "C": [0.1, 1.0, 10.0],
-                "fit_intercept": [True, False],
-                "max_iter": [1000, 2000, 3000],
-                "tol": [1e-3, 1e-4, 1e-5],
-                "early_stopping": [True, False],
-                "validation_fraction": [0.1, 0.2, 0.3],
-                "n_iter_no_change": [5, 10, 15],
-                "shuffle": [True, False],
-                "loss": ["hinge", "squared_hinge"],
-                "average": [True, False]
+                "shrinkage": [0.1, 0.5, 1.0]
             }
         },
         {
@@ -504,14 +458,6 @@ def get_ml_models(num_class: Optional[int] = None):
                 "alpha": [0.0001, 0.001, 0.01],
                 "learning_rate": ["constant", "adaptive"],
                 "learning_rate_init": [0.001, 0.01]
-            }
-        },
-        {
-            "name": NEAREST_CENTROID_CLASSIFIER.__class__.__name__,
-            "model": NEAREST_CENTROID_CLASSIFIER,
-            "tuning_param_grid": {
-                "metric": ["euclidean", "manhattan", "cosine"],
-                "shrink_threshold": [None, 0.1, 0.5, 1.0]
             }
         }
     ]
