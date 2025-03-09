@@ -23,6 +23,7 @@ from flexml._feature_engineer import FeatureEngineering
 
 import warnings
 warnings.filterwarnings("ignore")
+pd.set_option('display.max_columns', None)
 
 
 class SupervisedBase:
@@ -867,27 +868,37 @@ class SupervisedBase:
                 is_best = (s == s.max()) & (s != float('inf')) & (s != -1)
             return ['background-color: green' if v else '' for v in is_best]
         
+        # Define a helper function to detect interactive environments including Jupyter and Colab
+        def is_interactive_notebook():
+            try:
+                # Get the shell class name
+                shell = get_ipython().__class__.__name__
+                # Both Jupyter and Colab have specific shell names
+                if shell in ['ZMQInteractiveShell', 'Shell']:  # ZMQ is for Jupyter, Shell is for Colab
+                    return True
+                return False
+            except:
+                # get_ipython() will not be defined in non-interactive environments
+                return False
+            
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         sorted_model_stats_df = self.__sort_models(eval_metric)
         sorted_model_stats_df['Time Taken (sec)'] = sorted_model_stats_df['Time Taken (sec)'].apply(lambda x: round(x, 2))
         sorted_model_stats_df.index += 1
         
-        # If the user is not on a interactive kernel such as Jupyter Notebook, the styled DataFrame will not be displayed
-        # Instead, the user will see the raw DataFrame
-        # REASON: The styled DataFrame is only supported in interactive kernels, otherwise raises an error
-        if get_ipython().__class__.__name__ != 'ZMQInteractiveShell':
-            print(20*'-')
+                
+        # Check if we're in an interactive notebook environment (Jupyter or Colab)
+        if not is_interactive_notebook():
+            print(100*'-')
             print(sorted_model_stats_df.head(len(self.__ML_MODELS)))
-            print(20*'-')
-
+            print(100*'-')
         else:
             # Apply the highlighting to all metric columns and display the dataframe If It has more than 1 row so that we can compare the models
             if len(sorted_model_stats_df) < 2:
                 display(sorted_model_stats_df)
-            
             else:
                 styler = sorted_model_stats_df.style.apply(highlight_best, subset=self.__ALL_EVALUATION_METRICS)
-                display(styler) # display is only supported in interactive kernels such as Jupyter Notebook, for details check the comment block a couple of lines above
+                display(styler) # display is only supported in interactive kernels such as Jupyter Notebook/Google Colab
 
     def plot_feature_importance(self, model: Optional[object] = None):
         """
