@@ -817,7 +817,7 @@ class SupervisedBase:
         pd.DataFrame
             A pandas DataFrame containing the sorted model statistics according to the desired eval_metric
         """
-        if len(self.__model_stats_df) == 0:
+        if self.__model_stats_df is None or len(self.__model_stats_df) == 0:
             error_msg = "There is no model performance data to sort!"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
