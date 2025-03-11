@@ -23,6 +23,7 @@ from flexml._feature_engineer import FeatureEngineering
 
 import warnings
 warnings.filterwarnings("ignore")
+pd.set_option('display.max_columns', None)
 
 
 class SupervisedBase:
@@ -470,11 +471,8 @@ class SupervisedBase:
                 
                 self.feature_engineer.setup(data=train_data)
                 
-                transformed_train = self.feature_engineer.fit_transform()
-                transformed_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
-                
-                X_train, y_train = transformed_train
-                X_test, y_test = transformed_test
+                X_train, y_train = self.feature_engineer.fit_transform()
+                X_test, y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
 
                 for model_idx in range(len(self.__ML_MODELS)):
                     model_info = self.__ML_MODELS[model_idx]
@@ -744,9 +742,11 @@ class SupervisedBase:
             self.__logger.info("Training model with full feature-engineered data")
             X_train, y_train = self.full_data_feature_engineer.fit_transform()
             model.fit(X_train, y_train)
+            X_test = self.full_data_feature_engineer.transform(test_data)
 
-        # Transform test data
-        X_test = self.full_data_feature_engineer.transform(test_data)
+        else:
+            X_test = self.feature_engineer.transform(test_data)
+
         return model, X_test
 
     def predict(
@@ -817,7 +817,7 @@ class SupervisedBase:
         pd.DataFrame
             A pandas DataFrame containing the sorted model statistics according to the desired eval_metric
         """
-        if len(self.__model_stats_df) == 0:
+        if self.__model_stats_df is None or len(self.__model_stats_df) == 0:
             error_msg = "There is no model performance data to sort!"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
@@ -867,27 +867,37 @@ class SupervisedBase:
                 is_best = (s == s.max()) & (s != float('inf')) & (s != -1)
             return ['background-color: green' if v else '' for v in is_best]
         
+        # Define a helper function to detect interactive environments including Jupyter and Colab
+        def is_interactive_notebook():
+            try:
+                # Get the shell class name
+                shell = get_ipython().__class__.__name__
+                # Both Jupyter and Colab have specific shell names
+                if shell in ['ZMQInteractiveShell', 'Shell']:  # ZMQ is for Jupyter, Shell is for Colab
+                    return True
+                return False
+            except:
+                # get_ipython() will not be defined in non-interactive environments
+                return False
+            
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         sorted_model_stats_df = self.__sort_models(eval_metric)
         sorted_model_stats_df['Time Taken (sec)'] = sorted_model_stats_df['Time Taken (sec)'].apply(lambda x: round(x, 2))
         sorted_model_stats_df.index += 1
         
-        # If the user is not on a interactive kernel such as Jupyter Notebook, the styled DataFrame will not be displayed
-        # Instead, the user will see the raw DataFrame
-        # REASON: The styled DataFrame is only supported in interactive kernels, otherwise raises an error
-        if get_ipython().__class__.__name__ != 'ZMQInteractiveShell':
-            print(20*'-')
+                
+        # Check if we're in an interactive notebook environment (Jupyter or Colab)
+        if not is_interactive_notebook():
+            print(100*'-')
             print(sorted_model_stats_df.head(len(self.__ML_MODELS)))
-            print(20*'-')
-
+            print(100*'-')
         else:
             # Apply the highlighting to all metric columns and display the dataframe If It has more than 1 row so that we can compare the models
             if len(sorted_model_stats_df) < 2:
                 display(sorted_model_stats_df)
-            
             else:
                 styler = sorted_model_stats_df.style.apply(highlight_best, subset=self.__ALL_EVALUATION_METRICS)
-                display(styler) # display is only supported in interactive kernels such as Jupyter Notebook, for details check the comment block a couple of lines above
+                display(styler) # display is only supported in interactive kernels such as Jupyter Notebook/Google Colab
 
     def plot_feature_importance(self, model: Optional[object] = None):
         """
@@ -935,8 +945,8 @@ class SupervisedBase:
 
     def tune_model(
         self, 
-        model: Optional[object] = None,
-        tuning_method: Optional[str] = 'randomized_search',
+        model: Optional[Union[object, str]] = None,
+        tuning_method: str = 'randomized_search',
         n_iter: int = 10,
         cv_method: Optional[str] = None,
         n_folds: Optional[int] = None,
@@ -952,10 +962,11 @@ class SupervisedBase:
 
         Parameters
         ----------
-        model : object (default = None)
+        model : object or str (default = None)
             The machine learning model to tune. If It's none, flexml retrieves the best model found in the experiment
-        
-        tuning_method: str (default = 'random_search')
+            If It's a string, flexml will try to get the model from the model list
+            
+        tuning_method: str (default = 'randomized_search')
             The tuning method to use for model tuning
 
             * 'grid_search' for GridSearchCV (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html)
@@ -1099,6 +1110,19 @@ class SupervisedBase:
             self.show_model_stats()
             return True
         
+        if not isinstance(model, object) and not isinstance(model, str):
+            error_msg = f"model parameter should be an object or a string, got {type(model)}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        if isinstance(model, str):
+            model = self.get_model_by_name(model)
+        
+        if tuning_method not in ['grid_search', 'randomized_search', 'optuna']:
+            error_msg = f"tuning_method parameter should be one of the following: 'grid_search', 'randomized_search', 'optuna', got {tuning_method}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Check cross-validation method params
@@ -1166,8 +1190,11 @@ class SupervisedBase:
 
         # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
         if not hasattr(self, 'model_tuner'):
-            y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
-            y_encoded.index = self.y.index
+            if self.__ML_TASK_TYPE == 'classification':
+                y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
+                y_encoded.index = self.y.index
+            else:
+                y_encoded = self.y # No need to encode the target for regression
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, y_encoded, self.logging_to_file)
 
         feature_engineer = FeatureEngineering(**self.feature_engineering_params)
@@ -1209,11 +1236,6 @@ class SupervisedBase:
                 n_jobs=n_jobs,
                 verbose=verbose
             )
-            
-        else:
-            error_msg = f"Unsupported tuning method: {tuning_method}, expected one of the following: 'grid_search', 'randomized_search', 'optuna'"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
         
         if _show_tuning_report(tuning_result):
             self.__logger.info("[PROCESS] Model Tuning process is finished successfully")

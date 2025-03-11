@@ -159,9 +159,9 @@ def cross_validation_checker(
                 # e.g. 'stratified_kfold' and 'stratifiedkfold'
                 if cv_method in available_cv_methods.values():
                     cv_method = list(available_cv_methods.keys())[list(available_cv_methods.values()).index(cv_method)]
-        
+    
     # Check if cv_method is still None
-    if cv_method is None:
+    if cv_method is None or cv_method not in list(available_cv_methods.keys()):
         error_msg = f"cv_method is not found in the available cross-validation methods, expected one of {list(available_cv_methods.keys())}, got {cv_method}"
         logger.error(error_msg)
         raise ValueError(error_msg)
