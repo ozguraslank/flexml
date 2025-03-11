@@ -528,11 +528,8 @@ class ModelTuner:
 
                 feature_engineer.setup(data=train_data)
             
-                transformed_train = feature_engineer.fit_transform()
-                transformed_test = feature_engineer.transform(test_data=test_data, y_included=True)
-                
-                X_train, y_train = transformed_train
-                X_test, y_test = transformed_test
+                X_train, y_train = feature_engineer.fit_transform()
+                X_test, y_test = feature_engineer.transform(test_data=test_data, y_included=True)
 
                 test_model = type(model)()
                 test_model.set_params(**params)

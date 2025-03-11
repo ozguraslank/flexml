@@ -471,11 +471,8 @@ class SupervisedBase:
                 
                 self.feature_engineer.setup(data=train_data)
                 
-                transformed_train = self.feature_engineer.fit_transform()
-                transformed_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
-                
-                X_train, y_train = transformed_train
-                X_test, y_test = transformed_test
+                X_train, y_train = self.feature_engineer.fit_transform()
+                X_test, y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
 
                 for model_idx in range(len(self.__ML_MODELS)):
                     model_info = self.__ML_MODELS[model_idx]
