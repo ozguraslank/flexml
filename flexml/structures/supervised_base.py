@@ -945,7 +945,7 @@ class SupervisedBase:
 
     def tune_model(
         self, 
-        model: Optional[object] = None,
+        model: Optional[Union[object, str]] = None,
         tuning_method: str = 'randomized_search',
         n_iter: int = 10,
         cv_method: Optional[str] = None,
@@ -962,9 +962,10 @@ class SupervisedBase:
 
         Parameters
         ----------
-        model : object (default = None)
+        model : object or str (default = None)
             The machine learning model to tune. If It's none, flexml retrieves the best model found in the experiment
-        
+            If It's a string, flexml will try to get the model from the model list
+            
         tuning_method: str (default = 'randomized_search')
             The tuning method to use for model tuning
 
