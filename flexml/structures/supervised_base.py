@@ -774,7 +774,12 @@ class SupervisedBase:
             The predicted target column
         """
         model, X_test = self._predict_helper(test_data, model, full_train)
-        return model.predict(X_test)
+        try:
+            predictions = self.full_data_feature_engineer.target_encoder.inverse_transform(model.predict(X_test))
+        except AttributeError:
+            predictions = model.predict(X_test)
+
+        return predictions
     
     def predict_proba(
         self,
@@ -800,6 +805,10 @@ class SupervisedBase:
         np.ndarray
             The predicted probabilities for each class
         """
+        if self.__ML_TASK_TYPE == "Regression":
+            error_msg = "predict_proba is not available for regression tasks"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
         model, X_test = self._predict_helper(test_data, model, full_train)
         return model.predict_proba(X_test)
 
