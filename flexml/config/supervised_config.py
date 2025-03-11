@@ -54,6 +54,7 @@ CROSS_VALIDATION_METHODS = {
         'kfold': 'kfold',
         'stratified_kfold': 'stratifiedkfold',
         'holdout': 'holdout',
+        'shuffle_split': 'shufflesplit',
         'stratified_shuffle_split': 'stratifiedshufflesplit',
         'group_kfold': 'groupkfold',
         'group_shuffle_split': 'groupshufflesplit'
