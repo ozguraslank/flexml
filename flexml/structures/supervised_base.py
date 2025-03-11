@@ -946,7 +946,7 @@ class SupervisedBase:
     def tune_model(
         self, 
         model: Optional[object] = None,
-        tuning_method: Optional[str] = 'randomized_search',
+        tuning_method: str = 'randomized_search',
         n_iter: int = 10,
         cv_method: Optional[str] = None,
         n_folds: Optional[int] = None,
@@ -965,7 +965,7 @@ class SupervisedBase:
         model : object (default = None)
             The machine learning model to tune. If It's none, flexml retrieves the best model found in the experiment
         
-        tuning_method: str (default = 'random_search')
+        tuning_method: str (default = 'randomized_search')
             The tuning method to use for model tuning
 
             * 'grid_search' for GridSearchCV (https://scikit-learn.org/stable/modules/generated/sklearn.model_selection.GridSearchCV.html)
@@ -1109,6 +1109,19 @@ class SupervisedBase:
             self.show_model_stats()
             return True
         
+        if not isinstance(model, object) and not isinstance(model, str):
+            error_msg = f"model parameter should be an object or a string, got {type(model)}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        if isinstance(model, str):
+            model = self.get_model_by_name(model)
+        
+        if tuning_method not in ['grid_search', 'randomized_search', 'optuna']:
+            error_msg = f"tuning_method parameter should be one of the following: 'grid_search', 'randomized_search', 'optuna', got {tuning_method}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Check cross-validation method params
@@ -1222,11 +1235,6 @@ class SupervisedBase:
                 n_jobs=n_jobs,
                 verbose=verbose
             )
-            
-        else:
-            error_msg = f"Unsupported tuning method: {tuning_method}, expected one of the following: 'grid_search', 'randomized_search', 'optuna'"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
         
         if _show_tuning_report(tuning_result):
             self.__logger.info("[PROCESS] Model Tuning process is finished successfully")
