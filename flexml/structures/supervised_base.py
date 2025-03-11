@@ -745,9 +745,11 @@ class SupervisedBase:
             self.__logger.info("Training model with full feature-engineered data")
             X_train, y_train = self.full_data_feature_engineer.fit_transform()
             model.fit(X_train, y_train)
+            X_test = self.full_data_feature_engineer.transform(test_data)
 
-        # Transform test data
-        X_test = self.full_data_feature_engineer.transform(test_data)
+        else:
+            X_test = self.feature_engineer.transform(test_data)
+
         return model, X_test
 
     def predict(
