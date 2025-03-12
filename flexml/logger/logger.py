@@ -34,7 +34,8 @@ def _logger_configuration(log_level: str, logging_to_file: bool = False):
         level="INFO",
         format=log_format,
         datefmt="%Y-%m-%d %H:%M:%S",
-        handlers=handlers
+        handlers=handlers,
+        force=True
     )
 
 def get_logger(
