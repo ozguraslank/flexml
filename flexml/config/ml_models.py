@@ -14,6 +14,9 @@ from lightgbm import LGBMRegressor, LGBMClassifier
 from catboost import CatBoostRegressor, CatBoostClassifier
 from typing import Optional
 
+import warnings
+warnings.filterwarnings("ignore")
+
 
 # TODO: Should be improved
 def get_ml_models(num_class: Optional[int] = None):
