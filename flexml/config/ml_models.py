@@ -44,6 +44,8 @@ def get_ml_models(num_class: Optional[int] = None):
 
     # Quick Regression Models
     LINEAR_REGRESSION = LinearRegression()
+    LASSO_REGRESSION = Lasso()
+    RIDGE_REGRESSION = Ridge()
     XGBOOST_REGRESSION = XGBRegressor(enable_categorical=True)
     LIGHTGBM_REGRESSION = LGBMRegressor(verbose=-1, enable_categorical=True)
     CATBOOST_REGRESSION = CatBoostRegressor(allow_writing_files=False, silent=True)
@@ -51,11 +53,9 @@ def get_ml_models(num_class: Optional[int] = None):
     GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor()
     ELASTIC_NET_REGRESSION = ElasticNet()
     HUBER_REGRESSION = HuberRegressor()
-    KNN_REGRESSION = KNeighborsRegressor() 
 
     # Wide Regression Models
-    LASSO_REGRESSION = Lasso()
-    RIDGE_REGRESSION = Ridge()
+    KNN_REGRESSION = KNeighborsRegressor() 
     BAYESIAN_RIDGE_REGRESSION = BayesianRidge()
     ADA_BOOST_REGRESSION = AdaBoostRegressor()
     HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor()
@@ -100,6 +100,22 @@ def get_ml_models(num_class: Optional[int] = None):
             "model": LINEAR_REGRESSION,
             "tuning_param_grid": {
                 'fit_intercept': [True, False]
+            }
+        },
+        {
+            "name": LASSO_REGRESSION.__class__.__name__,
+            "model": LASSO_REGRESSION,
+            "tuning_param_grid": {
+                "alpha": [0.1, 0.5, 1.0, 2.0],
+                "max_iter": [1000, 2000, 3000]
+            }
+        },
+        {
+            "name": RIDGE_REGRESSION.__class__.__name__,
+            "model": RIDGE_REGRESSION,
+            "tuning_param_grid": {
+                "alpha": [0.1, 0.5, 1.0, 2.0],
+                "solver": ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"]
             }
         },
         {
@@ -183,7 +199,11 @@ def get_ml_models(num_class: Optional[int] = None):
                 "epsilon": [1.1, 1.35, 1.5, 1.75, 2.0],
                 "alpha": [0.0001, 0.001, 0.01, 0.1, 1.0]
             }
-        },
+        }
+    ]
+
+    # Wide Regression Model Configurations
+    WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
         {
             "name": KNN_REGRESSION.__class__.__name__,
             "model": KNN_REGRESSION,
@@ -192,11 +212,7 @@ def get_ml_models(num_class: Optional[int] = None):
                 "weights": ["uniform", "distance"],
                 "p": [1, 2]
             }
-        }
-    ]
-
-    # Wide Regression Model Configurations
-    WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
+        },
         {
             "name": ADA_BOOST_REGRESSION.__class__.__name__,
             "model": ADA_BOOST_REGRESSION,
@@ -204,23 +220,6 @@ def get_ml_models(num_class: Optional[int] = None):
                 "n_estimators": [50, 100, 200, 300],
                 "learning_rate": [0.01, 0.05, 0.1, 0.5, 1],
                 "loss": ["linear", "square", "exponential"]
-            }
-        },
-
-        {
-            "name": LASSO_REGRESSION.__class__.__name__,
-            "model": LASSO_REGRESSION,
-            "tuning_param_grid": {
-                "alpha": [0.1, 0.5, 1.0, 2.0],
-                "max_iter": [1000, 2000, 3000]
-            }
-        },
-        {
-            "name": RIDGE_REGRESSION.__class__.__name__,
-            "model": RIDGE_REGRESSION,
-            "tuning_param_grid": {
-                "alpha": [0.1, 0.5, 1.0, 2.0],
-                "solver": ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"]
             }
         },
         {
