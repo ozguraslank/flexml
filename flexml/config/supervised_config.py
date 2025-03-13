@@ -25,7 +25,7 @@ TUNING_METRIC_TRANSFORMATIONS = {
         'ROC-AUC': 'roc_auc'
     },
 
-    "reverse_signed_eval_metrics": ['MAE', 'MSE', 'RMSE']
+    "reverse_signed_eval_metrics": ['MAE','MSE', 'RMSE', 'MAPE']
     # These metrics are used in negative form for optimization processes, so we need to reverse the sign later, e.g. from -0.42 to 0.42
 }
 
