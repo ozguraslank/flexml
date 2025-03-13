@@ -259,7 +259,7 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-    def __prepare_models(self, experiment_size: str, num_class: int):
+    def __prepare_models(self, experiment_size: str, num_class: int, random_state: Optional[int] = None):
         """
         Prepares the models based on the selected experiment size ('quick' or 'wide')
 
@@ -267,18 +267,22 @@ class SupervisedBase:
         ----------
         experiment_size : str
             The size of the experiment to run. It can be 'quick' or 'wide'
-        """
-        if not isinstance(experiment_size, str):
-            error_msg = f"experiment_size expected to be a string, got {type(experiment_size)}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
 
+        num_class : int
+            The number of classes (If It's a Classification problem)
+
+        random_state : int, optional (default=None)
+            The random state value for the model training process
+        """
         if experiment_size not in ['quick', 'wide']:
             error_msg = f"experiment_size expected to be either 'quick' or 'wide', got {experiment_size}"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        self.__ML_MODELS = get_ml_models(num_class).get(self.__ML_TASK_TYPE).get(experiment_size.upper())
+        self.__ML_MODELS = get_ml_models(
+            num_class=num_class,
+            random_state=random_state
+        ).get(self.__ML_TASK_TYPE).get(experiment_size.upper())
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
         """
@@ -380,9 +384,8 @@ class SupervisedBase:
         eval_metric : str (default='R2' for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation
 
-        random_state : int, optional (default=42)
+        random_state : int, optional (default=None)
             The random state value for the model training process
-            # TODO: Not implemented yet, will be implemented in 1.1.0 release
 
         groups_col : str, optional
             Column name for group-based cross-validation methods
@@ -447,7 +450,7 @@ class SupervisedBase:
                 y_array = self.data[self.target_col]
             ))
 
-        self.__prepare_models(experiment_size, self.num_class)
+        self.__prepare_models(experiment_size, self.num_class, random_state)
         cv_splits_copy = self.cv_splits.copy() # Will be used for trainings
 
         self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} validation")
