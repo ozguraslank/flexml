@@ -321,9 +321,11 @@ class SupervisedBase:
                 for key, value in entry["model_stats"].items():
                     aggregated_metrics[key].append(value)
             
-            # Calculate the average for all aggregated metrics, with a special case for "Time Taken (sec)"
+            # Calculate the average for all aggregated metrics, with special cases for "Time Taken (sec)" and "Full Train"
             averaged_metrics = {
-                key: np.sum(value) if key == "Time Taken (sec)" else np.mean(value) if isinstance(value[0], (int, float)) else value[0]
+                key: (np.sum(value) if key == "Time Taken (sec)" else 
+                      value[0] if key == "Full Train" else 
+                      np.mean(value) if isinstance(value[0], (int, float)) else value[0])
                 for key, value in aggregated_metrics.items()
             }
             
@@ -514,6 +516,7 @@ class SupervisedBase:
                             "model": model,
                             "model_stats": {
                                 "Model Name": model_name,
+                                "Full Train": False,
                                 **avg_metrics,
                                 "Time Taken (sec)": total_time_taken
                             }
@@ -637,6 +640,7 @@ class SupervisedBase:
         -------
         Pipeline or object
         """
+        model_taken_from_leaderboard = False # If the model object is from leaderboard, track this
         # Ensure save_path is defined
         if save_path is None:
             save_path = "pipeline.pkl" if not model_only else "model.pkl"
@@ -663,6 +667,7 @@ class SupervisedBase:
         if model is None:
             try:
                 model = self.get_best_models()
+                model_taken_from_leaderboard = True
             except ValueError as e:
                 error_msg = "No models have been evaluated yet, and no model was specified to save."
                 self.__logger.error(error_msg)
@@ -670,16 +675,30 @@ class SupervisedBase:
         elif isinstance(model, str):
             try:
                 model = self.get_model_by_name(model)
+                model_taken_from_leaderboard = True
             except KeyError:
                 error_msg = f"Model with name '{model}' not found."
                 self.__logger.error(error_msg)
                 raise ValueError(error_msg)
 
         # Handle full training scenario if required
+        model_name = model.__class__.__name__
         if full_train:
-            X_train, y_train = self.full_data_feature_engineer.fit_transform()
-            self.__logger.info("Training the model using the fully feature-engineered data")
-            model.fit(X_train, y_train)
+            already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
+            if not already_trained:
+                self.__logger.info("Training the model using the fully feature-engineered data")
+                X_train, y_train = self.full_data_feature_engineer.fit_transform()
+                model.fit(X_train, y_train)
+
+                # find the model in leaderboard and update the full_train to True, and update the model object in there
+                for model_info in self.__model_training_info:
+                    for name, info in model_info.items():
+                        if name == model_name:
+                            info["model_stats"]["Full Train"] = True
+                            info["model"] = model
+                            break
+                # Update leaderboard
+                self.get_best_models()
 
         # If no feature pipeline is included, return the model directly
         if model_only:
@@ -709,6 +728,32 @@ class SupervisedBase:
             raise
 
         return pipeline
+    
+    def _check_if_model_is_full_trained(self, model_name: str, model_taken_from_leaderboard: bool) -> bool:
+        """
+        Checks if the model is full trained
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model
+
+        model_taken_from_leaderboard : bool
+            Whether the model is taken from leaderboard or user is passed a different model object
+
+        Returns
+        -------
+        bool
+            True if the model is full trained, False otherwise
+        """
+        if not model_taken_from_leaderboard:
+            return False
+        
+        for model_info in self.__model_training_info:
+            for name, info in model_info.items():
+                if name == model_name and info["model_stats"].get("Full Train", False):
+                    return True
+        return False
 
     def _predict_helper(
         self,
@@ -730,21 +775,38 @@ class SupervisedBase:
             if missing: error_msg += f" Missing: {missing}."
             if extra: error_msg += f" Extra: {extra}."
             raise ValueError(error_msg)
+        
+        model_taken_from_leaderboard = False # If the model object is from leaderboard, track this
 
         if model is None:
             model = self.get_best_models()
+            model_taken_from_leaderboard = True
         elif isinstance(model, str):
             model = self.get_model_by_name(model)
-
+            model_taken_from_leaderboard = True
         if self.full_data_feature_engineer is None:
             self.full_data_feature_engineer = FeatureEngineering(**self.feature_engineering_params)
             self.full_data_feature_engineer.setup()
         
+        model_name = model.__class__.__name__
         # Prepare training data if needed
         if full_train:
-            self.__logger.info("Training model with full feature-engineered data")
-            X_train, y_train = self.full_data_feature_engineer.fit_transform()
-            model.fit(X_train, y_train)
+            # Check If model_taken_from_leaderboard is True and Full Train in self.__model_training_info is True, then we don't need to train the model again
+            already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
+            if not already_trained:
+                self.__logger.info("Training the model using the fully feature-engineered data")
+                X_train, y_train = self.full_data_feature_engineer.fit_transform()
+                model.fit(X_train, y_train)
+
+                # find the model in leaderboard and update the full_train to True, and update the model object in there
+                for model_info in self.__model_training_info:
+                    for name, info in model_info.items():
+                        if name == model_name:
+                            info["model_stats"]["Full Train"] = True
+                            info["model"] = model
+                            break
+                # Update leaderboard
+                self.get_best_models()
             X_test = self.full_data_feature_engineer.transform(test_data)
 
         else:
@@ -896,6 +958,7 @@ class SupervisedBase:
         sorted_model_stats_df = self.__sort_models(eval_metric)
         sorted_model_stats_df['Time Taken (sec)'] = sorted_model_stats_df['Time Taken (sec)'].apply(lambda x: round(x, 2))
         sorted_model_stats_df.index += 1
+        sorted_model_stats_df = sorted_model_stats_df.drop('Full Train', axis=1)
         
                 
         # Check if we're in an interactive notebook environment (Jupyter or Colab)
@@ -1113,6 +1176,7 @@ class SupervisedBase:
                     "model": self.tuned_model,
                     "model_stats": {
                         "Model Name": tuned_model_name,
+                        "Full Train": True if tuning_method != "optuna" else False, # refit is done in grid_search and randomized_search, but not in optuna
                         **model_perf,
                         "Time Taken (sec)": tuned_time_taken
                     }
