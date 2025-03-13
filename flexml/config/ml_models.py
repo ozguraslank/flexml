@@ -19,7 +19,7 @@ warnings.filterwarnings("ignore")
 
 
 # TODO: Should be improved
-def get_ml_models(num_class: Optional[int] = None):
+def get_ml_models(num_class: Optional[int] = None, random_state: Optional[int] = None):
     """
     Returns a dictionary of quick and wide regression and classification models
 
@@ -28,6 +28,9 @@ def get_ml_models(num_class: Optional[int] = None):
     num_class : int, optional (default=None)
         The number of classes in the classification task. No need to pass it in regression tasks
         It will be set to 2 if None is passed to suppose its binary classification
+
+    random_state : int, optional (default=None)
+        The random state value for the model training process
     
     Returns
     -------
@@ -44,53 +47,55 @@ def get_ml_models(num_class: Optional[int] = None):
 
     # Quick Regression Models
     LINEAR_REGRESSION = LinearRegression()
-    XGBOOST_REGRESSION = XGBRegressor(enable_categorical=True)
-    LIGHTGBM_REGRESSION = LGBMRegressor(verbose=-1, enable_categorical=True)
-    CATBOOST_REGRESSION = CatBoostRegressor(allow_writing_files=False, silent=True)
-    DECISION_TREE_REGRESSION = DecisionTreeRegressor()
-    GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor()
-    ELASTIC_NET_REGRESSION = ElasticNet()
+    LASSO_REGRESSION = Lasso(random_state=random_state)
+    RIDGE_REGRESSION = Ridge(random_state=random_state)
+    XGBOOST_REGRESSION = XGBRegressor(enable_categorical=True, random_state=random_state)
+    LIGHTGBM_REGRESSION = LGBMRegressor(verbose=-1, enable_categorical=True, random_state=random_state)
+    CATBOOST_REGRESSION = CatBoostRegressor(allow_writing_files=False, silent=True, random_seed=random_state)
+    DECISION_TREE_REGRESSION = DecisionTreeRegressor(random_state=random_state)
+    GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor(random_state=random_state)
+    ELASTIC_NET_REGRESSION = ElasticNet(random_state=random_state)
     HUBER_REGRESSION = HuberRegressor()
-    KNN_REGRESSION = KNeighborsRegressor() 
 
     # Wide Regression Models
-    LASSO_REGRESSION = Lasso()
-    RIDGE_REGRESSION = Ridge()
+    KNN_REGRESSION = KNeighborsRegressor() 
     BAYESIAN_RIDGE_REGRESSION = BayesianRidge()
-    ADA_BOOST_REGRESSION = AdaBoostRegressor()
-    HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor()
-    RANDOM_FOREST_REGRESSION = RandomForestRegressor()
-    EXTRA_TREES_REGRESSION = ExtraTreesRegressor()
+    ADA_BOOST_REGRESSION = AdaBoostRegressor(random_state=random_state)
+    HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor(random_state=random_state)
+    RANDOM_FOREST_REGRESSION = RandomForestRegressor(random_state=random_state)
+    EXTRA_TREES_REGRESSION = ExtraTreesRegressor(random_state=random_state)
     OMP_REGRESSION = OrthogonalMatchingPursuit()
     MLP_REGRESSION = MLPRegressor(
         solver='lbfgs',
         hidden_layer_sizes=(50,),
         early_stopping=True,
-        learning_rate='adaptive'
+        learning_rate='adaptive',
+        random_state=random_state
     )
 
     # Quick Classification Models
-    LOGISTIC_REGRESSION = LogisticRegression()
-    XGBOOST_CLASSIFIER = XGBClassifier(objective=xgb_objective)
-    LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose=-1)
-    CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files=False, silent=True)
-    DECISION_TREE_CLASSIFIER = DecisionTreeClassifier()
-    GRADIENT_BOOSTING_CLASSIFIER = GradientBoostingClassifier()
+    LOGISTIC_REGRESSION = LogisticRegression(random_state=random_state)
+    XGBOOST_CLASSIFIER = XGBClassifier(objective=xgb_objective, random_state=random_state)
+    LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose=-1, random_state=random_state)
+    CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files=False, silent=True, random_seed=random_state)
+    DECISION_TREE_CLASSIFIER = DecisionTreeClassifier(random_state=random_state)
+    GRADIENT_BOOSTING_CLASSIFIER = GradientBoostingClassifier(random_state=random_state)
     NAIVE_BAYES_CLASSIFIER = GaussianNB()
     KNN_CLASSIFIER = KNeighborsClassifier()
 
     # Wide Classification Models
-    ADA_BOOST_CLASSIFIER = AdaBoostClassifier()
-    HIST_GRADIENT_BOOSTING_CLASSIFIER = HistGradientBoostingClassifier()
-    RANDOM_FOREST_CLASSIFIER = RandomForestClassifier()
-    EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier()
+    ADA_BOOST_CLASSIFIER = AdaBoostClassifier(random_state=random_state)
+    HIST_GRADIENT_BOOSTING_CLASSIFIER = HistGradientBoostingClassifier(random_state=random_state)
+    RANDOM_FOREST_CLASSIFIER = RandomForestClassifier(random_state=random_state)
+    EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier(random_state=random_state)
     QDA_CLASSIFIER = QuadraticDiscriminantAnalysis()
     LDA_CLASSIFIER = LinearDiscriminantAnalysis()
     MLP_CLASSIFIER = MLPClassifier(
         hidden_layer_sizes=(100,),
         early_stopping=True,
         tol=0.001,
-        learning_rate='adaptive'
+        learning_rate='adaptive',
+        random_state=random_state
     )
 
     # Quick Regression Model Configurations
@@ -100,6 +105,22 @@ def get_ml_models(num_class: Optional[int] = None):
             "model": LINEAR_REGRESSION,
             "tuning_param_grid": {
                 'fit_intercept': [True, False]
+            }
+        },
+        {
+            "name": LASSO_REGRESSION.__class__.__name__,
+            "model": LASSO_REGRESSION,
+            "tuning_param_grid": {
+                "alpha": [0.1, 0.5, 1.0, 2.0],
+                "max_iter": [1000, 2000, 3000]
+            }
+        },
+        {
+            "name": RIDGE_REGRESSION.__class__.__name__,
+            "model": RIDGE_REGRESSION,
+            "tuning_param_grid": {
+                "alpha": [0.1, 0.5, 1.0, 2.0],
+                "solver": ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"]
             }
         },
         {
@@ -183,7 +204,11 @@ def get_ml_models(num_class: Optional[int] = None):
                 "epsilon": [1.1, 1.35, 1.5, 1.75, 2.0],
                 "alpha": [0.0001, 0.001, 0.01, 0.1, 1.0]
             }
-        },
+        }
+    ]
+
+    # Wide Regression Model Configurations
+    WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
         {
             "name": KNN_REGRESSION.__class__.__name__,
             "model": KNN_REGRESSION,
@@ -192,11 +217,7 @@ def get_ml_models(num_class: Optional[int] = None):
                 "weights": ["uniform", "distance"],
                 "p": [1, 2]
             }
-        }
-    ]
-
-    # Wide Regression Model Configurations
-    WIDE_REGRESSION_MODELS = QUICK_REGRESSION_MODELS + [
+        },
         {
             "name": ADA_BOOST_REGRESSION.__class__.__name__,
             "model": ADA_BOOST_REGRESSION,
@@ -204,23 +225,6 @@ def get_ml_models(num_class: Optional[int] = None):
                 "n_estimators": [50, 100, 200, 300],
                 "learning_rate": [0.01, 0.05, 0.1, 0.5, 1],
                 "loss": ["linear", "square", "exponential"]
-            }
-        },
-
-        {
-            "name": LASSO_REGRESSION.__class__.__name__,
-            "model": LASSO_REGRESSION,
-            "tuning_param_grid": {
-                "alpha": [0.1, 0.5, 1.0, 2.0],
-                "max_iter": [1000, 2000, 3000]
-            }
-        },
-        {
-            "name": RIDGE_REGRESSION.__class__.__name__,
-            "model": RIDGE_REGRESSION,
-            "tuning_param_grid": {
-                "alpha": [0.1, 0.5, 1.0, 2.0],
-                "solver": ["auto", "svd", "cholesky", "lsqr", "sparse_cg", "sag", "saga"]
             }
         },
         {
