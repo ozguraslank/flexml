@@ -471,8 +471,23 @@ class SupervisedBase:
 
         with tqdm(total=total_iterations, desc="INFO | Training Progress", bar_format="{desc}:  | {bar} | {percentage:.0f}%") as pbar:
             for train_idx, test_idx in cv_splits_copy:
-                train_data = pd.concat([self.X.iloc[train_idx], self.y.iloc[train_idx]], axis=1)
-                test_data = pd.concat([self.X.iloc[test_idx], self.y.iloc[test_idx]], axis=1)
+                try:
+                    # Attempt to use as positional indices (For Cross-Validation splits)
+                    train_labels = self.X.index[train_idx]
+                    test_labels = self.X.index[test_idx]
+                except IndexError: # For holdout validation
+                    # Fallback to using as label-based indices
+                    train_labels = train_idx
+                    test_labels = test_idx
+                
+                train_data = pd.concat([
+                    self.X.loc[train_labels], 
+                    self.y.loc[train_labels]
+                ], axis=1)
+                test_data = pd.concat([
+                    self.X.loc[test_labels],
+                    self.y.loc[test_labels]
+                ], axis=1)
                 
                 self.feature_engineer.setup(data=train_data)
                 
