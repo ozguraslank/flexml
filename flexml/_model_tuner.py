@@ -8,6 +8,7 @@ from sklearn.pipeline import Pipeline
 from flexml.config import TUNING_METRIC_TRANSFORMATIONS
 from flexml.logger import get_logger
 from flexml.helpers import evaluate_model_perf
+from copy import deepcopy
 
 
 class ModelTuner:
@@ -505,6 +506,9 @@ class ModelTuner:
         study_direction = "maximize" if eval_metric in ['R2', 'Accuracy', 'Precision', 'Recall', 'F1 Score', 'ROC-AUC'] else "minimize"
 
         def objective(trial):
+            # Create a copy of feature engineer for this trial
+            feature_engineer_copy = deepcopy(feature_engineer)
+            
             # Generate parameters for the trial
             params = model.get_params()
             for param_name, param_values in param_grid.items():
@@ -526,10 +530,10 @@ class ModelTuner:
                 train_data = pd.concat([self.X.iloc[train_idx], self.y.iloc[train_idx]], axis=1)
                 test_data = pd.concat([self.X.iloc[test_idx], self.y.iloc[test_idx]], axis=1)
 
-                feature_engineer.setup(data=train_data)
-            
-                X_train, y_train = feature_engineer.fit_transform()
-                X_test, y_test = feature_engineer.transform(test_data=test_data, y_included=True)
+                # Use the copied feature engineer
+                feature_engineer_copy.setup(data=train_data)
+                X_train, y_train = feature_engineer_copy.fit_transform()
+                X_test, y_test = feature_engineer_copy.transform(test_data=test_data, y_included=True)
 
                 test_model = type(model)()
                 test_model.set_params(**params)
