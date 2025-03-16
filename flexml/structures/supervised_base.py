@@ -1264,7 +1264,7 @@ class SupervisedBase:
             cv_obj = self.cv_splits
         else:
             if self.__model_stats_df is not None:
-                self.__logger.warning("[WARNING] Validation params you've provided are different than the last run. Model performance table will be erased")
+                self.__logger.warning("Validation params you've provided are different than the last run. Model performance table will be erased")
                 self.__model_stats_df = None
                 self.__model_training_info = []
                 self.__existing_model_names = []
@@ -1337,4 +1337,4 @@ class SupervisedBase:
         if _show_tuning_report(tuning_result):
             self.__logger.info("[PROCESS] Model Tuning process is finished successfully")
         else:
-            self.__logger.warning("[WARNING] Model Tuning process is failed, Please check the error messages appeared")
+            self.__logger.warning("Model Tuning process is failed, Please check the error messages appeared")
