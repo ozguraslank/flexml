@@ -74,7 +74,7 @@ def get_ml_models(num_class: Optional[int] = None, random_state: Optional[int] =
     )
 
     # Quick Classification Models
-    LOGISTIC_REGRESSION = LogisticRegression(random_state=random_state)
+    LOGISTIC_REGRESSION = LogisticRegression(max_iter=1000, random_state=random_state)
     XGBOOST_CLASSIFIER = XGBClassifier(objective=xgb_objective, random_state=random_state)
     LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose=-1, random_state=random_state)
     CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files=False, silent=True, random_seed=random_state)
