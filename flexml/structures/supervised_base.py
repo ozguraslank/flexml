@@ -540,7 +540,7 @@ class SupervisedBase:
                     except Exception as e:
                         # TODO: FlexML should add a Pipeline step for revising column names. Reference: https://stackoverflow.com/questions/60582050/lightgbmerror-do-not-support-special-json-characters-in-feature-name-the-same/62364946#62364946
                         if model_name == "LGBMClassifier" and str(e) == 'Do not support special JSON characters in feature name.':
-                            self.__logger.warning("LGBMClassifier does not support special characters in column names. Please make sure that your column names are consisted of *only* English characters")
+                            self.__logger.error("LGBMClassifier does not support special characters in column names. Please make sure that your column names are consisted of *only* English characters")
                         else:
                             self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
                         self.__models_raised_error.append(model_name)
