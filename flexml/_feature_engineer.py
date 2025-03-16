@@ -185,7 +185,7 @@ class NumericalNormalizer(BaseEstimator, TransformerMixin):
                 scaler = None
 
             else:
-                self.logger.warning(f"[WARNING] Unknown method '{method}' for column '{column}'. Skipping.")
+                self.logger.warning(f"Unknown method '{method}' for column '{column}'. Skipping.")
                 continue
 
             if scaler is not None:
@@ -407,13 +407,13 @@ class FeatureEngineering:
         if id_columns:
             for column in id_columns:
                 if column not in self.drop_columns:
-                    self.logger.warning(f"[WARNING] Column '{column}' seems like an ID column. Consider dropping it if it is not a feature")
+                    self.logger.warning(f"Column '{column}' seems like an ID column. Consider dropping it via 'drop_columns' parameter if it is not a feature")
 
         columns_to_consider = self._anomaly_unique_values_finder(threshold=threshold)
         if columns_to_consider:
             for column, ratio in columns_to_consider.items():
                 self.logger.warning(
-                    f"[WARNING] Column '{column}' has too many unique values ({ratio:.2%}). "
+                    f"Column '{column}' has too many unique values ({ratio:.2%}). "
                     "Recommended to either process or drop this column"
                 )
 

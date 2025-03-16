@@ -538,7 +538,11 @@ class SupervisedBase:
                         })
 
                     except Exception as e:
-                        self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
+                        # TODO: FlexML should add a Pipeline step for revising column names. Reference: https://stackoverflow.com/questions/60582050/lightgbmerror-do-not-support-special-json-characters-in-feature-name-the-same/62364946#62364946
+                        if model_name == "LGBMClassifier" and str(e) == 'Do not support special JSON characters in feature name.':
+                            self.__logger.error("LGBMClassifier does not support special characters in column names. Please make sure that your column names are consisted of *only* English characters")
+                        else:
+                            self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
                         self.__models_raised_error.append(model_name)
 
                     finally:
@@ -781,8 +785,10 @@ class SupervisedBase:
             raise ValueError("test_data must be provided and non-empty")
 
         # Check column consistency
-        expected_columns = set(self.X.columns)
-        test_columns = set(test_data.columns)
+        drop_columns = set(self.feature_engineer.drop_columns)
+        expected_columns = set(self.X.columns) - drop_columns
+        test_columns = set(test_data.columns) - drop_columns
+
         if expected_columns != test_columns:
             missing = expected_columns - test_columns
             extra = test_columns - expected_columns
@@ -1258,7 +1264,7 @@ class SupervisedBase:
             cv_obj = self.cv_splits
         else:
             if self.__model_stats_df is not None:
-                self.__logger.warning("[WARNING] Validation params you've provided are different than the last run. Model performance table will be erased")
+                self.__logger.warning("Validation params you've provided are different than the last run. Model performance table will be erased")
                 self.__model_stats_df = None
                 self.__model_training_info = []
                 self.__existing_model_names = []
@@ -1281,11 +1287,11 @@ class SupervisedBase:
 
         # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
         if not hasattr(self, 'model_tuner'):
-            if self.__ML_TASK_TYPE == 'classification':
+            if self.__ML_TASK_TYPE == 'Classification' and self.y.dtype == 'object':
                 y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
                 y_encoded.index = self.y.index
             else:
-                y_encoded = self.y # No need to encode the target for regression
+                y_encoded = self.y # No need to encode the target for regression or if the target is already encoded
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, y_encoded, self.logging_to_file)
 
         feature_engineer = FeatureEngineering(**self.feature_engineering_params)
@@ -1331,4 +1337,4 @@ class SupervisedBase:
         if _show_tuning_report(tuning_result):
             self.__logger.info("[PROCESS] Model Tuning process is finished successfully")
         else:
-            self.__logger.warning("[WARNING] Model Tuning process is failed, Please check the error messages appeared")
+            self.__logger.warning("Model Tuning process is failed, Please check the error messages appeared")
