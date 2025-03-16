@@ -785,8 +785,10 @@ class SupervisedBase:
             raise ValueError("test_data must be provided and non-empty")
 
         # Check column consistency
-        expected_columns = set(self.X.columns)
-        test_columns = set(test_data.columns)
+        drop_columns = set(self.feature_engineer.drop_columns)
+        expected_columns = set(self.X.columns) - drop_columns
+        test_columns = set(test_data.columns) - drop_columns
+
         if expected_columns != test_columns:
             missing = expected_columns - test_columns
             extra = test_columns - expected_columns
