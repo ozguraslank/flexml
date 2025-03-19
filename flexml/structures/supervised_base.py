@@ -654,7 +654,7 @@ class SupervisedBase:
         include_feature_pipeline : bool, optional
             Whether to include the feature engineering pipeline in the saved pipeline
         full_train : bool, optional
-            Whether to train the model using the fully feature-engineered data
+            Whether to train the model using the whole data
             
         Returns
         -------
@@ -706,7 +706,7 @@ class SupervisedBase:
         if full_train:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             if not already_trained:
-                self.__logger.info("Training the model using the fully feature-engineered data")
+                self.__logger.info("Training the model using the whole data")
                 X_train, y_train = self.full_data_feature_engineer.fit_transform()
                 model.fit(X_train, y_train)
 
@@ -816,7 +816,7 @@ class SupervisedBase:
             # Check If model_taken_from_leaderboard is True and Full Train in self.__model_training_info is True, then we don't need to train the model again
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             if not already_trained:
-                self.__logger.info("Training the model using the fully feature-engineered data")
+                self.__logger.info("Training the model using the whole data")
                 X_train, y_train = self.full_data_feature_engineer.fit_transform()
                 model.fit(X_train, y_train)
 
@@ -853,7 +853,7 @@ class SupervisedBase:
             The trained model or model name to fetch for prediction
             If None, the best model will be fetched
         full_train : bool, optional
-            Whether to train the model using the fully feature-engineered data before prediction
+            Whether to train the model using the whole data before prediction
 
         Returns
         -------
@@ -885,7 +885,7 @@ class SupervisedBase:
             The trained model or model name to fetch for prediction
             If None, the best model will be fetched
         full_train : bool, optional
-            Whether to train the model using the fully feature-engineered data before prediction
+            Whether to train the model using the whole data before prediction
 
         Returns
         -------
