@@ -280,9 +280,10 @@ class SupervisedBase:
             raise ValueError(error_msg)
         
         self.__ML_MODELS = get_ml_models(
+            ml_task_type=self.__ML_TASK_TYPE,
             num_class=num_class,
             random_state=random_state
-        ).get(self.__ML_TASK_TYPE).get(experiment_size.upper())
+        ).get(experiment_size.upper())
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
         """

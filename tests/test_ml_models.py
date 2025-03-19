@@ -19,13 +19,13 @@ class TestMLModels(unittest.TestCase):
             'data': load_diabetes(as_frame=True)['frame'],
             'target_col': 'target',
             'exp_class': Regression,
-            'models': get_ml_models()['Regression']['WIDE']
+            'models': get_ml_models(ml_task_type="Regression")['WIDE']
         },
         'Classification': {
             'data': load_breast_cancer(as_frame=True)['frame'],
             'target_col': 'target',
             'exp_class': Classification,
-            'models': get_ml_models()['Classification']['WIDE']
+            'models': get_ml_models(ml_task_type="Classification")['WIDE']
         }
     }
 
