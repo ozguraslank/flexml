@@ -405,6 +405,7 @@ class SupervisedBase:
         - If both `n_folds` and `test_size` are provided, shuffle-based methods are prioritized
         - Defaults to a standard 5-fold if neither `n_folds` nor `test_size` is provided
         """
+        experiment_size = experiment_size.lower() # Convert to lowercase in case of any case mismatch
         self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         random_state = random_state_checker(random_state)
 
