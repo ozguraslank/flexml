@@ -51,7 +51,13 @@ def _evaluate_preds(
         The predicted values/probabilities of the target column
 
     eval_metric : str
-        The evaluation metric that will be used to evaluate the model.
+        The evaluation metric that will be used to evaluate the model   
+                 
+        - Avaiable evalulation metrics for Regression:    
+            - R2, MAE, MSE, RMSE, MAPE
+
+        - Avaiable evalulation metrics for Classification:    
+            - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         
     average : str, default='macro'
         The averaging method to use for multiclass classification metrics.

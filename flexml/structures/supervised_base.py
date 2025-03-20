@@ -384,8 +384,14 @@ class SupervisedBase:
         test_size : float, (default=0.25 for hold-out cv, None for other methods)
             The size of the test data if using hold-out or shuffle-based splits
 
-        eval_metric : str (default='R2' for Regression, 'Accuracy' for Classification)
+        eval_metric : str, optional (default='R2' for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation
+            
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
+
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         random_state : int, optional (default=None)
             The random state value for the model training process
@@ -586,13 +592,17 @@ class SupervisedBase:
         Parameters
         ----------
         top_n_models : int
-            The number of top models to select based on the evaluation metric.
-        eval_metric : str (default='R2 for Regression, 'Accuracy' for Classification)
-            The evaluation metric to use for model evaluation:
-                
-                * R2, MAE, MSE, RMSE, MAPE for Regression tasks
+            The number of top models to select based on the evaluation metric
 
-                * Accuracy, Precision, Recall, F1 Score for Classification tasks
+        eval_metric : str, optional
+            Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
+        
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
+
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
+        
         Returns
         -------
         object or list[object]
@@ -605,10 +615,9 @@ class SupervisedBase:
         
         top_n_models = self.__top_n_models_checker(top_n_models)
 
-        if eval_metric is not None:
-            eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
-        else: # If the user doesn't pass a eval_metric, get the evaluation metric passed to the start_experiment function
+        if eval_metric is None:
             eval_metric = self.eval_metric
+        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         model_stats = []
         best_models = []
@@ -905,8 +914,14 @@ class SupervisedBase:
 
         Parameters
         ----------
-        eval_metric : str (default='R2')
-            The evaluation metric to use for model evaluation
+        eval_metric : str, optional
+            Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
+        
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
+
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         Returns
         -------
@@ -917,8 +932,6 @@ class SupervisedBase:
             error_msg = "There is no model performance data to sort!"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
-        
-        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Since lower is better for mae, mse and rmse in Regression tasks, they should be sorted in ascending order
         if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['MAE', 'MSE', 'RMSE', 'MAPE']:
@@ -932,11 +945,14 @@ class SupervisedBase:
 
         Parameters
         ----------
-        eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
-            The evaluation metric to use for model evaluation
+        eval_metric : str, optional
+            Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            * R2, MAE, MSE, RMSE, MAPE for Regression tasks
-            * Accuracy, Precision, Recall, F1 Score for Classification tasks
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
+
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         """
         def highlight_best(s: pd.Series) -> list[str]:
             """
@@ -975,8 +991,11 @@ class SupervisedBase:
             except:
                 # get_ipython() will not be defined in non-interactive environments
                 return False
-            
+        
+        if eval_metric is None:
+            eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+
         sorted_model_stats_df = self.__sort_models(eval_metric)
         sorted_model_stats_df['Time Taken (sec)'] = sorted_model_stats_df['Time Taken (sec)'].apply(lambda x: round(x, 2))
         sorted_model_stats_df.index += 1
@@ -1103,12 +1122,14 @@ class SupervisedBase:
         groups_col : str, optional
             Column name for group-based cross-validation methods
 
-        eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
-            The evaluation metric to use for model evaluation
+        eval_metric : str, optional
+            Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            * R2, MAE, MSE, RMSE, MAPE for Regression tasks
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
 
-            * Accuracy, Precision, Recall, F1 Score for Classification tasks
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         param_grid : dict (default = defined custom param dict in flexml/config/tune_model_config.py)
             The parameter set to use for model tuning.
@@ -1221,6 +1242,8 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
+        if eval_metric is None:
+            eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Check cross-validation method params
@@ -1238,7 +1261,7 @@ class SupervisedBase:
 
         # Get the best model If the user doesn't pass any model object
         if model is None:
-            model = self.get_best_models()
+            model = self.get_best_models(eval_metric)
 
         # Get the model's param_grid from the config file If It's not passed from the user
         if param_grid is None:
