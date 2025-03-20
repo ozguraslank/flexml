@@ -322,9 +322,9 @@ class SupervisedBase:
                 for key, value in entry["model_stats"].items():
                     aggregated_metrics[key].append(value)
             
-            # Calculate the average for all aggregated metrics, with special cases for "Time Taken (sec)" and "Full Train"
+            # Calculate the average for all aggregated metrics, with special cases for "Time (sec)" and "Full Train"
             averaged_metrics = {
-                key: (np.sum(value) if key == "Time Taken (sec)" else 
+                key: (np.sum(value) if key == "Time (sec)" else 
                       value[0] if key == "Full Train" else 
                       np.mean(value) if isinstance(value[0], (int, float)) else value[0])
                 for key, value in aggregated_metrics.items()
@@ -540,7 +540,7 @@ class SupervisedBase:
                                 "Model Name": model_name,
                                 "Full Train": False,
                                 **avg_metrics,
-                                "Time Taken (sec)": total_time_taken
+                                "Time (sec)": total_time_taken
                             }
                         })
 
@@ -997,7 +997,7 @@ class SupervisedBase:
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
 
         sorted_model_stats_df = self.__sort_models(eval_metric)
-        sorted_model_stats_df['Time Taken (sec)'] = sorted_model_stats_df['Time Taken (sec)'].apply(lambda x: round(x, 2))
+        sorted_model_stats_df['Time (sec)'] = sorted_model_stats_df['Time (sec)'].apply(lambda x: f"{x:.2f}")
         sorted_model_stats_df.index += 1
         sorted_model_stats_df = sorted_model_stats_df.drop('Full Train', axis=1)
         
@@ -1221,7 +1221,7 @@ class SupervisedBase:
                         "Model Name": tuned_model_name,
                         "Full Train": True if tuning_method != "optuna" else False, # refit is done in grid_search and randomized_search, but not in optuna
                         **model_perf,
-                        "Time Taken (sec)": tuned_time_taken
+                        "Time (sec)": tuned_time_taken
                     }
                 }
             })
