@@ -576,6 +576,10 @@ class SupervisedBase:
         object
             The model object with the given model name
         """
+        if self.__model_training_info is None or len(self.__model_training_info) == 0:
+            error_msg = "No models have been trained yet! Please start an experiment first via start_experiment()"
+            self.__logger.error(error_msg)
+            raise Exception(error_msg)
 
         for model_info in self.__model_training_info:
             if model_name in model_info.keys():
@@ -586,7 +590,7 @@ class SupervisedBase:
         raise ValueError(error_msg)
 
 
-    def get_best_models(self, eval_metric: Optional[str] = None, top_n_models: int = 1) -> Union[object, list[object]]:
+    def get_best_models(self, eval_metric: Optional[str] = None, top_n_models: int = 1) -> Union[object, list[object], None]:
         """
         Returns the top n models based on the evaluation metric.
 
@@ -606,13 +610,11 @@ class SupervisedBase:
         
         Returns
         -------
-        object or list[object]
-            Single or a list of top n models based on the evaluation metric.
+        object or list[object] or None
+            Single or a list of top n models based on the evaluation metric or None If no models have been trained yet.
         """
         if len(self.__model_training_info) == 0:
-            error_msg = "There is no model performance data to sort!"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
+            return None
         
         top_n_models = self.__top_n_models_checker(top_n_models)
 
@@ -695,13 +697,13 @@ class SupervisedBase:
 
         # Fetch the best model if no specific model is provided
         if model is None:
-            try:
-                model = self.get_best_models()
-                model_taken_from_leaderboard = True
-            except ValueError as e:
-                error_msg = "No models have been evaluated yet, and no model was specified to save."
+            model = self.get_best_models()
+            if model is None:
+                error_msg = "There is no model to save! Please start an experiment first via start_experiment()"
                 self.__logger.error(error_msg)
-                raise ValueError(error_msg) from e
+                raise Exception(error_msg)
+            model_taken_from_leaderboard = True
+
         elif isinstance(model, str):
             try:
                 model = self.get_model_by_name(model)
@@ -792,8 +794,8 @@ class SupervisedBase:
         full_train: bool = True
     ) -> tuple:
         """Inner handler for prediction methods that returns prepared model and transformed data"""
-        if test_data is None or test_data.empty:
-            raise ValueError("test_data must be provided and non-empty")
+        if test_data is None or not isinstance(test_data, pd.DataFrame) or test_data.empty:
+            raise ValueError("test_data must be provided as a pandas DataFrame and non-empty")
 
         # Check column consistency
         drop_columns = set(self.feature_engineer.drop_columns)
@@ -812,6 +814,10 @@ class SupervisedBase:
 
         if model is None:
             model = self.get_best_models()
+            if model is None:
+                error_msg = "There is no model to use for prediction! Please start an experiment first via start_experiment()"
+                self.__logger.error(error_msg)
+                raise Exception(error_msg)
             model_taken_from_leaderboard = True
         elif isinstance(model, str):
             model = self.get_model_by_name(model)
@@ -1028,6 +1034,10 @@ class SupervisedBase:
         try:
             if model is None:
                 model = self.get_best_models()
+                if model is None:
+                    error_msg = "There is no model to display feature importance! Please start an experiment first via start_experiment()"
+                    self.__logger.error(error_msg)
+                    raise Exception(error_msg)
 
             model_name = model.__class__.__name__
             importance = None
@@ -1263,6 +1273,10 @@ class SupervisedBase:
         # Get the best model If the user doesn't pass any model object
         if model is None:
             model = self.get_best_models(eval_metric)
+            if model is None:
+                error_msg = "There is no model to tune! Please start an experiment first via start_experiment()"
+                self.__logger.error(error_msg)
+                raise Exception(error_msg)
 
         # Get the model's param_grid from the config file If It's not passed from the user
         if param_grid is None:
