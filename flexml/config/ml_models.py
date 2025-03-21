@@ -106,7 +106,7 @@ def get_ml_models(
                 "tuning_param_grid": {
                     "n_estimators": [100, 200, 300, 500, 700, 1000],
                     "max_depth": [3, 5, 7, 9, 10],
-                    "learning_rate": [0.01, 0.1, 0.3],
+                    "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
                     "subsample": [0.5, 0.7, 1],
                     "colsample_bytree": [0.5, 0.7, 1],
                     "gamma": [0, 0.1, 0.2],
@@ -121,8 +121,8 @@ def get_ml_models(
                 "model": LIGHTGBM_REGRESSION,
                 "tuning_param_grid": {
                     "n_estimators": [100, 200, 300, 500, 700, 1000],
-                    "max_depth": [3, 5, 7, 9, 10],
-                    "learning_rate": [0.01, 0.1, 0.3],
+                    "max_depth": [3, 5, 7, 9, 10, 12],
+                    "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
                     "subsample": [0.5, 0.7, 1],
                     "colsample_bytree": [0.5, 0.7, 1],
                     "reg_alpha": [0, 0.1, 0.5],
@@ -135,8 +135,8 @@ def get_ml_models(
                 "name": CATBOOST_REGRESSION.__class__.__name__,
                 "model": CATBOOST_REGRESSION,
                 "tuning_param_grid": {
-                    "iterations": [100, 200, 300, 500, 700, 1000],
-                    "depth": [3, 5, 7, 10],
+                    "iterations": [100, 200, 300, 500, 700, 1000, 1500],
+                    "depth": [3, 5, 7, 9, 10, 12],
                     "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
                     "l2_leaf_reg": [0.1, 1, 3, 5, 10],
                     "border_count": [32, 50, 75, 100, 150]
@@ -359,7 +359,7 @@ def get_ml_models(
                 "model": LIGHTGBM_CLASSIFIER,
                 "tuning_param_grid": {
                     "n_estimators": [100, 200, 300, 500, 700, 1000],
-                    "max_depth": [3, 5, 7, 9, 10],
+                    "max_depth": [3, 5, 7, 9, 10, 12],
                     "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
                     "subsample": [0.5, 0.7, 0.9, 1],
                     "colsample_bytree": [0.5, 0.7, 0.9, 1],
@@ -374,7 +374,7 @@ def get_ml_models(
                 "model": CATBOOST_CLASSIFIER,
                 "tuning_param_grid": {
                     "iterations": [100, 200, 300, 500, 700, 1000],
-                    "depth": [3, 5, 7, 10],
+                    "depth": [3, 5, 7, 9, 10, 12],
                     "learning_rate": [0.01, 0.05, 0.1, 0.2, 0.3],
                     "l2_leaf_reg": [0.1, 1, 3, 5, 10],
                     "border_count": [32, 50, 75, 100, 150]
