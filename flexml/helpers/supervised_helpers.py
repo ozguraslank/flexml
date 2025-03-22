@@ -144,7 +144,7 @@ def evaluate_model_perf(
             "MAPE": mape
         }
     
-    elif ml_task_type == "Classification":
+    else: # Classification
         # Convert probabilities to class labels for metrics except ROC-AUC if y_pred is probabilities
         if len(y_pred.shape) > 1:
             y_pred_labels = np.argmax(y_pred, axis=1)
@@ -171,6 +171,3 @@ def evaluate_model_perf(
             "F1 Score": f1,
             "ROC-AUC": roc_auc
         }
-    
-    else:
-        raise ValueError(f"Unsupported task type, only 'Regression' and 'Classification' tasks are supported, got {ml_task_type}")
