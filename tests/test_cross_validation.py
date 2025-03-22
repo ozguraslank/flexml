@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 from parameterized import parameterized
 from sklearn.datasets import load_breast_cancer, load_diabetes
 from flexml.logger import get_logger
@@ -44,21 +45,23 @@ class TestCrossValidation(unittest.TestCase):
             df = self.classification_data.copy()
 
             # Skip Stratified methods if classes are not sufficiently populated
-            if "Stratified" in cv_method and (df["target"].value_counts() < 2).any():
-                self.fail(f"{cv_method} couldn't be executed due to insufficient class instances, please take a look to data used for the test")
+            has_sufficient_class_instances = not ("Stratified" in cv_method and (df["target"].value_counts() < 2).any())
+            self.assertTrue(
+                has_sufficient_class_instances, 
+                f"{cv_method} couldn't be executed due to insufficient class instances, please take a look to data used for the test"
+            )
 
             experiment_object = Classification(df, target_col)
             
         elif ml_task_type == "Regression":
-            if "Stratified" in cv_method:  # Stratified is for Classification only
-                self.fail("Stratified methods are for Classification only. You've passed {cv_method} for Regression")
+            self.assertNotIn(
+                "Stratified",
+                cv_method, 
+                f"Stratified methods are for Classification only. You've passed {cv_method} for Regression"
+            )
 
             df = self.regression_data.copy()
             experiment_object = Regression(df, target_col)
-        else:
-            error_msg = f"Invalid model type specified. Expected 'Classification' or 'Regression', got '{ml_task_type}'"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
         
         experiment_object.start_experiment(
             experiment_size="wide",
@@ -67,3 +70,6 @@ class TestCrossValidation(unittest.TestCase):
             test_size=params.get("test_size"),
             groups_col=params.get("groups_col")
         )
+
+        predictions = experiment_object.predict(df.drop(columns=[target_col]), full_train=False)
+        self.assertIsInstance(predictions, np.ndarray)
