@@ -1,4 +1,5 @@
 import unittest
+import numpy as np
 from parameterized import parameterized
 from sklearn.datasets import load_diabetes, load_breast_cancer
 from flexml.regression import Regression
@@ -55,25 +56,21 @@ class TestMLModels(unittest.TestCase):
         exp = self.experiments[objective]
         cv_splitter = self.cv_splitters[objective]
 
-        try:
-            X, y = exp.X, exp.y
-            train_idx = cv_splitter[0][0] # holdout validation returns in [(train_index, test_index)] format
+        X, y = exp.X, exp.y
+        train_idx = cv_splitter[0][0] # holdout validation returns in [(train_index, test_index)] format
 
-            X_train = X.iloc[train_idx]
-            y_train = y.iloc[train_idx]
-            
-            model.fit(X_train, y_train)
+        X_train = X.iloc[train_idx]
+        y_train = y.iloc[train_idx]
+        
+        model.fit(X_train, y_train)
 
-            # If its classification problem
-            if objective == 'Classification':
-                model.predict_proba(X_train)
-            else:
-                model.predict(X_train)
-
-        except Exception as e:
-            error_msg = f"An error occurred while fitting {model_name} model. Error: {e}"
-            self.logger.error(error_msg)
-            raise Exception(error_msg)
+        # If its classification problem
+        if objective == 'Classification':
+            predictions = model.predict_proba(X_train)
+        else:
+            predictions = model.predict(X_train)
+        
+        self.assertIsInstance(predictions, np.ndarray)
 
         try:
             exp.tune_model(
@@ -93,5 +90,5 @@ class TestMLModels(unittest.TestCase):
             else:
                 # Handle other exceptions
                 error_msg = f"An error occurred while tuning {model_name} model with the following param_grid {model_tuning_params}. Error: {e}"
-                self.logger.error(error_msg)
+                self.logger.error(error_msg)                
                 raise Exception(error_msg)
