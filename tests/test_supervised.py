@@ -43,7 +43,7 @@ class TestRegression(unittest.TestCase):
                 data = df,
                 target_col = target_col
             )
-        elif objective in ['BinaryClassification', 'MulticlassClassification']:
+        else: # BinaryClassification or MulticlassClassification
             exp_obj = Classification(
                 data = df,
                 target_col = target_col

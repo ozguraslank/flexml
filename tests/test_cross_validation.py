@@ -53,7 +53,7 @@ class TestCrossValidation(unittest.TestCase):
 
             experiment_object = Classification(df, target_col)
             
-        elif ml_task_type == "Regression":
+        else: # Classification
             self.assertNotIn(
                 "Stratified",
                 cv_method, 
