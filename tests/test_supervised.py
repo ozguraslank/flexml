@@ -53,7 +53,8 @@ class TestRegression(unittest.TestCase):
 
         exp_obj.start_experiment(
             experiment_size = exp_size,
-            n_folds = self.n_folds
+            n_folds = self.n_folds,
+            eval_metric = "RMSE" if objective == "Regression" else "Accuracy"
         )
         
         top_x_models = exp_obj.get_best_models(top_n_models = 3)
@@ -162,7 +163,11 @@ class TestRegression(unittest.TestCase):
         exp_obj = self.test_config['Regression']['exp_obj']
         test_data = self.test_config['Regression'].get('data').drop(columns=['target'])
         
-        predictions = exp_obj.predict(test_data, full_train=True)
+        predictions = exp_obj.predict(
+            test_data=test_data,
+            model=exp_obj.get_model_by_name("LGBMRegressor"),
+            full_train=True,
+        )
         self.assertIsInstance(predictions, np.ndarray)
 
     def test_06_predict_model_binary_classification(self):
