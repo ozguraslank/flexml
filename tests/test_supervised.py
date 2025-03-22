@@ -160,7 +160,7 @@ class TestRegression(unittest.TestCase):
         exp_obj = self.test_config['Regression']['exp_obj']
         test_data = self.test_config['Regression'].get('data').drop(columns=['target'])
         
-        predictions = exp_obj.predict(test_data, full_train=False)
+        predictions = exp_obj.predict(test_data, full_train=True)
         self.assertIsInstance(predictions, np.ndarray)
 
     def test_06_predict_model_binary_classification(self):
