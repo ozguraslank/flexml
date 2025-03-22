@@ -1,4 +1,4 @@
-![Python versions](https://img.shields.io/badge/python_3.9+-blue) ![](https://img.shields.io/github/v/release/ozguraslank/flexml)
+![Python versions](https://img.shields.io/badge/python_3.9+-blue) ![](https://img.shields.io/github/v/release/ozguraslank/flexml) [![Code Coverage](https://codecov.io/gh/ozguraslank/flexml/branch/main/graph/badge.svg)](https://codecov.io/gh/ozguraslank/flexml)
 # FlexML
 
 <div align="center">
