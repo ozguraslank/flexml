@@ -50,7 +50,8 @@ class TestRegression(unittest.TestCase):
             )
 
         exp_obj.start_experiment(
-            experiment_size = exp_size
+            experiment_size = exp_size,
+            n_folds = 3
         )
         
         top_x_models = exp_obj.get_best_models(top_n_models = 3)
@@ -61,9 +62,18 @@ class TestRegression(unittest.TestCase):
                 
         exp_obj.show_model_stats()
         
-        tuning_methods = ["randomized_search", "optuna"]
+        tuning_methods = ["grid_search", "randomized_search", "optuna"]
         for method in tuning_methods:
-            exp_obj.tune_model(n_iter=3, n_folds = 3)
+            if method == "grid_search":
+                model = "LGBMRegressor" if objective == "Regression" else "LGBMClassifier"
+                param_grid = {
+                    "n_estimators": [100, 200],
+                    "max_depth": [3, 5],
+                    "learning_rate": [0.5, 0.1]
+                }
+                exp_obj.tune_model(model=model, tuning_method=method, param_grid=param_grid, n_iter=3)
+            else:
+                exp_obj.tune_model(tuning_method=method, n_iter=3)
             self.assertIsNotNone(exp_obj.tuned_model, f"An error occured while tuning the model with {method} in {exp_size} {objective}, tuned model is None")
             self.assertIsNotNone(exp_obj.tuned_model_score, f"An error occured while calculating the tuned model's score with {method} in {exp_size} {objective}, tuned model score is None")            
         
