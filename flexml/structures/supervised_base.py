@@ -618,7 +618,7 @@ class SupervisedBase:
         
         top_n_models = self.__top_n_models_checker(top_n_models)
 
-        if eval_metric is None:
+        if eval_metric is None and hasattr(self, 'eval_metric'):
             eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
@@ -999,7 +999,7 @@ class SupervisedBase:
                 # get_ipython() will not be defined in non-interactive environments
                 return False
         
-        if eval_metric is None:
+        if eval_metric is None and hasattr(self, 'eval_metric'):
             eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
 
@@ -1253,7 +1253,7 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        if eval_metric is None:
+        if eval_metric is None and hasattr(self, 'eval_metric'):
             eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         

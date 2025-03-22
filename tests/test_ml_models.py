@@ -19,15 +19,13 @@ class TestMLModels(unittest.TestCase):
             'data': load_diabetes(as_frame=True)['frame'],
             'target_col': 'target',
             'exp_class': Regression,
-            'models': get_ml_models(ml_task_type="Regression")['WIDE'],
-            'eval_metric': 'r2'
+            'models': get_ml_models(ml_task_type="Regression")['WIDE']
         },
         'Classification': {
             'data': load_breast_cancer(as_frame=True)['frame'],
             'target_col': 'target',
             'exp_class': Classification,
-            'models': get_ml_models(ml_task_type="Classification")['WIDE'],
-            'eval_metric': 'accuracy'
+            'models': get_ml_models(ml_task_type="Classification")['WIDE']
         }
     }
 
@@ -49,11 +47,11 @@ class TestMLModels(unittest.TestCase):
         )
 
     @parameterized.expand([
-        (objective, model_pack['name'], model_pack['model'], model_pack['tuning_param_grid'], config['eval_metric'])
+        (objective, model_pack['name'], model_pack['model'], model_pack['tuning_param_grid'])
         for objective, config in test_config.items()
         for model_pack in config['models']
     ])
-    def test_ml_models(self, objective, model_name, model, model_tuning_params, eval_metric):
+    def test_ml_models(self, objective, model_name, model, model_tuning_params):
         exp = self.experiments[objective]
         cv_splitter = self.cv_splitters[objective]
 
@@ -84,7 +82,6 @@ class TestMLModels(unittest.TestCase):
                 param_grid=model_tuning_params,
                 n_iter=3,
                 n_folds=3,
-                eval_metric=eval_metric,
                 n_jobs=-1
             )
 
