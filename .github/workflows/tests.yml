@@ -1,4 +1,4 @@
-name: Run Tests
+name: Run Tests and Upload Coverage
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
@@ -30,5 +30,38 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-test.txt
 
-      - name: Run tests
-        run: pytest tests
+      - name: Run tests with coverage
+        run: pytest --cov --cov-branch --cov-report=xml --cov-report=term
+
+      - name: Upload coverage report as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-${{ matrix.python-version }}
+          path: coverage.xml
+
+  merge-and-upload:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all coverage reports
+        uses: actions/download-artifact@v3
+        with:
+          path: coverage-reports
+
+      - name: Install dependencies
+        run: pip install coverage
+
+      - name: Merge coverage reports
+        run: |
+          coverage combine coverage-reports/**/coverage.xml
+          coverage report
+          coverage xml
+
+      - name: Upload merged coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: coverage.xml
