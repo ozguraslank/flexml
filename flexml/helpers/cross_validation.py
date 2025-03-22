@@ -108,10 +108,7 @@ def get_cv_splits(
     if cv_method != 'holdout' and not n_folds:
         n_folds = 5
 
-    if cv_method in ["stratified_kfold", "stratified_shuffle_split"] and y_array is None:
-        error_msg = "`y_array` must be provided for stratified methods"
-        logger.error(error_msg)
-        raise ValueError(error_msg)
+    assert y_array is not None or cv_method not in ["stratified_kfold", "stratified_shuffle_split"], "`y_array` must be provided for stratified methods"
 
     groups = df[groups_col].values if groups_col else None
 
