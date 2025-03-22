@@ -280,9 +280,10 @@ class SupervisedBase:
             raise ValueError(error_msg)
         
         self.__ML_MODELS = get_ml_models(
+            ml_task_type=self.__ML_TASK_TYPE,
             num_class=num_class,
             random_state=random_state
-        ).get(self.__ML_TASK_TYPE).get(experiment_size.upper())
+        ).get(experiment_size.upper())
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
         """
@@ -321,9 +322,9 @@ class SupervisedBase:
                 for key, value in entry["model_stats"].items():
                     aggregated_metrics[key].append(value)
             
-            # Calculate the average for all aggregated metrics, with special cases for "Time Taken (sec)" and "Full Train"
+            # Calculate the average for all aggregated metrics, with special cases for "Time (sec)" and "Full Train"
             averaged_metrics = {
-                key: (np.sum(value) if key == "Time Taken (sec)" else 
+                key: (np.sum(value) if key == "Time (sec)" else 
                       value[0] if key == "Full Train" else 
                       np.mean(value) if isinstance(value[0], (int, float)) else value[0])
                 for key, value in aggregated_metrics.items()
@@ -383,8 +384,14 @@ class SupervisedBase:
         test_size : float, (default=0.25 for hold-out cv, None for other methods)
             The size of the test data if using hold-out or shuffle-based splits
 
-        eval_metric : str (default='R2' for Regression, 'Accuracy' for Classification)
+        eval_metric : str, optional (default='R2' for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation
+            
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
+
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         random_state : int, optional (default=None)
             The random state value for the model training process
@@ -398,6 +405,7 @@ class SupervisedBase:
         - If both `n_folds` and `test_size` are provided, shuffle-based methods are prioritized
         - Defaults to a standard 5-fold if neither `n_folds` nor `test_size` is provided
         """
+        experiment_size = experiment_size.lower() # Convert to lowercase in case of any case mismatch
         self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         random_state = random_state_checker(random_state)
 
@@ -533,7 +541,7 @@ class SupervisedBase:
                                 "Model Name": model_name,
                                 "Full Train": False,
                                 **avg_metrics,
-                                "Time Taken (sec)": total_time_taken
+                                "Time (sec)": total_time_taken
                             }
                         })
 
@@ -568,6 +576,10 @@ class SupervisedBase:
         object
             The model object with the given model name
         """
+        if self.__model_training_info is None or len(self.__model_training_info) == 0:
+            error_msg = "No models have been trained yet! Please start an experiment first via start_experiment()"
+            self.__logger.error(error_msg)
+            raise Exception(error_msg)
 
         for model_info in self.__model_training_info:
             if model_name in model_info.keys():
@@ -578,36 +590,37 @@ class SupervisedBase:
         raise ValueError(error_msg)
 
 
-    def get_best_models(self, eval_metric: Optional[str] = None, top_n_models: int = 1) -> Union[object, list[object]]:
+    def get_best_models(self, eval_metric: Optional[str] = None, top_n_models: int = 1) -> Union[object, list[object], None]:
         """
         Returns the top n models based on the evaluation metric.
 
         Parameters
         ----------
         top_n_models : int
-            The number of top models to select based on the evaluation metric.
-        eval_metric : str (default='R2 for Regression, 'Accuracy' for Classification)
-            The evaluation metric to use for model evaluation:
-                
-                * R2, MAE, MSE, RMSE, MAPE for Regression tasks
+            The number of top models to select based on the evaluation metric
 
-                * Accuracy, Precision, Recall, F1 Score for Classification tasks
+        eval_metric : str, optional
+            Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
+        
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
+
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
+        
         Returns
         -------
-        object or list[object]
-            Single or a list of top n models based on the evaluation metric.
+        object or list[object] or None
+            Single or a list of top n models based on the evaluation metric or None If no models have been trained yet.
         """
         if len(self.__model_training_info) == 0:
-            error_msg = "There is no model performance data to sort!"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
+            return None
         
         top_n_models = self.__top_n_models_checker(top_n_models)
 
-        if eval_metric is not None:
-            eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
-        else: # If the user doesn't pass a eval_metric, get the evaluation metric passed to the start_experiment function
+        if eval_metric is None and hasattr(self, 'eval_metric'):
             eval_metric = self.eval_metric
+        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         model_stats = []
         best_models = []
@@ -653,7 +666,7 @@ class SupervisedBase:
         include_feature_pipeline : bool, optional
             Whether to include the feature engineering pipeline in the saved pipeline
         full_train : bool, optional
-            Whether to train the model using the fully feature-engineered data
+            Whether to train the model using the whole data
             
         Returns
         -------
@@ -684,13 +697,13 @@ class SupervisedBase:
 
         # Fetch the best model if no specific model is provided
         if model is None:
-            try:
-                model = self.get_best_models()
-                model_taken_from_leaderboard = True
-            except ValueError as e:
-                error_msg = "No models have been evaluated yet, and no model was specified to save."
+            model = self.get_best_models()
+            if model is None:
+                error_msg = "There is no model to save! Please start an experiment first via start_experiment()"
                 self.__logger.error(error_msg)
-                raise ValueError(error_msg) from e
+                raise Exception(error_msg)
+            model_taken_from_leaderboard = True
+
         elif isinstance(model, str):
             try:
                 model = self.get_model_by_name(model)
@@ -705,7 +718,7 @@ class SupervisedBase:
         if full_train:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             if not already_trained:
-                self.__logger.info("Training the model using the fully feature-engineered data")
+                self.__logger.info("Training the model using the whole data")
                 X_train, y_train = self.full_data_feature_engineer.fit_transform()
                 model.fit(X_train, y_train)
 
@@ -781,8 +794,8 @@ class SupervisedBase:
         full_train: bool = True
     ) -> tuple:
         """Inner handler for prediction methods that returns prepared model and transformed data"""
-        if test_data is None or test_data.empty:
-            raise ValueError("test_data must be provided and non-empty")
+        if test_data is None or not isinstance(test_data, pd.DataFrame) or test_data.empty:
+            raise ValueError("test_data must be provided as a pandas DataFrame and non-empty")
 
         # Check column consistency
         drop_columns = set(self.feature_engineer.drop_columns)
@@ -801,6 +814,10 @@ class SupervisedBase:
 
         if model is None:
             model = self.get_best_models()
+            if model is None:
+                error_msg = "There is no model to use for prediction! Please start an experiment first via start_experiment()"
+                self.__logger.error(error_msg)
+                raise Exception(error_msg)
             model_taken_from_leaderboard = True
         elif isinstance(model, str):
             model = self.get_model_by_name(model)
@@ -815,7 +832,7 @@ class SupervisedBase:
             # Check If model_taken_from_leaderboard is True and Full Train in self.__model_training_info is True, then we don't need to train the model again
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             if not already_trained:
-                self.__logger.info("Training the model using the fully feature-engineered data")
+                self.__logger.info("Training the model using the whole data")
                 X_train, y_train = self.full_data_feature_engineer.fit_transform()
                 model.fit(X_train, y_train)
 
@@ -852,7 +869,7 @@ class SupervisedBase:
             The trained model or model name to fetch for prediction
             If None, the best model will be fetched
         full_train : bool, optional
-            Whether to train the model using the fully feature-engineered data before prediction
+            Whether to train the model using the whole data before prediction
 
         Returns
         -------
@@ -884,7 +901,7 @@ class SupervisedBase:
             The trained model or model name to fetch for prediction
             If None, the best model will be fetched
         full_train : bool, optional
-            Whether to train the model using the fully feature-engineered data before prediction
+            Whether to train the model using the whole data before prediction
 
         Returns
         -------
@@ -904,8 +921,14 @@ class SupervisedBase:
 
         Parameters
         ----------
-        eval_metric : str (default='R2')
-            The evaluation metric to use for model evaluation
+        eval_metric : str, optional
+            Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
+        
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
+
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         Returns
         -------
@@ -916,8 +939,6 @@ class SupervisedBase:
             error_msg = "There is no model performance data to sort!"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
-        
-        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Since lower is better for mae, mse and rmse in Regression tasks, they should be sorted in ascending order
         if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['MAE', 'MSE', 'RMSE', 'MAPE']:
@@ -931,11 +952,14 @@ class SupervisedBase:
 
         Parameters
         ----------
-        eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
-            The evaluation metric to use for model evaluation
+        eval_metric : str, optional
+            Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            * R2, MAE, MSE, RMSE, MAPE for Regression tasks
-            * Accuracy, Precision, Recall, F1 Score for Classification tasks
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
+
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         """
         def highlight_best(s: pd.Series) -> list[str]:
             """
@@ -974,10 +998,13 @@ class SupervisedBase:
             except:
                 # get_ipython() will not be defined in non-interactive environments
                 return False
-            
+        
+        if eval_metric is None and hasattr(self, 'eval_metric'):
+            eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+
         sorted_model_stats_df = self.__sort_models(eval_metric)
-        sorted_model_stats_df['Time Taken (sec)'] = sorted_model_stats_df['Time Taken (sec)'].apply(lambda x: round(x, 2))
+        sorted_model_stats_df['Time (sec)'] = sorted_model_stats_df['Time (sec)'].apply(lambda x: f"{x:.2f}")
         sorted_model_stats_df.index += 1
         sorted_model_stats_df = sorted_model_stats_df.drop('Full Train', axis=1)
         
@@ -1007,6 +1034,10 @@ class SupervisedBase:
         try:
             if model is None:
                 model = self.get_best_models()
+                if model is None:
+                    error_msg = "There is no model to display feature importance! Please start an experiment first via start_experiment()"
+                    self.__logger.error(error_msg)
+                    raise Exception(error_msg)
 
             model_name = model.__class__.__name__
             importance = None
@@ -1102,12 +1133,14 @@ class SupervisedBase:
         groups_col : str, optional
             Column name for group-based cross-validation methods
 
-        eval_metric : str (default='R2' for regression, 'Accuracy' for classification)
-            The evaluation metric to use for model evaluation
+        eval_metric : str, optional
+            Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            * R2, MAE, MSE, RMSE, MAPE for Regression tasks
+            - Avaiable evalulation metrics for Regression:    
+                - R2, MAE, MSE, RMSE, MAPE
 
-            * Accuracy, Precision, Recall, F1 Score for Classification tasks
+            - Avaiable evalulation metrics for Classification:    
+                - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         param_grid : dict (default = defined custom param dict in flexml/config/tune_model_config.py)
             The parameter set to use for model tuning.
@@ -1199,7 +1232,7 @@ class SupervisedBase:
                         "Model Name": tuned_model_name,
                         "Full Train": True if tuning_method != "optuna" else False, # refit is done in grid_search and randomized_search, but not in optuna
                         **model_perf,
-                        "Time Taken (sec)": tuned_time_taken
+                        "Time (sec)": tuned_time_taken
                     }
                 }
             })
@@ -1220,6 +1253,8 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
+        if eval_metric is None and hasattr(self, 'eval_metric'):
+            eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # Check cross-validation method params
@@ -1237,7 +1272,11 @@ class SupervisedBase:
 
         # Get the best model If the user doesn't pass any model object
         if model is None:
-            model = self.get_best_models()
+            model = self.get_best_models(eval_metric)
+            if model is None:
+                error_msg = "There is no model to tune! Please start an experiment first via start_experiment()"
+                self.__logger.error(error_msg)
+                raise Exception(error_msg)
 
         # Get the model's param_grid from the config file If It's not passed from the user
         if param_grid is None:

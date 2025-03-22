@@ -19,10 +19,14 @@ def eval_metric_checker(
     ml_task_type : str
         The type of ML task ('Regression' or 'Classification')
 
-    eval_metric : str, (default=None)
+    eval_metric : str, optional (default='R2' for Regression, 'Accuracy' for Classification)
         The evaluation metric to use for model evaluation
 
-        If passed as None, the default evaluation metric of the corresponding ml_task_type will be used
+        - Avaiable evalulation metrics for Regression:    
+            - R2, MAE, MSE, RMSE, MAPE
+
+        - Avaiable evalulation metrics for Classification:    
+            - Accuracy, Precision, Recall, F1 Score, ROC-AUC
     
     all_evaluation_metrics : List[str], (default=None)
         All possible evaluation metrics for the current task (Regression or Classification), e.g. ['R2', 'MAE', 'MSE', 'RMSE', 'MAPE'] for Regression
