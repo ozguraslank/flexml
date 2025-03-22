@@ -290,12 +290,12 @@ class ModelTuner:
             }
 
             model_stats['tuned_model'] = search_result.best_estimator_.named_steps['model'] 
-            model_stats['tuned_model_score'] = round(search_result.best_estimator_.score, 6)
+            mean_score = search_result.cv_results_[f'mean_test_{eval_metric}'][search_result.best_index_]
+            model_stats['tuned_model_score'] = round(mean_score, 6)
             model_stats['model_perf'] = scores
             model_stats['time_taken_sec'] = time_taken
             model_stats['tuned_model_evaluation_metric'] = eval_metric
             return model_stats
-        
         except Exception as e:
             self.logger.error(f"Error while tuning the model with GridSearchCV, Error: {e}")
             return None
@@ -387,7 +387,8 @@ class ModelTuner:
             }
 
             model_stats['tuned_model'] = search_result.best_estimator_.named_steps['model']
-            model_stats['tuned_model_score'] = search_result.best_estimator_.score
+            mean_score = search_result.cv_results_[f'mean_test_{eval_metric}'][search_result.best_index_]
+            model_stats['tuned_model_score'] = round(mean_score, 6)
             model_stats['model_perf'] = scores
             model_stats['time_taken_sec'] = time_taken
             model_stats['tuned_model_evaluation_metric'] = eval_metric
