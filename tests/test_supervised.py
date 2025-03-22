@@ -70,33 +70,7 @@ class TestRegression(unittest.TestCase):
         # Save experiment objects to config
         self.test_config[objective]['exp_obj'] = exp_obj
 
-    def test_02_save_model(self):
-        try:
-            exp_obj = self.test_config['Regression']['exp_obj']
-            
-            # Thanks to function naming, test_01_supervised will run first and exp_obj will be created --
-            # But let's check it in just case and create a new experiment object if it's None
-            if exp_obj is None:
-                df = self.test_config['Regression'].get('data')
-                target_col = self.test_config['Regression'].get('target_col')
-
-                exp_obj = Regression(
-                    data = df,
-                    target_col = target_col
-                ).start_experiment()
-
-            save_path = "test_regression_model.pkl"
-            exp_obj.save_model(save_path=save_path)
-            self.assertTrue(os.path.exists(save_path))
-            with open(save_path, 'rb') as f:
-                model = pickle.load(f)
-            self.assertIsNotNone(model)
-
-        finally:
-            if os.path.exists(save_path):
-                os.remove(save_path)
-            
-    def test_03_save_model(self):
+    def test_02_save_regression_model(self):
         exp_obj = self.test_config['Regression']['exp_obj']
 
         # Test saving model with full_train=True and model_only=True (only the model object, not a pipeline)
@@ -120,8 +94,66 @@ class TestRegression(unittest.TestCase):
             saved_model = pickle.load(f)
             self.assertTrue(hasattr(saved_model, 'named_steps'))
         os.remove(save_path) # Clean up saved model
+            
+    def test_03_save_binary_classification_model(self):
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
 
-    def test_04_predict_model(self):
+        # Test saving model with full_train=True and model_only=True (only the model object, not a pipeline)
+        save_path = "test_binary_classification_model_full_train_model_only.pkl"
+        exp_obj.save_model(save_path=save_path, full_train=True, model_only=True)
+        self.assertTrue(os.path.exists(save_path))
+
+        # Load the saved model and check if it's the model object (not a pipeline)
+        with open(save_path, 'rb') as f:
+            saved_model = pickle.load(f)
+            self.assertFalse(hasattr(saved_model, 'named_steps'))
+        os.remove(save_path) # Clean up saved model
+
+        # Test saving model with full_train=False and model_only=False (should return a pipeline)
+        save_path = "test_binary_classification_model_no_full_train_model_only_false.pkl"
+        exp_obj.save_model(save_path=save_path, full_train=False, model_only=False)
+        self.assertTrue(os.path.exists(save_path))
+
+        # Load the saved model and check if it's a pipeline
+        with open(save_path, 'rb') as f:
+            saved_model = pickle.load(f)
+            self.assertTrue(hasattr(saved_model, 'named_steps'))
+        os.remove(save_path) # Clean up saved model
+
+    def test_04_save_multiclass_classification_model(self):
+        exp_obj = self.test_config['MulticlassClassification']['exp_obj']
+
+        # Test saving model with full_train=True and model_only=True (only the model object, not a pipeline)
+        save_path = "test_multiclass_classification_model_full_train_model_only.pkl"
+        exp_obj.save_model(save_path=save_path, full_train=True, model_only=True)
+        self.assertTrue(os.path.exists(save_path))
+
+        # Load the saved model and check if it's the model object (not a pipeline)
+        with open(save_path, 'rb') as f:
+            saved_model = pickle.load(f)
+            self.assertFalse(hasattr(saved_model, 'named_steps'))
+        os.remove(save_path) # Clean up saved model
+
+        # Test saving model with full_train=False and model_only=False (should return a pipeline)
+        save_path = "test_multiclass_classification_model_no_full_train_model_only_false.pkl"
+        exp_obj.save_model(save_path=save_path, full_train=False, model_only=False)
+        self.assertTrue(os.path.exists(save_path))
+
+        # Load the saved model and check if it's a pipeline
+        with open(save_path, 'rb') as f:
+            saved_model = pickle.load(f)
+            self.assertTrue(hasattr(saved_model, 'named_steps'))
+        os.remove(save_path) # Clean up saved model
+
+    def test_05_predict_model_regression(self):
+        # Test regression predictions
+        exp_obj = self.test_config['Regression']['exp_obj']
+        test_data = self.test_config['Regression'].get('data').drop(columns=['target'])
+        
+        predictions = exp_obj.predict(test_data, full_train=False)
+        self.assertIsInstance(predictions, np.ndarray)
+
+    def test_06_predict_model_binary_classification(self):
         # Test binary classification predictions
         exp_obj = self.test_config['BinaryClassification']['exp_obj']
         test_data = self.test_config['BinaryClassification'].get('data').drop(columns=['target'])
@@ -132,7 +164,7 @@ class TestRegression(unittest.TestCase):
         self.assertIsInstance(predictions_probabilities, np.ndarray)
         self.assertEqual(predictions_probabilities.shape[1], 2)  # Binary classification should have 2 probability columns
 
-    def test_05_predict_model_multiclass(self):
+    def test_07_predict_model_multiclass(self):
         # Test multiclass classification predictions
         exp_obj = self.test_config['MulticlassClassification']['exp_obj']
         test_data = self.test_config['MulticlassClassification'].get('data').drop(columns=['target'])
