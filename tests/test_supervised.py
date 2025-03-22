@@ -31,6 +31,8 @@ class TestRegression(unittest.TestCase):
             'exp_obj': None
         }
     }
+
+    n_folds = 3
     
     @parameterized.expand(list(test_config.keys()))
     def test_01_supervised(self, objective: str):
@@ -51,7 +53,7 @@ class TestRegression(unittest.TestCase):
 
         exp_obj.start_experiment(
             experiment_size = exp_size,
-            n_folds = 3
+            n_folds = self.n_folds
         )
         
         top_x_models = exp_obj.get_best_models(top_n_models = 3)
@@ -71,9 +73,9 @@ class TestRegression(unittest.TestCase):
                     "max_depth": [3, 5],
                     "learning_rate": [0.5, 0.1]
                 }
-                exp_obj.tune_model(model=model, tuning_method=method, param_grid=param_grid, n_iter=3)
+                exp_obj.tune_model(model=model, tuning_method=method, param_grid=param_grid, n_folds=self.n_folds, n_iter=3)
             else:
-                exp_obj.tune_model(tuning_method=method, n_iter=3)
+                exp_obj.tune_model(tuning_method=method, n_folds=self.n_folds, n_iter=3)
             self.assertIsNotNone(exp_obj.tuned_model, f"An error occured while tuning the model with {method} in {exp_size} {objective}, tuned model is None")
             self.assertIsNotNone(exp_obj.tuned_model_score, f"An error occured while calculating the tuned model's score with {method} in {exp_size} {objective}, tuned model score is None")            
         
@@ -184,3 +186,15 @@ class TestRegression(unittest.TestCase):
         self.assertIsInstance(predictions, np.ndarray)
         self.assertIsInstance(predictions_probabilities, np.ndarray)
         self.assertEqual(predictions_probabilities.shape[1], 3)  # Iris has 3 classes
+    
+    def test_08_plot_regression_feature_importance(self):
+        exp_obj = self.test_config['Regression']['exp_obj']
+        exp_obj.plot_feature_importance(exp_obj.get_best_models())
+
+    def test_09_plot_binary_classification_feature_importance(self):
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
+        exp_obj.plot_feature_importance(exp_obj.get_best_models())
+
+    def test_10_plot_multiclass_classification_feature_importance(self):
+        exp_obj = self.test_config['MulticlassClassification']['exp_obj']
+        exp_obj.plot_feature_importance(exp_obj.get_best_models())
