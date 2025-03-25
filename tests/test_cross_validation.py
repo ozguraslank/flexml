@@ -1,9 +1,11 @@
 import unittest
+from typing import Optional
 import numpy as np
 from parameterized import parameterized
 from sklearn.datasets import load_breast_cancer, load_diabetes
 from flexml.logger import get_logger
 from flexml import Regression, Classification
+from flexml.helpers import cross_validation_checker
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -32,11 +34,18 @@ class TestCrossValidation(unittest.TestCase):
         ("Regression", "group_kfold", {"n_splits": 3, "groups_col": "group"}),
         ("Regression", "group_shuffle_split", {"n_splits": 3, "test_size": 0.2, "groups_col": "group"}),
         ("Regression", "holdout", {"test_size": 0.25}),
+
+        # Edge cases
+        ("Regression", "holdout", {"test_size": None, "n_splits": 3}), # holdout but no test_size given
+        ("Regression", "holdout", {"test_size": 0.25, "n_splits": 3}), # holdout but n_splits given
+        ("Regression", "kfold", {"test_size": 0.25, "n_splits": 3}), # kfold but test_size given
+        ("Regression", "kfold", {"n_splits": None}), # kfold but no n_splits given
+        ("Regression", "holdout", {"groups_col": "group"}) # not a group cross-validation but groups_col given
     ])
     def test_cross_validation(
         self,
         ml_task_type: str,
-        cv_method: str,
+        cv_method: Optional[str],
         params: dict
     ):
         target_col = "target"
@@ -73,3 +82,21 @@ class TestCrossValidation(unittest.TestCase):
 
         predictions = experiment_object.predict(df.drop(columns=[target_col]), full_train=False)
         self.assertIsInstance(predictions, np.ndarray)
+
+    @parameterized.expand([
+        ("X", {}, ValueError),  # Random cv_method is given
+        ("kfold", {"n_splits": 1}, ValueError),  # n_folds is not an integer >= 2
+        ("holdout", {"test_size": 1.1}, ValueError),  # test_size is not a float between 0 and 1
+        ("group_kfold", {"n_splits": 3, "groups_col": "X"}, ValueError),  # groups_col is not a column in the DataFrame
+        ("group_shuffle_split", {"n_splits": 3}, ValueError),  # groups_col is not provided
+        ("group_kfold", {"n_splits": 3, "test_size": 0.25}, ValueError),  # groups_col is not provided
+    ])
+    def test_required_errors(self, cv_method: str, params: dict, expected_error: Exception):
+        with self.assertRaises(expected_error):
+            cross_validation_checker(
+                df=self.regression_data,
+                cv_method=cv_method,
+                n_folds=params.get("n_splits"),
+                test_size=params.get("test_size"),
+                groups_col=params.get("groups_col")
+            )

@@ -1,6 +1,6 @@
 import pandas as pd
 from typing import Optional, List, Any
-from flexml.config import EVALUATION_METRICS, FEATURE_ENGINEERING_METHODS
+from flexml.config import EVALUATION_METRICS, FEATURE_ENGINEERING_METHODS, CROSS_VALIDATION_METHODS
 from flexml.logger import get_logger
 import re
 
@@ -52,8 +52,6 @@ def eval_metric_checker(
     if eval_metric is None:
         return default_evaluation_metric
     
-    assert isinstance(eval_metric, str), f"eval_metric expected to be a string, got {type(eval_metric)}"
-    
     if ml_task_type == "Regression":
         eval_metric = eval_metric.upper()
     else:
@@ -69,9 +67,12 @@ def eval_metric_checker(
             error_msg = (f"'{original_metric}' is not a valid evaluation metric for {ml_task_type}, "
                         f"expected one of: {all_evaluation_metrics}")
             logger.error(error_msg)
-            assert False, error_msg
+            raise ValueError(error_msg)
 
-    assert eval_metric in all_evaluation_metrics, f"Validation failed for {eval_metric} - not in configured metrics"
+    if eval_metric not in all_evaluation_metrics:
+        error_msg = f"Validation failed for {eval_metric} - not in configured metrics"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
     return eval_metric
 
@@ -91,7 +92,10 @@ def random_state_checker(random_state: Any) -> int:
     """
     logger = get_logger(__name__, "PROD", False)
 
-    assert random_state is None or (isinstance(random_state, int) and random_state >= 0), f"random_state should be either None or a positive integer, got {random_state}"
+    if random_state is not None and (not isinstance(random_state, int) or random_state < 0):
+        error_msg = f"random_state should be either None or a positive integer, got {random_state}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
     return random_state
 
@@ -136,6 +140,12 @@ def cross_validation_checker(
     """
     logger = get_logger(__name__, "PROD", False)
 
+    if available_cv_methods is None:
+        if ml_task_type is not None:
+            available_cv_methods = CROSS_VALIDATION_METHODS[ml_task_type]
+        else:
+            available_cv_methods = CROSS_VALIDATION_METHODS['all']
+
     if cv_method is None:
         if ml_task_type is not None:
             if ml_task_type == 'Regression':
@@ -145,28 +155,40 @@ def cross_validation_checker(
             else:
                 error_msg = f"ml_task_type should be 'Regression' or 'Classification', got {ml_task_type}"
                 logger.error(error_msg)
-                assert False, error_msg
+                raise ValueError(error_msg)
     else:
         cv_method = cv_method.lower()
-        if available_cv_methods is not None and isinstance(available_cv_methods, dict):
-            if available_cv_methods.get(cv_method) is None:
-                # If cv_method is not found in the available cv methods, check the without '_' version -->
-                # e.g. 'stratified_kfold' and 'stratifiedkfold'
-                if cv_method in available_cv_methods.values():
-                    cv_method = list(available_cv_methods.keys())[list(available_cv_methods.values()).index(cv_method)]
+        if available_cv_methods.get(cv_method) is None:
+            # If cv_method is not found in the available cv methods, check the without '_' version -->
+            # e.g. 'stratified_kfold' and 'stratifiedkfold'
+            if cv_method in available_cv_methods.values():
+                cv_method = list(available_cv_methods.keys())[list(available_cv_methods.values()).index(cv_method)]
     
     # Check if cv_method is still None
-    assert cv_method is not None and cv_method in list(available_cv_methods.keys()), f"cv_method is not found in the available cross-validation methods, expected one of {list(available_cv_methods.keys())}, got {cv_method}"
+    if cv_method is None or cv_method not in list(available_cv_methods.keys()):
+        error_msg = f"cv_method is not found in the available cross-validation methods, expected one of {list(available_cv_methods.keys())}, got {cv_method}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
-    assert n_folds is None or (isinstance(n_folds, int) and n_folds >= 2), "`n_folds` must be an integer >= 2 if provided"
+    if n_folds is not None and (not isinstance(n_folds, int) or n_folds < 2):
+        error_msg = "`n_folds` must be an integer >= 2 if provided"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
-    assert test_size is None or (isinstance(test_size, float) and 0 < test_size < 1), f"test_size parameter expected to be a float between 0 and 1, got {test_size}"
+    if test_size is not None and (not isinstance(test_size, float) or not 0 < test_size < 1):
+        error_msg = f"test_size parameter expected to be a float between 0 and 1, got {test_size}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
-    assert groups_col is None or groups_col in df.columns, f"groups_col should be a column in the DataFrame, got {groups_col}"
+    if groups_col is not None and groups_col not in df.columns:
+        error_msg = f"groups_col should be a column in the DataFrame, got {groups_col}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
-    assert groups_col is None or groups_col in df.columns, f"`groups_col` must be a column in `df`, got '{groups_col}'"
-    
-    assert not (cv_method in ["group_kfold", "group_shuffle_split"]) or groups_col is not None, "`groups_col` must be provided for group-based methods"
+    if cv_method in ["group_kfold", "group_shuffle_split"] and groups_col is None:
+        error_msg = "`groups_col` must be provided for group-based methods"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
     
     return cv_method
 
@@ -259,106 +281,151 @@ def validate_inputs(
             * https://scikit-learn.org/stable/modules/generated/sklearn.preprocessing.normalize.html
     """
     # Check if any of the columns in drop_columns match the target_col
-    assert drop_columns is None or target_col not in drop_columns, f"The target column '{target_col}' cannot be in the drop_columns list"
+    if drop_columns is not None and target_col in drop_columns:
+        error_msg = f"The target column '{target_col}' cannot be in the drop_columns list"
+        raise ValueError(error_msg)
     
     if drop_columns is None:
         drop_columns = []
     remaining_columns = set(data.columns) - set(drop_columns)
 
     # Ensure the target column is in the remaining columns and there's at least one feature column
-    error_msg = (
-        f"After dropping columns, only {remaining_columns} remain. "
-        f"There should be at least one feature column and the target column '{target_col}' remaining."
-    )
-    assert target_col in remaining_columns and len(remaining_columns) >= 2, error_msg
+    if target_col not in remaining_columns or len(remaining_columns) < 2:
+        error_msg = (
+            f"After dropping columns, only {remaining_columns} remain. "
+            f"There should be at least one feature column and the target column '{target_col}' remaining."
+        )
+        raise ValueError(error_msg)
     
     # Check if categorical_imputation_method is valid
-    assert categorical_imputation_method in FEATURE_ENGINEERING_METHODS["accepted_categorical_imputations_methods"], f"The categorical_imputation_method '{categorical_imputation_method}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_categorical_imputations_methods']}"
+    if categorical_imputation_method not in FEATURE_ENGINEERING_METHODS["accepted_categorical_imputations_methods"]:
+        error_msg = f"The categorical_imputation_method '{categorical_imputation_method}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_categorical_imputations_methods']}"
+        raise ValueError(error_msg)
     
     # Check if numerical_imputation_method is valid
-    assert numerical_imputation_method in FEATURE_ENGINEERING_METHODS["accepted_numeric_imputations_methods"], f"The numerical_imputation_method '{numerical_imputation_method}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_numeric_imputations_methods']}"
+    if numerical_imputation_method not in FEATURE_ENGINEERING_METHODS["accepted_numeric_imputations_methods"]:
+        error_msg = f"The numerical_imputation_method '{numerical_imputation_method}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_numeric_imputations_methods']}"
+        raise ValueError(error_msg)
     
     # Check if encoding_method is valid
-    assert encoding_method in FEATURE_ENGINEERING_METHODS["accepted_encoding_methods"], f"The encoding_method '{encoding_method}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_encoding_methods']}"
+    if encoding_method not in FEATURE_ENGINEERING_METHODS["accepted_encoding_methods"]:
+        error_msg = f"The encoding_method '{encoding_method}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_encoding_methods']}"
+        raise ValueError(error_msg)
     
     # Check if onehot_limit is a positive integer
-    assert isinstance(onehot_limit, int) and onehot_limit >= 0, f"onehot_limit should be a positive integer, got {onehot_limit}"
+    if not isinstance(onehot_limit, int) or onehot_limit < 0:
+        error_msg = f"onehot_limit should be a positive integer, got {onehot_limit}"
+        raise ValueError(error_msg)
     
     # Check if drop_columns columns are in data
     if drop_columns is not None:
         for col in drop_columns:
-            assert col in data.columns, f"The column '{col}' in drop_columns is not in the data"
+            if col not in data.columns:
+                error_msg = f"The column '{col}' in drop_columns is not in the data"
+                raise ValueError(error_msg)
         
     # Check if columns in column_imputation_map are in data and methods are valid
     if column_imputation_map is not None:
         for col, method in column_imputation_map.items():
-            assert col in data.columns, f"The column '{col}' in column_imputation_map is not in the data"
+            if col not in data.columns:
+                error_msg = f"The column '{col}' in column_imputation_map is not in the data"
+                raise ValueError(error_msg)
             
             if col in data.select_dtypes(include=['number']).columns:
-                assert method in FEATURE_ENGINEERING_METHODS["accepted_numeric_imputations_methods"], f"The numeric imputation method '{method}' for column '{col}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_numeric_imputations_methods']}"
+                if method not in FEATURE_ENGINEERING_METHODS["accepted_numeric_imputations_methods"]:
+                    error_msg = f"The numeric imputation method '{method}' for column '{col}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_numeric_imputations_methods']}"
+                    raise ValueError(error_msg)
             else:
-                assert method in FEATURE_ENGINEERING_METHODS["accepted_categorical_imputations_methods"], f"The categorical imputation method '{method}' for column '{col}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_categorical_imputations_methods']}"
+                if method not in FEATURE_ENGINEERING_METHODS["accepted_categorical_imputations_methods"]:
+                    error_msg = f"The categorical imputation method '{method}' for column '{col}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_categorical_imputations_methods']}"
+                    raise ValueError(error_msg)
 
     # Check if numerical_imputation_constant is a number
-    assert isinstance(numerical_imputation_constant, (int, float)), f"numerical_imputation_constant should be a number, got {type(numerical_imputation_constant)}"
+    if not isinstance(numerical_imputation_constant, (int, float)):
+        error_msg = f"numerical_imputation_constant should be a number, got {type(numerical_imputation_constant)}"
+        raise ValueError(error_msg)
 
     # Check if categorical_imputation_constant is a string
-    assert isinstance(categorical_imputation_constant, str), f"categorical_imputation_constant should be a string, got {type(categorical_imputation_constant)}"
+    if not isinstance(categorical_imputation_constant, str):
+        error_msg = f"categorical_imputation_constant should be a string, got {type(categorical_imputation_constant)}"
+        raise ValueError(error_msg)
 
     # Check if encoding_method is ordinal_encoder and ordinal_encoder_map is provided for every categorical column
     if encoding_method == "ordinal_encoder":
-        assert ordinal_encode_map is not None, "Ordinal encoding is selected but no ordinal_encode_map is provided"
+        if ordinal_encode_map is None:
+            error_msg = "Ordinal encoding is selected but no ordinal_encode_map is provided"
+            raise ValueError(error_msg)
         # Check if ordinal_encode_map is provided for every categorical column
         for col in data.select_dtypes(include=['object', 'category']).columns:
-            assert col in ordinal_encode_map, f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+            if col not in ordinal_encode_map:
+                error_msg = f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+                raise ValueError(error_msg)
 
     # Check if methods inside encoding_method_map are valid and columns are in data
     if encoding_method_map is not None:
         for col, method in encoding_method_map.items():
-            assert col in data.columns, f"The column '{col}' in encoding_method_map is not in the data"
+            if col not in data.columns:
+                error_msg = f"The column '{col}' in encoding_method_map is not in the data"
+                raise ValueError(error_msg)
             
-            assert col not in drop_columns, f"The column '{col}' in encoding_method_map is in drop_columns"
+            if col in drop_columns:
+                error_msg = f"The column '{col}' in encoding_method_map is in drop_columns"
+                raise ValueError(error_msg)
 
-            assert method in FEATURE_ENGINEERING_METHODS["accepted_encoding_methods"], f"The encoding method '{method}' for column '{col}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_encoding_methods']}"
+            if method not in FEATURE_ENGINEERING_METHODS["accepted_encoding_methods"]:
+                error_msg = f"The encoding method '{method}' for column '{col}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_encoding_methods']}"
+                raise ValueError(error_msg)
 
             # Check if there is a ordinal_encoder between methods and ordinal_encode_map is provided
             if method == "ordinal_encoder":
-                assert ordinal_encode_map is not None, f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+                if ordinal_encode_map is None:
+                    error_msg = f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+                    raise ValueError(error_msg)
                 # Check if map for col is provided within ordinal_encode_map
-                assert col in ordinal_encode_map, f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+                if col not in ordinal_encode_map:
+                    error_msg = f"Ordinal encoding is selected for column '{col}' but no ordinal_encode_map is provided"
+                    raise ValueError(error_msg)
 
     # Check if normalize is valid
-    assert normalize is None or normalize in FEATURE_ENGINEERING_METHODS["accepted_standardization_methods"], f"The normalize method '{normalize}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_standardization_methods']}"
+    if normalize is not None and normalize not in FEATURE_ENGINEERING_METHODS["accepted_standardization_methods"]:
+        error_msg = f"The normalize method '{normalize}' is not valid. Expected one of the following: {FEATURE_ENGINEERING_METHODS['accepted_standardization_methods']}"
+        raise ValueError(error_msg)
 
     # Check if encoding_method is ordinal_encoder
     if encoding_method == "ordinal_encoder":
-        assert ordinal_encode_map is not None, "Ordinal encoding is selected, but no ordinal_encode_map is provided."
+        if ordinal_encode_map is None:
+            error_msg = "Ordinal encoding is selected, but no ordinal_encode_map is provided."
+            raise ValueError(error_msg)
         
         # Get all categorical columns
         categorical_columns = data.select_dtypes(include=['object', 'category']).columns.tolist()
         
         # Check that all categorical columns are in ordinal_encode_map
         for col in categorical_columns:
-            assert col in ordinal_encode_map, f"Ordinal encoding is selected, but column '{col}' is missing in ordinal_encode_map."
+            if col not in ordinal_encode_map:
+                error_msg = f"Ordinal encoding is selected, but column '{col}' is missing in ordinal_encode_map."
+                raise ValueError(error_msg)
             
             # Get distinct values in the column
             distinct_values = set(data[col].dropna().unique())
             map_values = set(ordinal_encode_map[col])
             
             # Check if the values in ordinal_encode_map match exactly with the distinct values
-            error_msg = (
-                f"Distinct values in column '{col}' do not match "
-                f"Ensure they match exactly."
-            )
-            assert distinct_values == map_values, error_msg
+            if distinct_values != map_values:
+                error_msg = (
+                    f"Distinct values in column '{col}' do not match "
+                    f"Ensure they match exactly."
+                )
+                raise ValueError(error_msg)
         
         # Check that ordinal_encode_map does not include extra columns
         extra_columns = set(ordinal_encode_map.keys()) - set(categorical_columns)
-        error_msg = (
-            f"Ordinal_encode_map includes extra columns not in the categorical columns: {extra_columns}. "
-            f"Remove these columns from the mapping."
-        )
-        assert not extra_columns, error_msg
+        if extra_columns:
+            error_msg = (
+                f"Ordinal_encode_map includes extra columns not in the categorical columns: {extra_columns}. "
+                f"Remove these columns from the mapping."
+            )
+            raise ValueError(error_msg)
 
     # Check if encoding_method_map is provided and has ordinal_encoder
     if encoding_method_map:
@@ -369,29 +436,35 @@ def validate_inputs(
         ordinal_columns = []
 
     if ordinal_columns:
-        assert ordinal_encode_map is not None, "Ordinal encoding is specified in encoding_method_map, but no ordinal_encode_map is provided."
+        if not ordinal_encode_map:
+            raise ValueError(
+                "Ordinal encoding is specified in encoding_method_map, but no ordinal_encode_map is provided."
+            )
         
         # Validate only the columns specified for ordinal encoding
         for col in ordinal_columns:
-            assert col in ordinal_encode_map, f"Column '{col}' is marked for ordinal encoding but is missing in ordinal_encode_map."
+            if col not in ordinal_encode_map:
+                raise ValueError(
+                    f"Column '{col}' is marked for ordinal encoding but is missing in ordinal_encode_map."
+                )
             
             # Get distinct values in the column
             distinct_values = set(data[col].dropna().unique())
             map_values = set(ordinal_encode_map[col])
             
             # Check if the values in ordinal_encode_map match exactly with the distinct values
-            error_msg = (
-                f"Unique values in '{col}' do not match with the ones given in ordinal_encode_map. "
-                f"Ensure they match exactly."
-            )
-            assert distinct_values == map_values, error_msg
+            if distinct_values != map_values:
+                raise ValueError(
+                    f"Unique values in '{col}' do not match with the ones given in ordinal_encode_map. "
+                    f"Ensure they match exactly."
+                )
         
         # Ensure ordinal_encode_map does not include extra columns
         extra_columns = set(ordinal_encode_map.keys()) - set(ordinal_columns)
-        error_msg = (
-            f"Ordinal_encode_map includes extra columns not specified for ordinal encoding."
-            f"Remove these columns from the mapping."
-        )
-        assert not extra_columns, error_msg
+        if extra_columns:
+            raise ValueError(
+                f"Ordinal_encode_map includes extra columns not specified for ordinal encoding."
+                f"Remove these columns from the mapping."
+            )
 
     return True
