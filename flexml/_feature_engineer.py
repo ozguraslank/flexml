@@ -47,6 +47,10 @@ class ColumnImputer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X) -> pd.DataFrame:
+        # Categorical columns are converted to string
+        categorical_cols = X.select_dtypes(exclude=['number']).columns
+        X[categorical_cols] = X[categorical_cols].astype(str)
+
         for column, method in self.column_imputation_mapper.items():
             X[column] = X[column].replace("nan", pd.NA)
             if method == "mean":
@@ -100,6 +104,10 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
         self.ordinal_encoders = {}
 
     def fit(self, X, y=None):
+        # Categorical columns are converted to string
+        categorical_cols = X.select_dtypes(exclude=['number']).columns
+        X[categorical_cols] = X[categorical_cols].astype(str)
+
         for col, method in self.encoding_method_mapper.items():
             if method == "label_encoder":
                 encoder = LabelEncoder()
@@ -125,6 +133,10 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X) -> pd.DataFrame:
+        # Categorical columns are converted to string
+        categorical_cols = X.select_dtypes(exclude=['number']).columns
+        X[categorical_cols] = X[categorical_cols].astype(str)
+
         for col, method in self.encoding_method_mapper.items():
             if method == "label_encoder":
                 if col in self.label_encoders:
@@ -331,7 +343,6 @@ class FeatureEngineering:
         self.feature_data = self.data.drop(columns=[self.target_col, *self.drop_columns], errors='ignore')
         self.numerical_columns = self.feature_data.select_dtypes(include=['number']).columns.tolist()
         self.categorical_columns = self.feature_data.columns.difference(self.numerical_columns).tolist()
-        self.feature_data[self.categorical_columns] = self.feature_data[self.categorical_columns].astype(str)
 
         # Separate imputation mapping for numerical and categorical columns
         self.numerical_column_imputation_mapper = {
