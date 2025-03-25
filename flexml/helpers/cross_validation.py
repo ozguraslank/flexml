@@ -108,18 +108,20 @@ def get_cv_splits(
     if cv_method != 'holdout' and not n_folds:
         n_folds = 5
 
-    assert y_array is not None or cv_method not in ["stratified_kfold", "stratified_shuffle_split"], "`y_array` must be provided for stratified methods"
+    if cv_method in ["stratified_kfold", "stratified_shuffle_split"] and y_array is None:
+        error_msg = "`y_array` must be provided for stratified methods"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     groups = df[groups_col].values if groups_col else None
-
     if groups is not None and cv_method not in ["group_kfold", "group_shuffle_split"]:
         logger.warning(f"'groups_col' provided even though 'cv_method' is {cv_method}. Ignoring 'groups_col'")
         groups = None
 
-    elif cv_method == "kfold":
+    if cv_method == "kfold":
         splitter = KFold(n_splits=n_folds, random_state=random_state, shuffle=shuffle)
         return splitter.split(df)
-
+    
     elif cv_method == "shuffle_split":
         splitter = ShuffleSplit(n_splits=n_folds, test_size=test_size, random_state=random_state)
         return splitter.split(df)
