@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Optional, List, Any
+from typing import Optional, List
 from flexml.config import EVALUATION_METRICS, FEATURE_ENGINEERING_METHODS, CROSS_VALIDATION_METHODS
 from flexml.logger import get_logger
 import re
@@ -76,13 +76,13 @@ def eval_metric_checker(
     
     return eval_metric
 
-def random_state_checker(random_state: Any) -> int:
+def random_state_checker(random_state: Optional[int] = None) -> int:
     """
     Validates the random_state parameter
 
     Parameters
     ----------
-    random_state : Any
+    random_state : int, optional (default=None)
         Random state value
 
     Returns
