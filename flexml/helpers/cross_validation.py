@@ -151,7 +151,3 @@ def get_cv_splits(
                 stratify=y_array if cv_method == "stratified_kfold" else None
         )
         return [(train_index, test_index)]
-
-    else: # Default
-        splitter = KFold(n_splits=5, random_state=random_state, shuffle=shuffle)
-        return splitter.split(df)
