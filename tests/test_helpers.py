@@ -31,10 +31,6 @@ class TestHelpers(unittest.TestCase):
             mask = np.random.random(n_rows) < 0.2
             df.loc[mask, column] = np.nan
 
-    encoding_methods = ['label_encoder', 'onehot_encoder', 'ordinal_encoder']
-    imputation_methods = ['mean', 'median', 'mode', 'constant', 'drop']
-    normalization_methods = ['standard_scaler', 'minmax_scaler', 'robust_scaler', 'quantile_transformer', 'maxabs_scaler', 'normalize_scaler']
-
 
     @parameterized.expand([
         # Basic validation errors
@@ -247,6 +243,7 @@ class TestHelpers(unittest.TestCase):
                 **params
             )
 
+    # helpers/validators.py
     @parameterized.expand([
         # Default behavior tests
         (
@@ -343,6 +340,7 @@ class TestHelpers(unittest.TestCase):
             result = eval_metric_checker(**params)
             self.assertEqual(result, expected_result)
 
+    # helpers/validators.py
     @parameterized.expand([
         # Valid cases
         (
@@ -386,3 +384,109 @@ class TestHelpers(unittest.TestCase):
         else:
             result = random_state_checker(input_value)
             self.assertEqual(result, expected_result)
+
+    # helpers/supervised_helpers.py
+    def test_binary_classification_probabilities(self):
+        """
+        Test binary classification with probability predictions.
+        """
+        from flexml.helpers.supervised_helpers import evaluate_model_perf
+
+        # Setup binary classification data
+        y_true = np.array([0, 1, 0, 1, 0])
+        y_pred_proba = np.array([
+            [0.8, 0.2],  # Should predict class 0
+            [0.3, 0.7],  # Should predict class 1
+            [0.6, 0.4],  # Should predict class 0
+            [0.2, 0.8],  # Should predict class 1
+            [0.9, 0.1]   # Should predict class 0
+        ])
+
+        # Test model performance evaluation
+        results = evaluate_model_perf("Classification", y_true, y_pred_proba)
+
+        # Verify all metrics are present
+        expected_metrics = {"Accuracy", "Precision", "Recall", "F1 Score", "ROC-AUC"}
+        self.assertEqual(set(results.keys()), expected_metrics)
+
+    def test_multiclass_classification_probabilities(self):
+        """
+        Test multiclass classification with probability predictions for more than two classes.
+        """
+        from flexml.helpers.supervised_helpers import evaluate_model_perf
+
+        # Setup multiclass classification data
+        y_true = np.array([0, 1, 2, 1, 0])
+        y_pred_proba = np.array([
+            [0.8, 0.1, 0.1],  # Should predict class 0
+            [0.1, 0.7, 0.2],  # Should predict class 1
+            [0.2, 0.2, 0.6],  # Should predict class 2
+            [0.1, 0.8, 0.1],  # Should predict class 1
+            [0.6, 0.2, 0.2]   # Should predict class 0
+        ])
+
+        # Test model performance evaluation
+        results = evaluate_model_perf("Classification", y_true, y_pred_proba)
+
+        # Verify all metrics are present
+        expected_metrics = {"Accuracy", "Precision", "Recall", "F1 Score", "ROC-AUC"}
+        self.assertEqual(set(results.keys()), expected_metrics)
+
+    def test_classification_with_direct_labels(self):
+        """
+        Test classification with direct label predictions (no probabilities).
+        Tests the handling of predictions when model doesn't output probabilities.
+        """
+        from flexml.helpers.supervised_helpers import evaluate_model_perf
+
+        # Setup classification data with direct labels
+        y_true = np.array([0, 1, 0, 1, 0])
+        y_pred_labels = np.array([0, 1, 0, 1, 0])  # Direct label predictions
+
+        # Test model performance evaluation
+        results = evaluate_model_perf("Classification", y_true, y_pred_labels)
+
+        # Verify all metrics are present
+        expected_metrics = {"Accuracy", "Precision", "Recall", "F1 Score", "ROC-AUC"}
+        self.assertEqual(set(results.keys()), expected_metrics)
+
+    def test_evaluate_preds_invalid_metric(self):
+        """
+        Test that _evaluate_preds raises ValueError for invalid metrics.
+        """
+        from flexml.helpers.supervised_helpers import _evaluate_preds
+
+        y_true = np.array([0, 1, 0])
+        y_pred = np.array([0, 1, 0])
+
+        with self.assertRaisesRegex(ValueError, "Error while evaluating the current model"):
+            _evaluate_preds(y_true, y_pred, "InvalidMetric")
+
+    def test_probability_to_label_conversion(self):
+        """
+        Test the conversion from probability predictions to class labels.
+        Tests both binary and multiclass cases.
+        """
+        from flexml.helpers.supervised_helpers import evaluate_model_perf
+
+        # Binary case
+        y_true_binary = np.array([0, 1, 0])
+        y_pred_binary_proba = np.array([
+            [0.8, 0.2],  # Should convert to 0
+            [0.3, 0.7],  # Should convert to 1
+            [0.6, 0.4]   # Should convert to 0
+        ])
+        
+        binary_results = evaluate_model_perf("Classification", y_true_binary, y_pred_binary_proba)
+        self.assertEqual(binary_results["Accuracy"], 1.0)  # Perfect predictions after conversion
+
+        # Multiclass case
+        y_true_multi = np.array([0, 1, 2])
+        y_pred_multi_proba = np.array([
+            [0.8, 0.1, 0.1],  # Should convert to 0
+            [0.1, 0.7, 0.2],  # Should convert to 1
+            [0.2, 0.2, 0.6]   # Should convert to 2
+        ])
+        
+        multi_results = evaluate_model_perf("Classification", y_true_multi, y_pred_multi_proba)
+        self.assertEqual(multi_results["Accuracy"], 1.0)  # Perfect predictions after conversion
