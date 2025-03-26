@@ -140,6 +140,11 @@ def cross_validation_checker(
     """
     logger = get_logger(__name__, "PROD", False)
 
+    if ml_task_type is not None and ml_task_type not in ['Regression', 'Classification']:
+        error_msg = f"ml_task_type should be 'Regression' or 'Classification', got {ml_task_type}"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+
     if available_cv_methods is None:
         if ml_task_type is not None:
             available_cv_methods = CROSS_VALIDATION_METHODS[ml_task_type]
@@ -152,10 +157,7 @@ def cross_validation_checker(
                 cv_method = 'kfold'
             elif ml_task_type == "Classification":
                 cv_method = 'stratified_kfold'
-            else:
-                error_msg = f"ml_task_type should be 'Regression' or 'Classification', got {ml_task_type}"
-                logger.error(error_msg)
-                raise ValueError(error_msg)
+
     else:
         cv_method = cv_method.lower()
         if available_cv_methods.get(cv_method) is None:
