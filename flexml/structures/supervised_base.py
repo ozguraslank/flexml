@@ -1326,7 +1326,7 @@ class SupervisedBase:
 
         # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
         if not hasattr(self, 'model_tuner'):
-            if self.__ML_TASK_TYPE == 'Classification' and self.y.dtype == 'object':
+            if self.__ML_TASK_TYPE == 'Classification' and self.y.dtype in ['object', 'category']:
                 y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
                 y_encoded.index = self.y.index
             else:
