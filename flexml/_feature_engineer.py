@@ -495,7 +495,7 @@ class FeatureEngineering:
         
         # Process if target column is categorical
         target_data = self.data[self.target_col]
-        if target_data.dtype == 'object':
+        if target_data.dtype in ['object', 'category']:
             target_data = self.target_encoder.fit_transform(target_data)
 
         processed_features[self.target_col] = target_data
@@ -534,7 +534,7 @@ class FeatureEngineering:
         # Add target column if it exists in test data
         if self.target_col in test_data.columns:
             target_data = test_data[self.target_col]
-            if target_data.dtype == 'object':
+            if target_data.dtype in ['object', 'category']:
                 target_data = self.target_encoder.transform(target_data)
             processed_test_features[self.target_col] = target_data
 
