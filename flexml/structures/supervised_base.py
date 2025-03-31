@@ -189,7 +189,7 @@ class SupervisedBase:
         self.__existing_model_names = [] # To keep the existing model names in the experiment
         self.__models_raised_error = []   # To keep the models that raised error in the experiment to avoid running them again in the next cv splits
         self.__model_training_info = []
-        self.__model_stats_df = None
+        self._model_stats_df = None
         self.__sorted_model_stats_df = None
 
         # Cross-Validation Settings
@@ -467,10 +467,10 @@ class SupervisedBase:
 
         # Train only the models that haven't been trained yet
         if not reset_the_experiment and quick_to_wide_flag: 
-            self.__existing_model_names = self.__model_stats_df['Model Name'].unique() if self.__model_stats_df is not None else []
+            self.__existing_model_names = self._model_stats_df['Model Name'].unique() if self._model_stats_df is not None else []
         else:
             self.__model_training_info = []
-            self.__model_stats_df = None
+            self._model_stats_df = None
             self.__existing_model_names = []
             self.__models_raised_error = []
         
@@ -629,7 +629,7 @@ class SupervisedBase:
             for model_name, model_data in model_pack.items():
                 model_stats.append(model_data["model_stats"])
     
-        self.__model_stats_df = pd.DataFrame(model_stats)
+        self._model_stats_df = pd.DataFrame(model_stats)
         self.__sorted_model_stats_df = self.__sort_models(eval_metric)
 
         for i in range(top_n_models):
@@ -935,16 +935,16 @@ class SupervisedBase:
         pd.DataFrame
             A pandas DataFrame containing the sorted model statistics according to the desired eval_metric
         """
-        if self.__model_stats_df is None or len(self.__model_stats_df) == 0:
+        if self._model_stats_df is None or len(self._model_stats_df) == 0:
             error_msg = "There is no model performance data to sort!"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
         # Since lower is better for mae, mse and rmse in Regression tasks, they should be sorted in ascending order
         if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['MAE', 'MSE', 'RMSE', 'MAPE']:
-            return self.__model_stats_df.sort_values(by=eval_metric, ascending=True).reset_index(drop = True)
+            return self._model_stats_df.sort_values(by=eval_metric, ascending=True).reset_index(drop = True)
         else:
-            return self.__model_stats_df.sort_values(by=eval_metric, ascending=False).reset_index(drop = True)
+            return self._model_stats_df.sort_values(by=eval_metric, ascending=False).reset_index(drop = True)
 
     def show_model_stats(self, eval_metric: Optional[str] = None):
         """
@@ -1236,7 +1236,7 @@ class SupervisedBase:
                     }
                 }
             })
-            self.get_best_models() # Update the self.__model_stats_df
+            self.get_best_models() # Update the self._model_stats_df
             self.show_model_stats()
             return True
         
@@ -1302,9 +1302,9 @@ class SupervisedBase:
         if hasattr(self, 'cv_splits') and cv_method == self._last_cv_method and n_folds == self._last_n_folds and test_size == self._last_test_size and groups_col == self._last_groups_col:
             cv_obj = self.cv_splits
         else:
-            if self.__model_stats_df is not None:
+            if self._model_stats_df is not None:
                 self.__logger.warning("Validation params you've provided are different than the last run. Model performance table will be erased")
-                self.__model_stats_df = None
+                self._model_stats_df = None
                 self.__model_training_info = []
                 self.__existing_model_names = []
 
