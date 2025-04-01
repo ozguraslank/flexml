@@ -324,7 +324,8 @@ class FeatureEngineering:
         self.encoding_method_map = encoding_method_map or {}
         self.ordinal_encode_map = ordinal_encode_map or {}
         self.normalize = normalize
-
+        self.y_class_mapping = None
+        
     def setup(self, data: Optional[pd.DataFrame] = None):
         """
         Setup the feature engineering pipeline
@@ -497,7 +498,9 @@ class FeatureEngineering:
         target_data = self.data[self.target_col]
         if target_data.dtype in ['object', 'category']:
             target_data = self.target_encoder.fit_transform(target_data)
-
+            self.y_class_mapping = { # for example: {0: 'male', 1: 'female'}
+                i: label for i, label in enumerate(self.target_encoder.classes_)
+            }
         processed_features[self.target_col] = target_data
 
         return processed_features.drop(self.target_col, axis=1), processed_features[self.target_col]

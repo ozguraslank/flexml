@@ -194,12 +194,76 @@ class TestRegression(unittest.TestCase):
     
     def test_08_plot_regression_feature_importance(self):
         exp_obj = self.test_config['Regression']['exp_obj']
-        exp_obj.plot_feature_importance(exp_obj.get_best_models())
+        exp_obj.plot("CatBoostRegressor", kind="feature_importance")
 
     def test_09_plot_binary_classification_feature_importance(self):
         exp_obj = self.test_config['BinaryClassification']['exp_obj']
-        exp_obj.plot_feature_importance(exp_obj.get_best_models())
+        exp_obj.plot("XGBClassifier", kind="feature_importance")
 
     def test_10_plot_multiclass_classification_feature_importance(self):
         exp_obj = self.test_config['MulticlassClassification']['exp_obj']
-        exp_obj.plot_feature_importance(exp_obj.get_best_models())
+        exp_obj.plot("LogisticRegression", kind="feature_importance")
+
+    def test_11_plot_regression_residuals(self):
+        exp_obj = self.test_config['Regression']['exp_obj']
+        exp_obj.plot("LinearRegression", kind="residuals")
+
+    def test_12_plot_regression_prediction_error(self):
+        exp_obj = self.test_config['Regression']['exp_obj']
+        exp_obj.plot("LGBMRegressor", kind="prediction_error")
+
+    def test_13_plot_regression_shap_summary(self):
+        exp_obj = self.test_config['Regression']['exp_obj']
+        exp_obj.plot("XGBRegressor", kind="shap_summary")
+
+    def test_14_plot_regression_shap_violin(self):
+        exp_obj = self.test_config['Regression']['exp_obj']
+        exp_obj.plot("RandomForestRegressor", kind="shap_violin")
+
+    def test_15_plot_binary_classification_confusion_matrix(self):
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
+        exp_obj.plot("LogisticRegression", kind="confusion_matrix")
+
+    def test_16_plot_binary_classification_roc_curve(self):
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
+        exp_obj.plot("RandomForestClassifier", kind="roc_curve")
+
+    def test_17_plot_binary_classification_calibration_uniform(self):
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
+        exp_obj.plot("XGBClassifier", kind="calibration_curve", strategy='uniform', n_bins=10)
+
+    def test_18_plot_binary_classification_calibration_quantile(self):
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
+        exp_obj.plot("LGBMClassifier", kind="calibration_curve", strategy='quantile', n_bins=8)
+
+    def test_19_plot_binary_classification_shap_summary(self):
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
+        exp_obj.plot("CatBoostClassifier", kind="shap_summary")
+
+    def test_20_plot_binary_classification_shap_violin(self):
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
+        exp_obj.plot("XGBClassifier", kind="shap_violin")
+
+    def test_21_plot_multiclass_classification_confusion_matrix(self):
+        exp_obj = self.test_config['MulticlassClassification']['exp_obj']
+        exp_obj.plot("RandomForestClassifier", kind="confusion_matrix")
+
+    def test_22_plot_multiclass_classification_roc_curve(self):
+        exp_obj = self.test_config['MulticlassClassification']['exp_obj']
+        exp_obj.plot("LogisticRegression", kind="roc_curve")
+
+    def test_23_plot_multiclass_calibration_uniform(self):
+        exp_obj = self.test_config['MulticlassClassification']['exp_obj']
+        exp_obj.plot("XGBClassifier", kind="calibration_curve", strategy='uniform', n_bins=10)
+
+    def test_24_plot_multiclass_calibration_quantile(self):
+        exp_obj = self.test_config['MulticlassClassification']['exp_obj']
+        exp_obj.plot("CatBoostClassifier", kind="calibration_curve", strategy='quantile', n_bins=12)
+
+    def test_25_plot_multiclass_classification_shap_summary(self):
+        exp_obj = self.test_config['MulticlassClassification']['exp_obj']
+        exp_obj.plot("LGBMClassifier", kind="shap_summary")
+
+    def test_26_plot_multiclass_classification_shap_violin(self):
+        exp_obj = self.test_config['MulticlassClassification']['exp_obj']
+        exp_obj.plot("RandomForestClassifier", kind="shap_violin")

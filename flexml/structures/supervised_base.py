@@ -1,22 +1,34 @@
 import pickle
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from collections import defaultdict
+from copy import deepcopy
 from time import time
-from typing import Any, Union, Optional, Iterator, List, Dict
+from typing import Union, Optional, List, Dict
 from tqdm import tqdm
-from IPython import get_ipython
 from sklearn.pipeline import Pipeline
-from flexml.config import get_ml_models, EVALUATION_METRICS, CROSS_VALIDATION_METHODS
 from flexml.logger import get_logger
+from flexml.config import (
+    get_ml_models,
+    EVALUATION_METRICS,
+    CROSS_VALIDATION_METHODS,
+    PLOT_TYPES
+)
 from flexml.helpers import (
     eval_metric_checker,
     random_state_checker,
     cross_validation_checker,
     get_cv_splits,
     evaluate_model_perf,
-    validate_inputs
+    validate_inputs,
+    is_interactive_notebook,
+    plot_feature_importance,
+    plot_confusion_matrix,
+    plot_roc_curve,
+    plot_shap,
+    plot_residuals,
+    plot_prediction_error,
+    plot_calibration_curve
 )
 from flexml._model_tuner import ModelTuner
 from flexml._feature_engineer import FeatureEngineering
@@ -162,7 +174,12 @@ class SupervisedBase:
         self.__validate_data()
         validate_inputs(**self.feature_engineering_params)
         self.X = self.data.drop(columns=[self.target_col])
-        self.y = self.data[self.target_col] 
+        self.y = self.data[self.target_col]
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
+        self.feature_names = None
         self.num_class = len(self.y.unique())
         self.feature_engineer = FeatureEngineering(**self.feature_engineering_params)
         self.feature_engineer.setup()
@@ -179,7 +196,6 @@ class SupervisedBase:
         self.encoding_method_map = encoding_method_map
         self.ordinal_encode_map = ordinal_encode_map
         self.normalize = normalize
-        self.feature_names = self.data.drop(columns=[self.target_col]).columns
         self.full_data_feature_engineer = None
 
         # Model Preparation
@@ -190,6 +206,7 @@ class SupervisedBase:
         self.__models_raised_error = []   # To keep the models that raised error in the experiment to avoid running them again in the next cv splits
         self.__model_training_info = []
         self._model_stats_df = None
+        self._holdout_model_objects = {}
         self.__sorted_model_stats_df = None
 
         # Cross-Validation Settings
@@ -258,6 +275,36 @@ class SupervisedBase:
             error_msg = "Target column should not include null values"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
+    
+    def __prepare_holdout_data(self, test_size: Optional[float] = None):
+        """
+        Prepares the holdout data for the model training process
+        """
+        holdout_cv_splits = get_cv_splits(
+            df=self.data,
+            cv_method="holdout",
+            test_size=test_size,
+            shuffle=self.shuffle,
+            random_state=self._data_processing_random_state,
+            ml_task_type=self.__ML_TASK_TYPE
+        )[0]
+        train_labels, test_labels = holdout_cv_splits[0], holdout_cv_splits[1]
+
+        train_data = pd.concat([
+            self.X.loc[train_labels], 
+            self.y.loc[train_labels]
+        ], axis=1)
+        test_data = pd.concat([
+            self.X.loc[test_labels],
+            self.y.loc[test_labels]
+        ], axis=1)
+
+        self.holdout_data_feature_engineer = self.feature_engineer
+        self.holdout_data_feature_engineer.setup(data=train_data)
+
+        self.X_train, self.y_train = self.holdout_data_feature_engineer.fit_transform()
+        self.X_test, self.y_test = self.holdout_data_feature_engineer.transform(test_data=test_data, y_included=True)
+        self.feature_names = list(self.X_train.columns)
         
     def __prepare_models(self, experiment_size: str, num_class: int, random_state: Optional[int] = None):
         """
@@ -447,6 +494,8 @@ class SupervisedBase:
             self._last_test_size = test_size
             self._last_groups_col = groups_col
 
+            self.__prepare_holdout_data(test_size=test_size if cv_method == "holdout" else None)
+
             self.cv_splits = list(get_cv_splits(
                 df=self.data,
                 cv_method=cv_method,
@@ -473,6 +522,7 @@ class SupervisedBase:
             self._model_stats_df = None
             self.__existing_model_names = []
             self.__models_raised_error = []
+            self._holdout_model_objects = {}
         
         all_model_stats = defaultdict(list)
         total_iterations = len(cv_splits_copy) * len(self.__ML_MODELS)
@@ -548,7 +598,7 @@ class SupervisedBase:
                     except Exception as e:
                         # TODO: FlexML should add a Pipeline step for revising column names. Reference: https://stackoverflow.com/questions/60582050/lightgbmerror-do-not-support-special-json-characters-in-feature-name-the-same/62364946#62364946
                         if model_name == "LGBMClassifier" and str(e) == 'Do not support special JSON characters in feature name.':
-                            self.__logger.error("LGBMClassifier does not support special characters in column names. Please make sure that your column names are consisted of *only* English characters")
+                            self.__logger.error("LGBMClassifier does not support special characters in row/column names. Please make sure that your row/column names are consisted of *only* English characters")
                         else:
                             self.__logger.error(f"An error occurred while training {model_name}: {str(e)}")
                         self.__models_raised_error.append(model_name)
@@ -915,6 +965,132 @@ class SupervisedBase:
         model, X_test = self._predict_helper(test_data, model, full_train)
         return model.predict_proba(X_test)
 
+    def __get_holdout_model_from_stats(self, model_name: str) -> object:
+        if self._holdout_model_objects is None or self._holdout_model_objects == {}:
+            return None
+        return self._holdout_model_objects.get(model_name)
+    
+    def __add_holdout_model_to_stats(self, model: object, model_name: Optional[str] = None):
+        if model_name is None:
+            model_name = model.__class__.__name__
+
+        model_copy = deepcopy(model)
+        model_copy.fit(self.X_train, self.y_train)
+        self._holdout_model_objects[model_name] = model_copy
+        return model_copy
+    
+    def plot(self, model_name: str, kind: str = "feature_importance", **kwargs):
+        """
+        Plots the model performance graphs
+
+        - For Regression:
+            - "feature_importance"
+            - "residuals"
+            - "prediction_error"
+            - "calibration_curve"
+            - "shap_summary"
+            - "shap_violin"
+            
+        - For Classification:
+            - "feature_importance"
+            - "confusion_matrix"
+            - "roc_curve"
+            - "calibration_curve"
+            - "shap_summary"
+            - "shap_violin"
+
+        **Warning:**
+        
+        The outputs of the plots may not be equal with the results in the leaderboard If you used `cv_method` other than "holdout".
+
+        The reason is FlexML can't hold all X, y pairs across all folds and predictions of each model for each fold since It would cause high memory usage and time cost for you,
+        In order to generalize the results, FlexML uses 25% of the data for holdout validation and train the model on the rest of the data and show the results of the holdout validation. 
+    
+        If you have used "holdout" as `cv_method`, generated holdout will be based on the `test_size` param you have passed to the start_experiment() method. So, the results will be the same as the leaderboard
+
+        Parameters
+        ----------
+        model_name : str
+            The name of the model to plot
+
+        kind : str, optional
+            The type of the plot to plot
+        
+        **kwargs : dict or param=value pair, optional
+            Additional keyword arguments to pass to the plot function
+
+            `width` and `height` in pixels (default = 800 and 600) (Supported for "feature_importance", "confusion_matrix", "roc_curve", "calibration_curve")
+
+            - "feature_importance"
+                - `top_x_features` : int (default = 10)
+                    The number of top features to display in the plot
+
+            - "calibration_curve"
+                - `n_bins` : int (default = 10)
+                    The number of bins to discretize the [0, 1] interval
+                - `strategy` : str (default = 'uniform')
+                    The strategy used to define the widths of the bins
+                    - "uniform" : The bins have equal width
+                    - "quantile" : The bins have equal number of points
+        """
+        available_plot_types = PLOT_TYPES.get(self.__ML_TASK_TYPE, [])
+
+        if kind not in available_plot_types:
+            error_msg = f"Invalid plot type: {kind}. Available plot kinds: {available_plot_types}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        model = self.get_model_by_name(model_name)
+        if model is None:
+            error_msg = f"Model {model_name} not found! Available models are: {self.__model_stats_df['Model'].unique()}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        if self.__get_holdout_model_from_stats(model_name) is not None:
+            model = self.__get_holdout_model_from_stats(model_name)
+        else:
+            model = self.__add_holdout_model_to_stats(model, model_name)
+
+        # If kind expects predictions
+        if kind in ["confusion_matrix"]:
+            preds = model.predict(self.X_test)
+        elif kind in ["roc_curve", "calibration_curve"]:
+            preds = model.predict_proba(self.X_test)
+
+        graph = None
+        y_class_mapping = self.holdout_data_feature_engineer.y_class_mapping
+        if kind == "feature_importance":
+            if not hasattr(self, 'feature_names'):
+                self.feature_names = list(self.X_train.columns)
+            graph = plot_feature_importance(model, self.feature_names, **kwargs)
+        elif kind == "confusion_matrix":
+            graph = plot_confusion_matrix(self.y_test, preds, y_class_mapping, **kwargs)
+        elif kind == "roc_curve":
+            graph = plot_roc_curve(self.y_test, preds, y_class_mapping, **kwargs)
+        elif kind == "residuals":
+            graph = plot_residuals(model, self.X_train, self.y_train, self.X_test, self.y_test, **kwargs)
+        elif kind == "prediction_error":
+            graph = plot_prediction_error(model, self.X_train, self.y_train, self.X_test, self.y_test, **kwargs)
+        elif kind == "calibration_curve":
+            graph = plot_calibration_curve(self.y_test, preds, y_class_mapping, **kwargs)
+        elif 'shap' in kind:
+            graph = plot_shap(model, self.X_test, kind, **kwargs)
+        else:
+            error_msg = f"Invalid plot type: {kind}. Available plot types: {available_plot_types}"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
+        if isinstance(graph, str):
+            self.__logger.error(graph)
+            raise ValueError(graph)
+        
+        if graph is not None and not isinstance(graph, bool):
+            graph.show()
+        elif graph is not None and graph != True:
+            error_msg = f"Failed to plot {kind} for the model {model} due to an unknown error"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
     def __sort_models(self, eval_metric: Optional[str] = None):
         """
         Sorts the models based on the evaluation metric.
@@ -986,18 +1162,6 @@ class SupervisedBase:
                 is_best = (s == s.max()) & (s != float('inf')) & (s != -1)
             return ['background-color: green' if v else '' for v in is_best]
         
-        # Define a helper function to detect interactive environments including Jupyter and Colab
-        def is_interactive_notebook():
-            try:
-                # Get the shell class name
-                shell = get_ipython().__class__.__name__
-                # Both Jupyter and Colab have specific shell names
-                if shell in ['ZMQInteractiveShell', 'Shell']:  # ZMQ is for Jupyter, Shell is for Colab
-                    return True
-                return False
-            except:
-                # get_ipython() will not be defined in non-interactive environments
-                return False
         
         if eval_metric is None and hasattr(self, 'eval_metric'):
             eval_metric = self.eval_metric
@@ -1021,54 +1185,6 @@ class SupervisedBase:
             else:
                 styler = sorted_model_stats_df.style.apply(highlight_best, subset=self.__ALL_EVALUATION_METRICS)
                 display(styler) # display is only supported in interactive kernels such as Jupyter Notebook/Google Colab
-
-    def plot_feature_importance(self, model: Optional[object] = None):
-        """
-        Display feature importance for a given model
-
-        Parameters
-        ----------
-        model: object (default = None)
-            Machine learning model to display it's feature importance. If It's set to None, the best model found in the experiment will be used
-        """
-        try:
-            if model is None:
-                model = self.get_best_models()
-                if model is None:
-                    error_msg = "There is no model to display feature importance! Please start an experiment first via start_experiment()"
-                    self.__logger.error(error_msg)
-                    raise Exception(error_msg)
-
-            model_name = model.__class__.__name__
-            importance = None
-
-            # Check if the model has 'feature_importances_' attribute (tree-based models)
-            if hasattr(model, 'feature_importances_'):
-                importance = model.feature_importances_
-
-            # Check if the model has coefficients (linear models)
-            elif hasattr(model, 'coef_'):
-                importance = np.abs(model.coef_)
-
-            if importance is not None:
-                indices = np.argsort(importance)[::-1]
-                sorted_importance = importance[indices]
-                sorted_features = np.array(self.feature_names)[indices]
-
-                plt.figure(figsize=(10, 6))
-                plt.barh(range(len(sorted_importance)), sorted_importance, color=plt.cm.viridis(np.linspace(0, 1, len(sorted_importance))))
-                plt.yticks(range(len(sorted_features)), sorted_features)
-                plt.xlabel("Importance")
-                plt.ylabel("Features")
-                plt.title(f"Feature Importance for {model_name}")
-                plt.gca().invert_yaxis()
-                plt.show()
-
-            else:
-                self.__logger.info(f"Feature importance is not available for this model {(model_name)}, If you think there is a mistake, please open an issue on GitHub repository")
-
-        except Exception as e:
-            self.__logger.error(f"Could not calculate feature importance for the following model: {model}, Error: {e}")
 
     def tune_model(
         self, 
@@ -1307,6 +1423,7 @@ class SupervisedBase:
                 self._model_stats_df = None
                 self.__model_training_info = []
                 self.__existing_model_names = []
+                self._holdout_model_objects = {}
 
                 self._last_cv_method = cv_method
                 self._last_n_folds = n_folds
