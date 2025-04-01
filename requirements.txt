@@ -8,3 +8,7 @@ tqdm>=4.60.0
 optuna>=3.0.0  
 ipython>=7.11.0
 jinja2>=3.1.0
+nbformat>=5.10.0
+plotly>=6.0.0
+yellowbrick>=1.5
+shap>=0.46.0

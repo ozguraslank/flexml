@@ -68,3 +68,9 @@ FEATURE_ENGINEERING_METHODS = {
     "accepted_encoding_methods": ['label_encoder', 'onehot_encoder', 'ordinal_encoder'],
     "accepted_standardization_methods": ['standard_scaler', 'normalize_scaler', 'robust_scaler', 'quantile_transformer', 'minmax_scaler', 'maxabs_scaler']
 }
+
+# Supported Plot Types
+PLOT_TYPES = {
+    "Regression": ["feature_importance", "residuals", "prediction_error", "shap_summary","shap_violin"],
+    "Classification": ["feature_importance", "confusion_matrix", "roc_curve", "shap_summary", "shap_violin", "calibration_curve"]
+}

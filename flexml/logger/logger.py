@@ -37,6 +37,10 @@ def _logger_configuration(log_level: str, logging_to_file: bool = False):
         handlers=handlers,
         force=True
     )
+    
+    # Set some of the libraries logging to ERROR level to reduce verbosity
+    logging.getLogger('shap').setLevel(logging.ERROR)
+    logging.getLogger('sklearn').setLevel(logging.ERROR)
 
 def get_logger(
     name: str,

@@ -94,7 +94,6 @@ def get_cv_splits(
     )
 
     if cv_method == 'holdout' and not test_size:
-        logger.warning(f"No 'test_size' provided for {cv_method} method. Defaulting to 0.25")
         test_size = 0.25
 
     if cv_method == 'holdout' and test_size and n_folds:
