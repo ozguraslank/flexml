@@ -36,11 +36,11 @@ class Regression(SupervisedBase):
         Custom mapping of columns to specific imputation methods
         Example usage: {'column_name': 'mean', 'column_name2': 'mode'}
 
-    numerical_imputation_constant : float, default=0.0
-        The constant value for imputing numerical columns when 'constant' is selected
-
     categorical_imputation_constant : str, default='Unknown'
         The constant value for imputing categorical columns when 'constant' is selected
+
+    numerical_imputation_constant : float, default=0.0
+        The constant value for imputing numerical columns when 'constant' is selected
 
     encoding_method : str, default='onehot_encoder'
         Encoding method for categorical columns. Options:
