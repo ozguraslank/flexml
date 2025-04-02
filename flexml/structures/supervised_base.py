@@ -6,6 +6,8 @@ from copy import deepcopy
 from time import time
 from typing import Union, Optional, List, Dict
 from tqdm import tqdm
+from rich.console import Console
+from rich.table import Table
 from sklearn.pipeline import Pipeline
 from flexml.logger import get_logger
 from flexml.config import (
@@ -76,11 +78,11 @@ class SupervisedBase:
         Custom mapping of columns to specific imputation methods
         Example usage: {'column_name': 'mean', 'column_name2': 'mode'}
 
-    numerical_imputation_constant : float, default=0.0
-        The constant value for imputing numerical columns when 'constant' is selected
-
     categorical_imputation_constant : str, default='Unknown'
         The constant value for imputing categorical columns when 'constant' is selected
+
+    numerical_imputation_constant : float, default=0.0
+        The constant value for imputing numerical columns when 'constant' is selected
 
     encoding_method : str, default='onehot_encoder'
         Encoding method for categorical columns. Options:
@@ -132,8 +134,8 @@ class SupervisedBase:
         categorical_imputation_method: str = "mode",
         numerical_imputation_method: str = "mean", 
         column_imputation_map: Optional[Dict[str, str]] = None,
-        numerical_imputation_constant: float = 0.0,
         categorical_imputation_constant: str = "Unknown", 
+        numerical_imputation_constant: float = 0.0,
         encoding_method: str = "onehot_encoder",
         onehot_limit: int = 25,
         encoding_method_map: Optional[Dict[str, str]] = None,
@@ -161,8 +163,8 @@ class SupervisedBase:
             'categorical_imputation_method': categorical_imputation_method,
             'numerical_imputation_method': numerical_imputation_method,
             'column_imputation_map': column_imputation_map,
-            'numerical_imputation_constant': numerical_imputation_constant,
             'categorical_imputation_constant': categorical_imputation_constant,
+            'numerical_imputation_constant': numerical_imputation_constant,
             'encoding_method': encoding_method,
             'onehot_limit': onehot_limit,
             'encoding_method_map': encoding_method_map,
@@ -223,28 +225,46 @@ class SupervisedBase:
         # Track experiment history
         self._experiment_history = []
 
+        print(self.__repr__())
+
     def __repr__(self):
-        return (
-            f"SupervisedBase(\n"
-            f"data={self.data.head()},\n"
-            f"target_col={self.target_col},\n"
-            f"random_state={self._data_processing_random_state},\n"
-            f"drop_columns={self.drop_columns},\n"
-            f"categorical_imputation_method={self.categorical_imputation_method},\n"
-            f"numerical_imputation_method={self.numerical_imputation_method},\n"
-            f"column_imputation_map={self.column_imputation_map},\n"
-            f"numerical_imputation_constant={self.numerical_imputation_constant},\n"
-            f"categorical_imputation_constant={self.categorical_imputation_constant},\n"
-            f"encoding_method={self.encoding_method},\n"
-            f"onehot_limit={self.onehot_limit},\n"
-            f"encoding_method_map={self.encoding_method_map},\n"
-            f"ordinal_encode_map={self.ordinal_encode_map},\n"
-            f"normalize={self.normalize},\n"
-            f"shuffle={self.shuffle},\n"
-            f"logging_to_file={self.logging_to_file}\n"
-            f")"
-        )
-    
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Attribute", style="dim", width=30)
+        table.add_column("Value")
+
+        # Add regular fields to the table
+        table.add_row("Data Shape", str(self.data.shape))
+        table.add_row("Target Column", self.target_col)
+        table.add_row("Random State", str(self._data_processing_random_state))
+
+        # Only add "Drop Columns" if it's not empty or None
+        if self.drop_columns:
+            table.add_row("Drop Columns", ", ".join(map(str, self.drop_columns)))
+
+        table.add_row("Categorical Imputation", self.categorical_imputation_method)
+        table.add_row("Numerical Imputation", self.numerical_imputation_method)
+        table.add_row("Categorical Imputation Const", str(self.categorical_imputation_constant))
+        table.add_row("Numerical Imputation Const", str(self.numerical_imputation_constant))
+        table.add_row("Encoding Method", self.encoding_method)
+        table.add_row("One-Hot Limit", str(self.onehot_limit))
+        table.add_row("Normalize", str(self.normalize) if self.normalize else "None")
+        table.add_row("Shuffle", str(self.shuffle))
+        table.add_row("Logging to File", str(self.logging_to_file))
+
+        # Conditionally add
+        if self.column_imputation_map:
+            table.add_row("Column Imputation Map", str(self.column_imputation_map))
+        if self.encoding_method_map:
+            table.add_row("Encoding Map", str(self.encoding_method_map))
+        if self.ordinal_encode_map:
+            table.add_row("Ordinal Encode Map", str(self.ordinal_encode_map))
+
+        # Print the table to console (if using a console, such as in Jupyter)
+        console = Console()
+        console.print(table)
+
+        return ""
+
     def __validate_data(self):
         """
         Validates the input data given while initializing the Regression Class

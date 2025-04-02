@@ -251,11 +251,11 @@ class FeatureEngineering:
         Custom mapping of columns to specific imputation methods
         Example usage: {'column_name1': 'mean', 'column_name2': 'mode'}
 
-    numerical_imputation_constant : float, default=0.0
-        The constant value for imputing numerical columns when 'constant' is selected
-
     categorical_imputation_constant : str, default='Unknown'
         The constant value for imputing categorical columns when 'constant' is selected
+
+    numerical_imputation_constant : float, default=0.0
+        The constant value for imputing numerical columns when 'constant' is selected
 
     encoding_method : str, default='onehot_encoder'
         Encoding method for categorical columns. Options:
@@ -300,8 +300,8 @@ class FeatureEngineering:
         categorical_imputation_method: str = "mode",
         numerical_imputation_method: str = "mean", 
         column_imputation_map: Optional[Dict[str, str]] = None,
-        numerical_imputation_constant: float = 0.0,
         categorical_imputation_constant: str = "Unknown", 
+        numerical_imputation_constant: float = 0.0,
         encoding_method: str = "onehot_encoder",
         onehot_limit: int = 25,
         encoding_method_map: Optional[Dict[str, str]] = None,
