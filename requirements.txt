@@ -13,3 +13,4 @@ plotly>=6.0.0
 yellowbrick>=1.5
 shap>=0.46.0
 rich>=13.9.0
+setuptools; python_version>="3.12"

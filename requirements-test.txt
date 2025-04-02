@@ -12,6 +12,7 @@ nbformat>=5.10.0
 plotly>=6.0.0
 yellowbrick>=1.5
 shap>=0.46.0
+setuptools; python_version>="3.12"
 pytest>=8.0.1
 parameterized>=0.8.1
 pytest-cov>=6.0.0
