@@ -1439,7 +1439,7 @@ class SupervisedBase:
             cv_obj = self.cv_splits
         else:
             if self._model_stats_df is not None:
-                self.__logger.warning("Validation params you've provided are different than the last run. Model performance table will be erased")
+                self.__logger.warning("Validation params (e.g. cv_method, n_folds, test_size, groups_col) you've provided are different than the last run. Model performance table will be erased")
                 self._model_stats_df = None
                 self.__model_training_info = []
                 self.__existing_model_names = []
