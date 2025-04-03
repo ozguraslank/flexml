@@ -308,14 +308,14 @@ def get_ml_models(
         LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose=-1, random_state=random_state)
         CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files=False, silent=True, random_seed=random_state)
         DECISION_TREE_CLASSIFIER = DecisionTreeClassifier(random_state=random_state)
-        GRADIENT_BOOSTING_CLASSIFIER = GradientBoostingClassifier(random_state=random_state)
+        RANDOM_FOREST_CLASSIFIER = RandomForestClassifier(random_state=random_state)
         NAIVE_BAYES_CLASSIFIER = GaussianNB()
         KNN_CLASSIFIER = KNeighborsClassifier()
 
         # Wide Classification Models
         ADA_BOOST_CLASSIFIER = AdaBoostClassifier(random_state=random_state)
         HIST_GRADIENT_BOOSTING_CLASSIFIER = HistGradientBoostingClassifier(random_state=random_state)
-        RANDOM_FOREST_CLASSIFIER = RandomForestClassifier(random_state=random_state)
+        GRADIENT_BOOSTING_CLASSIFIER = GradientBoostingClassifier(random_state=random_state)
         EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier(random_state=random_state)
         QDA_CLASSIFIER = QuadraticDiscriminantAnalysis()
         LDA_CLASSIFIER = LinearDiscriminantAnalysis()
@@ -393,14 +393,15 @@ def get_ml_models(
                 }
             },
             {
-                "name": GRADIENT_BOOSTING_CLASSIFIER.__class__.__name__,
-                "model": GRADIENT_BOOSTING_CLASSIFIER,
+                "name": RANDOM_FOREST_CLASSIFIER.__class__.__name__,
+                "model": RANDOM_FOREST_CLASSIFIER,
                 "tuning_param_grid": {
-                    'n_estimators': [100, 200, 300, 500],
-                    'learning_rate': [0.01, 0.1, 0.3],
-                    'max_depth': [3, 5, 7, 9, 10],
-                    'min_samples_split': [2, 5, 10],
-                    'min_samples_leaf': [1, 2, 4]
+                    "n_estimators": [100, 200, 300, 400],
+                    "max_depth": [3, 5, 7, 9, 10],
+                    "min_samples_split": [2, 5, 10],
+                    "min_samples_leaf": [1, 2, 4],
+                    "max_features": ["sqrt", "log2", 0.3, 0.5],
+                    "bootstrap": [True, False]
                 }
             },
             {
@@ -447,15 +448,14 @@ def get_ml_models(
                 }
             },
             {
-                "name": RANDOM_FOREST_CLASSIFIER.__class__.__name__,
-                "model": RANDOM_FOREST_CLASSIFIER,
+                "name": GRADIENT_BOOSTING_CLASSIFIER.__class__.__name__,
+                "model": GRADIENT_BOOSTING_CLASSIFIER,
                 "tuning_param_grid": {
-                    "n_estimators": [100, 200, 300, 400],
-                    "max_depth": [3, 5, 7, 9, 10],
-                    "min_samples_split": [2, 5, 10],
-                    "min_samples_leaf": [1, 2, 4],
-                    "max_features": ["sqrt", "log2", 0.3, 0.5],
-                    "bootstrap": [True, False]
+                    'n_estimators': [100, 200, 300, 500],
+                    'learning_rate': [0.01, 0.1, 0.3],
+                    'max_depth': [3, 5, 7, 9, 10],
+                    'min_samples_split': [2, 5, 10],
+                    'min_samples_leaf': [1, 2, 4]
                 }
             },
             {
