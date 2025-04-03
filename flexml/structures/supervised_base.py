@@ -225,7 +225,7 @@ class SupervisedBase:
         # Track experiment history
         self._experiment_history = []
 
-        print(self.__repr__())
+        self.__repr__()
 
     def __repr__(self):
         table = Table(show_header=True, header_style="bold magenta")
