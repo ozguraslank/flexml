@@ -55,7 +55,6 @@ def get_ml_models(
         LIGHTGBM_REGRESSION = LGBMRegressor(verbose=-1, enable_categorical=True, random_state=random_state)
         CATBOOST_REGRESSION = CatBoostRegressor(allow_writing_files=False, silent=True, random_seed=random_state)
         DECISION_TREE_REGRESSION = DecisionTreeRegressor(random_state=random_state)
-        GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor(random_state=random_state)
         ELASTIC_NET_REGRESSION = ElasticNet(random_state=random_state)
         HUBER_REGRESSION = HuberRegressor()
 
@@ -64,6 +63,7 @@ def get_ml_models(
         BAYESIAN_RIDGE_REGRESSION = BayesianRidge()
         ADA_BOOST_REGRESSION = AdaBoostRegressor(random_state=random_state)
         HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor(random_state=random_state)
+        GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor(random_state=random_state)
         RANDOM_FOREST_REGRESSION = RandomForestRegressor(random_state=random_state)
         EXTRA_TREES_REGRESSION = ExtraTreesRegressor(random_state=random_state)
         OMP_REGRESSION = OrthogonalMatchingPursuit()
@@ -152,18 +152,6 @@ def get_ml_models(
                     "max_features": ["sqrt", "log2"],
                     "max_leaf_nodes": [10, 20, 30, 40],
                     "criterion": ["friedman_mse", "poisson", "absolute_error", "squared_error"]
-                }
-            },
-            {
-                "name": GRADIENT_BOOSTING_REGRESSION.__class__.__name__,
-                "model": GRADIENT_BOOSTING_REGRESSION,
-                "tuning_param_grid": {
-                    "n_estimators": [100, 200, 300, 400, 500],
-                    "max_depth": [3, 5, 7, 9, 10],
-                    "learning_rate": [0.01, 0.02, 0.05, 0.1, 0.2],
-                    "min_samples_split": [2, 5, 10],
-                    "min_samples_leaf": [1, 2, 4],
-                    "alpha": [0.1, 0.5, 0.9]
                 }
             },
             {
@@ -257,6 +245,18 @@ def get_ml_models(
                     "min_samples_leaf": [1, 5, 10],
                     "l2_regularization": [0, 1.0, 10.0],
                     "max_bins": [128, 255]
+                }
+            },
+            {
+                "name": GRADIENT_BOOSTING_REGRESSION.__class__.__name__,
+                "model": GRADIENT_BOOSTING_REGRESSION,
+                "tuning_param_grid": {
+                    "n_estimators": [100, 200, 300, 400, 500],
+                    "max_depth": [3, 5, 7, 9, 10],
+                    "learning_rate": [0.01, 0.02, 0.05, 0.1, 0.2],
+                    "min_samples_split": [2, 5, 10],
+                    "min_samples_leaf": [1, 2, 4],
+                    "alpha": [0.1, 0.5, 0.9]
                 }
             },
             {
