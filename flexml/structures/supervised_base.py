@@ -536,7 +536,7 @@ class SupervisedBase:
 
         # Train only the models that haven't been trained yet
         if not reset_the_experiment and quick_to_wide_flag: 
-            self.__existing_model_names = self._model_stats_df['Model Name'].unique() if self._model_stats_df is not None else []
+            self.__existing_model_names = list(self._model_stats_df['Model Name'].unique()) if self._model_stats_df is not None else []
         else:
             self.__model_training_info = []
             self._model_stats_df = None
