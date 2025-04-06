@@ -6,7 +6,7 @@ def parse_requirements(filename: str):
 
 setup(
     name="flexml",
-    version="1.1.0b1",
+    version="1.1.0b2",
     author="Ozgur Aslan",
     author_email="ozguraslank@gmail.com",
     description="Easy-to-use and flexible AutoML library for Python",
