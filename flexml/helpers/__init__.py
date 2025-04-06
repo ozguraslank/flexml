@@ -1,3 +1,6 @@
+from flexml.helpers.tools import check_numpy_dtype_error
+check_numpy_dtype_error() # Check cronic Colab version issue
+
 from flexml.helpers.validators import (
     eval_metric_checker,
     random_state_checker,
