@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flexml"
+version = "1.1.0b2"
+authors = [
+  { name="Ozgur Aslan", email="ozguraslank@gmail.com"},
+]
+description = "Easy-to-use and flexible AutoML library for Python"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+license = { file = "LICENSE" }
+keywords = ["AutoML", "Machine Learning", "Data Science", "Regression", "Classification"]
+classifiers = [
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: Apache Software License",
+]
+
+dependencies = [
+    "numpy>=1.21,<=1.26.4",
+    "pandas>=2.0.1,<2.2",
+    "scikit-learn>=1.5.0,<=1.5.2",
+    "xgboost>=2.0.0,<3.0.0",
+    "lightgbm>=4.0.0",
+    "catboost>=1.2.5",
+    "tqdm>=4.60.0",
+    "optuna>=3.0.0",
+    "ipython>=7.11.0",
+    "jinja2>=3.1.0",
+    "nbformat>=5.10.0",
+    "plotly>=6.0.0",
+    "yellowbrick>=1.5",
+    "shap>=0.46.0",
+    "rich>=13.9.0",
+    'setuptools; python_version>="3.12"',
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.1",
+    "parameterized>=0.8.1",
+    "pytest-cov>=6.0.0",
+    "seaborn>=0.13.0",
+]
+
+[project.urls]
+Repository = "https://github.com/ozguraslank/flexml"
+Issues = "https://github.com/ozguraslank/flexml/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["flexml*"]
+exclude = ["tests*"] 
