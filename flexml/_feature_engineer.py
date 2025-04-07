@@ -141,9 +141,14 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
             if method == "label_encoder":
                 if col in self.label_encoders:
                     encoder = self.label_encoders[col]
-                    X[col] = X[col].apply(
-                        lambda x: encoder.transform([x])[0] if x in encoder.classes_ else -1
-                    )
+                    # Identify known and unknown labels
+                    known_mask = X[col].isin(encoder.classes_)
+                    # Transform known labels
+                    if known_mask.any():
+                         X.loc[known_mask, col] = encoder.transform(X.loc[known_mask, col])
+                    # Handle unknown labels
+                    X.loc[~known_mask, col] = -1
+                    X[col] = X[col].astype(int)
 
             elif method == "onehot_encoder":
                 if col in self.onehot_encoders:
@@ -159,10 +164,15 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
             elif method == "ordinal_encoder":
                 if col in self.ordinal_encoders:
                     encoder = self.ordinal_encoders[col]
-                    categories = encoder.categories_[0]
-                    X[col] = X[col].apply(
-                        lambda x: encoder.transform(pd.DataFrame([[x]], columns=[col]))[0][0] if x in categories else -1
-                    )
+                    # Identify known and unknown categories
+                    known_categories = encoder.categories_[0]
+                    known_mask = X[col].isin(known_categories)
+                    # Transform known categories
+                    if known_mask.any():
+                         X.loc[known_mask, col] = encoder.transform(X.loc[known_mask, [col]])[:, 0]
+                    # Handle unknown categories
+                    X.loc[~known_mask, col] = -1
+                    X[col] = X[col].astype(int)
 
         return X
 
@@ -368,6 +378,11 @@ class FeatureEngineering:
         if self.encoding_method_map:
             self.encoding_method_mapper.update(self.encoding_method_map)
         
+        if self.ordinal_encode_map:
+            for col in self.ordinal_encode_map.keys():
+                if col in self.encoding_method_mapper:
+                    self.encoding_method_mapper[col] = 'ordinal_encoder'
+        
         # Initialize numerical normalization map
         if self.normalize:
             self.normalization_map = {
@@ -498,7 +513,7 @@ class FeatureEngineering:
         target_data = self.data[self.target_col]
         if target_data.dtype in ['object', 'category']:
             target_data = self.target_encoder.fit_transform(target_data)
-            self.y_class_mapping = { # for example: {0: 'male', 1: 'female'}
+            self.y_class_mapping = { # for example: {0: 'male', 1: 'female'}
                 i: label for i, label in enumerate(self.target_encoder.classes_)
             }
         processed_features[self.target_col] = target_data
