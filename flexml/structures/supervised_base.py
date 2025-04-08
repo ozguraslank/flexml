@@ -547,7 +547,11 @@ class SupervisedBase:
         all_model_stats = defaultdict(list)
         total_iterations = len(cv_splits_copy) * len(self.__ML_MODELS)
 
-        with tqdm(total=total_iterations, desc="INFO | Training Progress", bar_format="{desc}:  | {bar} | {percentage:.0f}%") as pbar:
+        with tqdm(
+            total=total_iterations,
+            desc="INFO | Training Progress",
+            bar_format="{desc} ({n_fmt}/{total_fmt}): |{bar}| {percentage:.0f}%"
+        ) as pbar:
             for train_idx, test_idx in cv_splits_copy:
                 try:
                     # Attempt to use as positional indices (For Cross-Validation splits)
