@@ -1,14 +1,46 @@
 import numpy as np
 import pandas as pd
 import optuna
+import joblib
+from joblib.parallel import BatchCompletionCallBack
+from contextlib import contextmanager
 from typing import Optional, Union
 from time import time
-from sklearn.model_selection import GridSearchCV, RandomizedSearchCV
+from sklearn.model_selection import ParameterGrid, GridSearchCV, RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from flexml.config import TUNING_METRIC_TRANSFORMATIONS
 from flexml.logger import get_logger
 from flexml.helpers import evaluate_model_perf
 from copy import deepcopy
+from tqdm import tqdm
+
+
+class TqdmBatchCompletionCallback(BatchCompletionCallBack):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+    
+    def __call__(self, *args, **kwargs):
+        self.tqdm_object.update(n=self.batch_size)
+        return super().__call__(*args, **kwargs)
+
+@contextmanager
+def tqdm_joblib(tqdm_object):
+    """Context manager to patch joblib to report into tqdm progress bar"""
+    class TqdmBatchCompletionCallback(joblib.parallel.BatchCompletionCallBack):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        def __call__(self, *args, **kwargs):
+            tqdm_object.update(n=self.batch_size)
+            return super().__call__(*args, **kwargs)
+
+    old_batch_callback = joblib.parallel.BatchCompletionCallBack
+    joblib.parallel.BatchCompletionCallBack = TqdmBatchCompletionCallback
+    try:
+        yield tqdm_object
+    finally:
+        joblib.parallel.BatchCompletionCallBack = old_batch_callback
+        tqdm_object.close()
 
 
 class ModelTuner:
@@ -276,7 +308,31 @@ class ModelTuner:
         
         try:
             t_start = time()
-            search_result = GridSearchCV(pipeline, param_grid, scoring=self.eval_metrics_in_tuning_format, refit=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X, self.y)
+            
+            # Calculate total fits
+            total_params = len(ParameterGrid(param_grid))
+            n_splits = len(list(cv))
+            total_fits = total_params * n_splits
+
+            # Create GridSearchCV object
+            search = GridSearchCV(
+                pipeline,
+                param_grid,
+                scoring=self.eval_metrics_in_tuning_format,
+                refit=eval_metric,
+                cv=cv,
+                n_jobs=n_jobs,
+                verbose=verbose
+            )
+            
+            # Fit with progress bar
+            with tqdm_joblib(tqdm(
+                total=total_fits,
+                desc="INFO | Grid Search Progress",
+                bar_format="{desc} ({n_fmt}/{total_fmt}): |{bar}| {percentage:.0f}%"
+            )):
+                search_result = search.fit(self.X, self.y)
+
             t_end = time()
             time_taken = round(t_end - t_start, 2)
 
@@ -371,32 +427,52 @@ class ModelTuner:
         model_stats = self._setup_tuning("randomized_search", pipeline, param_grid, n_iter=n_iter, n_jobs=n_jobs)
         param_grid = model_stats['tuning_param_grid']
 
-        try:
-            t_start = time()
-            search_result = RandomizedSearchCV(estimator=pipeline, param_distributions=param_grid, n_iter=n_iter, scoring=self.eval_metrics_in_tuning_format, refit=eval_metric, cv=cv, n_jobs=n_jobs, verbose=verbose).fit(self.X, self.y)
-            t_end = time()
-            time_taken = round(t_end - t_start, 2)
-
-            scores = {
-                metric: (
-                    -search_result.cv_results_[f'mean_test_{metric}'][search_result.best_index_]
-                    if metric in self.reverse_signed_eval_metrics else
-                    search_result.cv_results_[f'mean_test_{metric}'][search_result.best_index_]
-                )
-                for metric in list(self.eval_metrics_in_tuning_format.keys())
-            }
-
-            model_stats['tuned_model'] = search_result.best_estimator_.named_steps['model']
-            mean_score = search_result.cv_results_[f'mean_test_{eval_metric}'][search_result.best_index_]
-            model_stats['tuned_model_score'] = round(mean_score, 6)
-            model_stats['model_perf'] = scores
-            model_stats['time_taken_sec'] = time_taken
-            model_stats['tuned_model_evaluation_metric'] = eval_metric
-            return model_stats
+        t_start = time()
         
-        except Exception as e:
-            self.logger.error(f"Error while tuning the model with RandomizedSearchCV, Error: {e}")
-            return None
+        # Calculate total fits
+        n_splits = len(list(cv))
+        total_fits = n_iter * n_splits
+
+        # Create RandomizedSearchCV object
+        search = RandomizedSearchCV(
+            estimator=pipeline,
+            param_distributions=param_grid, 
+            n_iter=n_iter,
+            scoring=self.eval_metrics_in_tuning_format, 
+            refit=eval_metric,
+            cv=cv,
+            n_jobs=n_jobs,
+            verbose=verbose
+        )
+        
+        # Fit with progress bar
+        with tqdm_joblib(tqdm(
+            total=total_fits,
+            desc="INFO | Random Search Progress",
+            bar_format="{desc} ({n_fmt}/{total_fmt}): |{bar}| {percentage:.0f}%"
+        )):
+            search_result = search.fit(self.X, self.y)
+
+        t_end = time()
+        time_taken = round(t_end - t_start, 2)
+
+        scores = {
+            metric: (
+                -search_result.cv_results_[f'mean_test_{metric}'][search_result.best_index_]
+                if metric in self.reverse_signed_eval_metrics else
+                search_result.cv_results_[f'mean_test_{metric}'][search_result.best_index_]
+            )
+            for metric in list(self.eval_metrics_in_tuning_format.keys())
+        }
+
+        model_stats['tuned_model'] = search_result.best_estimator_.named_steps['model']
+        mean_score = search_result.cv_results_[f'mean_test_{eval_metric}'][search_result.best_index_]
+        model_stats['tuned_model_score'] = round(mean_score, 6)
+        model_stats['model_perf'] = scores
+        model_stats['time_taken_sec'] = time_taken
+        model_stats['tuned_model_evaluation_metric'] = eval_metric
+        return model_stats
+
         
     def optuna_search(
         self,
@@ -564,7 +640,7 @@ class ModelTuner:
             # Perform Optuna optimization
             t_start = time()
             study = optuna.create_study(direction=study_direction)
-            study.optimize(objective, n_trials=n_iter, timeout=timeout, n_jobs=n_jobs)
+            study.optimize(objective, n_trials=n_iter, timeout=timeout, n_jobs=n_jobs, show_progress_bar=True)
             t_end = time()
 
             # Update model stats
