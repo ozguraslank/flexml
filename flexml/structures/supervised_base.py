@@ -550,7 +550,7 @@ class SupervisedBase:
         with tqdm(
             total=total_iterations,
             desc="INFO | Training Progress",
-            bar_format="{desc} ({n_fmt}/{total_fmt}): |{bar}| {percentage:.0f}%"
+            bar_format="{desc}: |{bar}| {percentage:.0f}%"
         ) as pbar:
             for train_idx, test_idx in cv_splits_copy:
                 try:
