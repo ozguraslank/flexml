@@ -1397,18 +1397,30 @@ class SupervisedBase:
             eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
-        # Check cross-validation method params
-        cv_method = cross_validation_checker(
-            df=self.data,
-            cv_method=cv_method,
-            n_folds=n_folds,
-            test_size=test_size,
-            groups_col=groups_col,
-            available_cv_methods=self.__AVAILABLE_CV_METHODS,
-            ml_task_type=self.__ML_TASK_TYPE
-        )
-        if cv_method != "holdout" and n_folds is None:
-            n_folds = 5
+        # If the user doesn't pass any cross-validation method params, use the last used ones
+        if (
+            cv_method is None and hasattr(self, '_last_cv_method') and \
+            n_folds is None and hasattr(self, '_last_n_folds') and \
+            test_size is None and hasattr(self, '_last_test_size') and \
+            groups_col is None and hasattr(self, '_last_groups_col')
+        ):
+            cv_method = self._last_cv_method
+            n_folds = self._last_n_folds
+            test_size = self._last_test_size
+            groups_col = self._last_groups_col
+
+        else:
+            cv_method = cross_validation_checker(
+                df=self.data,
+                cv_method=cv_method,
+                n_folds=n_folds,
+                test_size=test_size,
+                groups_col=groups_col,
+                available_cv_methods=self.__AVAILABLE_CV_METHODS,
+                ml_task_type=self.__ML_TASK_TYPE
+            )
+            if cv_method != "holdout" and n_folds is None:
+                n_folds = 5
 
         # Get the best model If the user doesn't pass any model object
         if model is None:
