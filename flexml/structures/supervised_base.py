@@ -1380,6 +1380,11 @@ class SupervisedBase:
             self.show_model_stats()
             return True
         
+        if self._model_stats_df is None or len(self._model_stats_df) == 0:
+            error_msg = "Model leaderboard is empty! Please start an experiment first via start_experiment()"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         if not isinstance(model, object) and not isinstance(model, str):
             error_msg = f"model parameter should be an object or a string, got {type(model)}"
             self.__logger.error(error_msg)
@@ -1434,9 +1439,14 @@ class SupervisedBase:
         if param_grid is None:
             try:
                 param_grid = [ml_model for ml_model in self.__ML_MODELS if ml_model['name'] == model.__class__.__name__][0]['tuning_param_grid']
+
+            except IndexError:
+                error_msg = f"{model}'s tuning param_grid is not found (Is it a model not located in the model leaderboard?), please then pass it manually via 'param_grid' parameter"
+                self.__logger.error(error_msg)
+                raise ValueError(error_msg)
                 
             except AttributeError:
-                error_msg = f"{model}'s tuning config is not found in the config, please pass it manually via 'param_grid' parameter"
+                error_msg = f"{model}'s tuning param_grid is not found in the config, please pass it manually via 'param_grid' parameter"
                 self.__logger.error(error_msg)
                 raise ValueError(error_msg)
         
