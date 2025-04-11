@@ -629,7 +629,7 @@ class ModelTuner:
             mean_score = avg_metrics.get(eval_metric, float('inf'))
 
             # Update the best score and model
-            if model_stats['tuned_model_score'] is None or mean_score > model_stats['tuned_model_score']:
+            if model_stats['tuned_model_score'] is None or (study_direction == "maximize" and mean_score > model_stats['tuned_model_score']) or (study_direction == "minimize" and mean_score < model_stats['tuned_model_score']):
                 model_stats['tuned_model_score'] = round(mean_score, 6)
                 model_stats['tuned_model'] = test_model
                 model_stats['model_perf'] = avg_metrics
