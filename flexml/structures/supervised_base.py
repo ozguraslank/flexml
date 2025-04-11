@@ -228,8 +228,11 @@ class SupervisedBase:
         self.__repr__()
 
     def __repr__(self):
+        any_imputation_method_constant_flag = self.categorical_imputation_method == "constant" or self.numerical_imputation_method == "constant"
+        width = 30 if any_imputation_method_constant_flag else 25
+
         table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Attribute", style="dim", width=30)
+        table.add_column("Attribute", style="dim", width=width)
         table.add_column("Value")
 
         # Add regular fields to the table
@@ -243,8 +246,10 @@ class SupervisedBase:
 
         table.add_row("Categorical Imputation", self.categorical_imputation_method)
         table.add_row("Numerical Imputation", self.numerical_imputation_method)
-        table.add_row("Categorical Imputation Const", str(self.categorical_imputation_constant))
-        table.add_row("Numerical Imputation Const", str(self.numerical_imputation_constant))
+        if self.categorical_imputation_method == "constant":
+            table.add_row("Categorical Imputation Const", str(self.categorical_imputation_constant))
+        if self.numerical_imputation_method == "constant":
+            table.add_row("Numerical Imputation Const", str(self.numerical_imputation_constant))
         table.add_row("Encoding Method", self.encoding_method)
         table.add_row("One-Hot Limit", str(self.onehot_limit))
         table.add_row("Normalize", str(self.normalize) if self.normalize else "None")
