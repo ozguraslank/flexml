@@ -16,7 +16,7 @@ At the moment, FlexML supports only regression and classification tasks and offe
 To install FlexML 1.1.0 pre-release, you can use pip:
 
 ```bash
-pip install flexml==1.1.0rc0
+pip install flexml==1.1.0rc1
 ```
 
 ## Start Guide with Regression Experiment
