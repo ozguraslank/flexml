@@ -329,7 +329,7 @@ class ModelTuner:
             with tqdm_joblib(tqdm(
                 total=total_fits,
                 desc="INFO | Grid Search Progress",
-                bar_format="{desc} ({n_fmt}/{total_fmt}): |{bar}| {percentage:.0f}%"
+                bar_format="{desc}: |{bar}| {percentage:.0f}%"
             )):
                 search_result = search.fit(self.X, self.y)
 
@@ -448,8 +448,8 @@ class ModelTuner:
         # Fit with progress bar
         with tqdm_joblib(tqdm(
             total=total_fits,
-            desc="INFO | Random Search Progress",
-            bar_format="{desc} ({n_fmt}/{total_fmt}): |{bar}| {percentage:.0f}%"
+            desc="INFO | Randomized Search Progress",
+            bar_format="{desc}: |{bar}| {percentage:.0f}%"
         )):
             search_result = search.fit(self.X, self.y)
 
