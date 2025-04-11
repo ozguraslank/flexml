@@ -83,7 +83,7 @@ class TestMLModels(unittest.TestCase):
             )
 
         except Exception as e:
-            if 'Invalid top_n_models value' in str(e):
+            if 'Model leaderboard is empty!' in str(e):
                 # Since we don't use the start_experiment() function, there will be no saved models and this error will be raised --
                 # Because, we call _show_tuning_report when tune_model operation is done and that function calls get_best_models() function that calls __top_n_models_checker() where the error will be raised :)
                 pass

@@ -550,7 +550,7 @@ class SupervisedBase:
         with tqdm(
             total=total_iterations,
             desc="INFO | Training Progress",
-            bar_format="{desc} ({n_fmt}/{total_fmt}): |{bar}| {percentage:.0f}%"
+            bar_format="{desc}: |{bar}| {percentage:.0f}%"
         ) as pbar:
             for train_idx, test_idx in cv_splits_copy:
                 try:
@@ -1380,6 +1380,11 @@ class SupervisedBase:
             self.show_model_stats()
             return True
         
+        if self._model_stats_df is None or len(self._model_stats_df) == 0:
+            error_msg = "Model leaderboard is empty! Please start an experiment first via start_experiment()"
+            self.__logger.error(error_msg)
+            raise ValueError(error_msg)
+        
         if not isinstance(model, object) and not isinstance(model, str):
             error_msg = f"model parameter should be an object or a string, got {type(model)}"
             self.__logger.error(error_msg)
@@ -1397,18 +1402,30 @@ class SupervisedBase:
             eval_metric = self.eval_metric
         eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
-        # Check cross-validation method params
-        cv_method = cross_validation_checker(
-            df=self.data,
-            cv_method=cv_method,
-            n_folds=n_folds,
-            test_size=test_size,
-            groups_col=groups_col,
-            available_cv_methods=self.__AVAILABLE_CV_METHODS,
-            ml_task_type=self.__ML_TASK_TYPE
-        )
-        if cv_method != "holdout" and n_folds is None:
-            n_folds = 5
+        # If the user doesn't pass any cross-validation method params, use the last used ones
+        if (
+            cv_method is None and hasattr(self, '_last_cv_method') and \
+            n_folds is None and hasattr(self, '_last_n_folds') and \
+            test_size is None and hasattr(self, '_last_test_size') and \
+            groups_col is None and hasattr(self, '_last_groups_col')
+        ):
+            cv_method = self._last_cv_method
+            n_folds = self._last_n_folds
+            test_size = self._last_test_size
+            groups_col = self._last_groups_col
+
+        else:
+            cv_method = cross_validation_checker(
+                df=self.data,
+                cv_method=cv_method,
+                n_folds=n_folds,
+                test_size=test_size,
+                groups_col=groups_col,
+                available_cv_methods=self.__AVAILABLE_CV_METHODS,
+                ml_task_type=self.__ML_TASK_TYPE
+            )
+            if cv_method != "holdout" and n_folds is None:
+                n_folds = 5
 
         # Get the best model If the user doesn't pass any model object
         if model is None:
@@ -1422,9 +1439,14 @@ class SupervisedBase:
         if param_grid is None:
             try:
                 param_grid = [ml_model for ml_model in self.__ML_MODELS if ml_model['name'] == model.__class__.__name__][0]['tuning_param_grid']
+
+            except IndexError:
+                error_msg = f"{model}'s tuning param_grid is not found (Is it a model not located in the model leaderboard?), please then pass it manually via 'param_grid' parameter"
+                self.__logger.error(error_msg)
+                raise ValueError(error_msg)
                 
             except AttributeError:
-                error_msg = f"{model}'s tuning config is not found in the config, please pass it manually via 'param_grid' parameter"
+                error_msg = f"{model}'s tuning param_grid is not found in the config, please pass it manually via 'param_grid' parameter"
                 self.__logger.error(error_msg)
                 raise ValueError(error_msg)
         

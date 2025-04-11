@@ -1,5 +1,7 @@
 from IPython import get_ipython
 from flexml.logger import get_logger
+import warnings
+warnings.filterwarnings("ignore")
 
 
 def is_interactive_notebook():

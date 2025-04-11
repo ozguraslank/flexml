@@ -444,6 +444,18 @@ class FeatureEngineering:
                     "Recommended to either process or drop this column"
                 )
 
+        # Find the columns that exceeds one_hot_limit
+        columns_exceeding_limit = self._anomaly_onehot_limit_finder()
+        # remove columns_to_consider from columns_exceeding_limit to avoid duplicate warnings
+        columns_exceeding_limit = {k: v for k, v in columns_exceeding_limit.items() if k not in columns_to_consider}
+        if columns_exceeding_limit:
+            for column, count in columns_exceeding_limit.items():
+                self.logger.warning(
+                    f"Column '{column}' has {count} unique values. "
+                    "Consider operations like increasing value of 'onehot_limit', "
+                    "changing the encoding method or processing the column"
+                )
+
     def _id_finder(self) -> list:
         """
         Identifies potential ID columns by checking if values in the first 100 rows 
@@ -463,7 +475,7 @@ class FeatureEngineering:
         
         return potential_ids
 
-    def _anomaly_unique_values_finder(self, threshold: float = 0.5) -> list:
+    def _anomaly_unique_values_finder(self, threshold: float = 0.5) -> dict:
         """
         Identifies categorical columns where the ratio of unique values to non-null rows
         exceeds the given threshold
@@ -475,8 +487,8 @@ class FeatureEngineering:
 
         Returns
         -------
-        list
-            List of column names that meet the condition
+        dict
+            Dictionary of column names and their unique value ratios
         """
         columns_above_threshold = {}
 
@@ -487,6 +499,23 @@ class FeatureEngineering:
                 unique_ratio = self.data[column].nunique() / non_null_count
                 if unique_ratio > threshold:
                     columns_above_threshold[column] = unique_ratio
+
+        return columns_above_threshold
+    
+    def _anomaly_onehot_limit_finder(self) -> dict:
+        """
+        Identifies categorical columns where the number of unique values exceeds the one_hot_limit
+
+        Returns
+        -------
+        dict
+            Dictionary of column names and their unique value counts
+        """
+        columns_above_threshold = {}
+        
+        for column in self.categorical_columns:
+            if self.data[column].nunique() > self.onehot_limit:
+                columns_above_threshold[column] = self.data[column].nunique()
 
         return columns_above_threshold
     
