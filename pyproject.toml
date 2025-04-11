@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flexml"
-version = "1.1.0rc1"
+version = "1.1.0rc2"
 authors = [
   { name="Ozgur Aslan", email="ozguraslank@gmail.com"},
 ]

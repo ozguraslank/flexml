@@ -8,6 +8,6 @@ check_numpy_dtype_error() # Check cronic Colab version issue
 from .regression import Regression
 from .classification import Classification
 
-__version__ = "1.1.0rc1"
+__version__ = "1.1.0rc2"
 
 __all__ = ["Regression", "Classification"]
