@@ -441,7 +441,7 @@ class FeatureEngineering:
             for column, ratio in columns_to_consider.items():
                 self.logger.warning(
                     f"Column '{column}' has too many unique values ({ratio:.2%}). "
-                    "Recommended to either process or drop this column"
+                    "Recommended to either process or drop this column via 'drop_columns'"
                 )
 
         # Find the columns that exceeds one_hot_limit
