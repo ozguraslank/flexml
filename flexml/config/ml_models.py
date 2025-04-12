@@ -7,7 +7,8 @@ warnings.filterwarnings("ignore")
 def get_ml_models(
     ml_task_type: str,
     num_class: Optional[int] = None,
-    random_state: Optional[int] = None
+    random_state: Optional[int] = None,
+    n_jobs: Optional[int] = -1
 ) -> dict:
     """
     Returns a dictionary of quick and wide regression and classification models
@@ -23,6 +24,9 @@ def get_ml_models(
 
     random_state : int, optional (default=None)
         The random state value for the model training process
+
+    n_jobs : int, optional (default=-1)
+        The number of jobs to run in parallel. -1 means using all processors
     
     Returns
     -------
@@ -48,24 +52,24 @@ def get_ml_models(
 
 
         # Quick Regression Models
-        LINEAR_REGRESSION = LinearRegression()
+        LINEAR_REGRESSION = LinearRegression(n_jobs=n_jobs)
         LASSO_REGRESSION = Lasso(random_state=random_state)
         RIDGE_REGRESSION = Ridge(random_state=random_state)
-        XGBOOST_REGRESSION = XGBRegressor(enable_categorical=True, random_state=random_state)
-        LIGHTGBM_REGRESSION = LGBMRegressor(verbose=-1, enable_categorical=True, random_state=random_state)
-        CATBOOST_REGRESSION = CatBoostRegressor(allow_writing_files=False, silent=True, random_seed=random_state)
+        XGBOOST_REGRESSION = XGBRegressor(enable_categorical=True, random_state=random_state, n_jobs=n_jobs)
+        LIGHTGBM_REGRESSION = LGBMRegressor(verbose=-1, enable_categorical=True, random_state=random_state, n_jobs=n_jobs)
+        CATBOOST_REGRESSION = CatBoostRegressor(allow_writing_files=False, silent=True, random_seed=random_state, thread_count=n_jobs)
         DECISION_TREE_REGRESSION = DecisionTreeRegressor(random_state=random_state)
         ELASTIC_NET_REGRESSION = ElasticNet(random_state=random_state)
         HUBER_REGRESSION = HuberRegressor()
 
         # Wide Regression Models
-        KNN_REGRESSION = KNeighborsRegressor() 
+        KNN_REGRESSION = KNeighborsRegressor(n_jobs=n_jobs) 
         BAYESIAN_RIDGE_REGRESSION = BayesianRidge()
         ADA_BOOST_REGRESSION = AdaBoostRegressor(random_state=random_state)
         HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor(random_state=random_state)
         GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor(random_state=random_state)
-        RANDOM_FOREST_REGRESSION = RandomForestRegressor(random_state=random_state)
-        EXTRA_TREES_REGRESSION = ExtraTreesRegressor(random_state=random_state)
+        RANDOM_FOREST_REGRESSION = RandomForestRegressor(random_state=random_state, n_jobs=n_jobs)
+        EXTRA_TREES_REGRESSION = ExtraTreesRegressor(random_state=random_state, n_jobs=n_jobs)
         OMP_REGRESSION = OrthogonalMatchingPursuit()
         MLP_REGRESSION = MLPRegressor(
             solver='lbfgs',
@@ -303,20 +307,20 @@ def get_ml_models(
             xgb_objective = "binary:logistic"
 
         # Quick Classification Models
-        LOGISTIC_REGRESSION = LogisticRegression(max_iter=1000, random_state=random_state)
-        XGBOOST_CLASSIFIER = XGBClassifier(objective=xgb_objective, random_state=random_state)
-        LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose=-1, random_state=random_state)
-        CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files=False, silent=True, random_seed=random_state)
+        LOGISTIC_REGRESSION = LogisticRegression(max_iter=1000, random_state=random_state, n_jobs=n_jobs)
+        XGBOOST_CLASSIFIER = XGBClassifier(objective=xgb_objective, random_state=random_state, n_jobs=n_jobs)
+        LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose=-1, random_state=random_state, n_jobs=n_jobs)
+        CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files=False, silent=True, random_seed=random_state, thread_count=n_jobs)
         DECISION_TREE_CLASSIFIER = DecisionTreeClassifier(random_state=random_state)
-        RANDOM_FOREST_CLASSIFIER = RandomForestClassifier(random_state=random_state)
+        RANDOM_FOREST_CLASSIFIER = RandomForestClassifier(random_state=random_state, n_jobs=n_jobs)
         NAIVE_BAYES_CLASSIFIER = GaussianNB()
-        KNN_CLASSIFIER = KNeighborsClassifier()
+        KNN_CLASSIFIER = KNeighborsClassifier(n_jobs=n_jobs)
 
         # Wide Classification Models
         ADA_BOOST_CLASSIFIER = AdaBoostClassifier(random_state=random_state)
         HIST_GRADIENT_BOOSTING_CLASSIFIER = HistGradientBoostingClassifier(random_state=random_state)
         GRADIENT_BOOSTING_CLASSIFIER = GradientBoostingClassifier(random_state=random_state)
-        EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier(random_state=random_state)
+        EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier(random_state=random_state, n_jobs=n_jobs)
         QDA_CLASSIFIER = QuadraticDiscriminantAnalysis()
         LDA_CLASSIFIER = LinearDiscriminantAnalysis()
         MLP_CLASSIFIER = MLPClassifier(
