@@ -331,7 +331,7 @@ class SupervisedBase:
         self.X_test, self.y_test = self.holdout_data_feature_engineer.transform(test_data=test_data, y_included=True)
         self.feature_names = list(self.X_train.columns)
         
-    def __prepare_models(self, experiment_size: str, num_class: int, random_state: Optional[int] = None):
+    def __prepare_models(self, experiment_size: str, num_class: int, random_state: Optional[int] = None, n_jobs: Optional[int] = -1):
         """
         Prepares the models based on the selected experiment size ('quick' or 'wide')
 
@@ -345,6 +345,9 @@ class SupervisedBase:
 
         random_state : int, optional (default=None)
             The random state value for the model training process
+
+        n_jobs : int, optional (default=-1)
+            The number of jobs to run in parallel. -1 means using all processors
         """
         if experiment_size not in ['quick', 'wide']:
             error_msg = f"experiment_size expected to be either 'quick' or 'wide', got {experiment_size}"
@@ -354,7 +357,8 @@ class SupervisedBase:
         self.__ML_MODELS = get_ml_models(
             ml_task_type=self.__ML_TASK_TYPE,
             num_class=num_class,
-            random_state=random_state
+            random_state=random_state,
+            n_jobs=n_jobs
         ).get(experiment_size.upper())
     
     def __top_n_models_checker(self, top_n_models: Optional[int]) -> int:
@@ -419,7 +423,8 @@ class SupervisedBase:
         test_size: Optional[float] = None,
         eval_metric: Optional[str] = None,
         random_state: Optional[int] = 42,
-        groups_col: Optional[str] = None
+        groups_col: Optional[str] = None,
+        n_jobs: Optional[int] = -1
     ):
         """
         Trains machine learning algorithms and evaluates them based on the specified evaluation metric
@@ -470,6 +475,9 @@ class SupervisedBase:
 
         groups_col : str, optional
             Column name for group-based cross-validation methods
+
+        n_jobs : int, optional (default=-1)
+            The number of jobs to run in parallel. -1 means using all processors
 
         Notes for Cross-Validation Methods
         ----------------------------------
@@ -534,7 +542,7 @@ class SupervisedBase:
                 y_array = self.data[self.target_col]
             ))
 
-        self.__prepare_models(experiment_size, self.num_class, random_state)
+        self.__prepare_models(experiment_size, self.num_class, random_state, n_jobs)
         cv_splits_copy = self.cv_splits.copy() # Will be used for trainings
 
         self.__logger.info(f"[PROCESS] Training the ML models with {cv_method} validation")
