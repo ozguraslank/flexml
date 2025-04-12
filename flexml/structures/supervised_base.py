@@ -198,7 +198,6 @@ class SupervisedBase:
         self.encoding_method_map = encoding_method_map
         self.ordinal_encode_map = ordinal_encode_map
         self.normalize = normalize
-        self.full_data_feature_engineer = None
 
         # Model Preparation
         self.__ML_MODELS = []
@@ -324,12 +323,12 @@ class SupervisedBase:
             self.y.loc[test_labels]
         ], axis=1)
 
-        self.holdout_data_feature_engineer = self.feature_engineer
-        self.holdout_data_feature_engineer.setup(data=train_data)
+        self.feature_engineer.setup(data=train_data)
 
-        self.X_train, self.y_train = self.holdout_data_feature_engineer.fit_transform()
-        self.X_test, self.y_test = self.holdout_data_feature_engineer.transform(test_data=test_data, y_included=True)
+        self.X_train, self.y_train = self.feature_engineer.fit_transform()
+        self.X_test, self.y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
         self.feature_names = list(self.X_train.columns)
+        self.y_class_mapping = self.feature_engineer.y_class_mapping
         
     def __prepare_models(self, experiment_size: str, num_class: int, random_state: Optional[int] = None, n_jobs: Optional[int] = -1):
         """
@@ -769,19 +768,6 @@ class SupervisedBase:
             self.__logger.warning(f"Only .pkl files are supported. Changing '{save_path}' to '{save_path.rsplit('.', 1)[0]}.pkl'.")
             save_path = save_path.rsplit('.', 1)[0] + ".pkl"
 
-        # Initialize pipeline steps
-        pipeline_steps = []
-
-        # Initialize and setup feature engineering if needed
-        if not model_only or full_train:
-            if self.full_data_feature_engineer is None:
-                self.full_data_feature_engineer = FeatureEngineering(**self.feature_engineering_params)
-                self.full_data_feature_engineer.setup()
-            
-            if not model_only:
-                # Add the feature engineering pipeline directly
-                pipeline_steps.extend(self.full_data_feature_engineer.pipeline.steps)
-
         # Fetch the best model if no specific model is provided
         if model is None:
             model = self.get_best_models()
@@ -799,6 +785,14 @@ class SupervisedBase:
                 error_msg = f"Model with name '{model}' not found."
                 self.__logger.error(error_msg)
                 raise ValueError(error_msg)
+            
+        # Initialize pipeline steps
+        pipeline_steps = []
+
+        # Initialize and setup feature engineering if needed
+        if not model_only:
+            # Add the feature engineering pipeline directly
+            pipeline_steps.extend(self.feature_engineer.pipeline.steps)
 
         # Handle full training scenario if required
         model_name = model.__class__.__name__
@@ -806,7 +800,8 @@ class SupervisedBase:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             if not already_trained:
                 self.__logger.info("Training the model using the whole data")
-                X_train, y_train = self.full_data_feature_engineer.fit_transform()
+                self.feature_engineer.setup(data=self.data)
+                X_train, y_train = self.feature_engineer.fit_transform()
                 model.fit(X_train, y_train)
 
                 # find the model in leaderboard and update the full_train to True, and update the model object in there
@@ -909,9 +904,6 @@ class SupervisedBase:
         elif isinstance(model, str):
             model = self.get_model_by_name(model)
             model_taken_from_leaderboard = True
-        if self.full_data_feature_engineer is None:
-            self.full_data_feature_engineer = FeatureEngineering(**self.feature_engineering_params)
-            self.full_data_feature_engineer.setup()
         
         model_name = model.__class__.__name__
         # Prepare training data if needed
@@ -920,7 +912,8 @@ class SupervisedBase:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             if not already_trained:
                 self.__logger.info("Training the model using the whole data")
-                X_train, y_train = self.full_data_feature_engineer.fit_transform()
+                self.feature_engineer.setup(data=self.data)
+                X_train, y_train = self.feature_engineer.fit_transform()
                 model.fit(X_train, y_train)
 
                 # find the model in leaderboard and update the full_train to True, and update the model object in there
@@ -932,7 +925,7 @@ class SupervisedBase:
                             break
                 # Update leaderboard
                 self.get_best_models()
-            X_test = self.full_data_feature_engineer.transform(test_data)
+            X_test = self.feature_engineer.transform(test_data)
 
         else:
             X_test = self.feature_engineer.transform(test_data)
@@ -965,7 +958,7 @@ class SupervisedBase:
         """
         model, X_test = self._predict_helper(test_data, model, full_train)
         try:
-            predictions = self.full_data_feature_engineer.target_encoder.inverse_transform(model.predict(X_test))
+            predictions = self.feature_engineer.target_encoder.inverse_transform(model.predict(X_test))
         except AttributeError:
             predictions = model.predict(X_test)
 
@@ -1095,21 +1088,21 @@ class SupervisedBase:
             preds = model.predict_proba(self.X_test)
 
         graph = None
-        y_class_mapping = self.holdout_data_feature_engineer.y_class_mapping
+
         if kind == "feature_importance":
             if not hasattr(self, 'feature_names'):
                 self.feature_names = list(self.X_train.columns)
             graph = plot_feature_importance(model, self.feature_names, **kwargs)
         elif kind == "confusion_matrix":
-            graph = plot_confusion_matrix(self.y_test, preds, y_class_mapping, **kwargs)
+            graph = plot_confusion_matrix(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif kind == "roc_curve":
-            graph = plot_roc_curve(self.y_test, preds, y_class_mapping, **kwargs)
+            graph = plot_roc_curve(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif kind == "residuals":
             graph = plot_residuals(model, self.X_train, self.y_train, self.X_test, self.y_test, **kwargs)
         elif kind == "prediction_error":
             graph = plot_prediction_error(model, self.X_train, self.y_train, self.X_test, self.y_test, **kwargs)
         elif kind == "calibration_curve":
-            graph = plot_calibration_curve(self.y_test, preds, y_class_mapping, **kwargs)
+            graph = plot_calibration_curve(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif 'shap' in kind:
             graph = plot_shap(model, self.X_test, kind, **kwargs)
         else:
@@ -1509,9 +1502,7 @@ class SupervisedBase:
                 y_encoded = self.y # No need to encode the target for regression or if the target is already encoded
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, y_encoded, self.logging_to_file)
 
-        feature_engineer = FeatureEngineering(**self.feature_engineering_params)
-        feature_engineer.setup()
-        pipeline = feature_engineer.pipeline
+        pipeline = self.feature_engineer.pipeline
         pipeline = Pipeline(steps=pipeline.steps + [('model', model)])
 
         self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")
@@ -1529,7 +1520,7 @@ class SupervisedBase:
         elif tuning_method == "randomized_search":
             tuning_result = self.model_tuner.random_search(
                 pipeline=pipeline,
-                param_grid=param_grid,
+                param_grid=param_grid,      
                 eval_metric=eval_metric,
                 n_iter=n_iter,
                 cv=cv_obj,
@@ -1540,7 +1531,7 @@ class SupervisedBase:
         elif tuning_method == "optuna":
             tuning_result = self.model_tuner.optuna_search(
                 model=model,
-                feature_engineer=feature_engineer,
+                feature_engineer=self.feature_engineer,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 cv=cv_obj,
