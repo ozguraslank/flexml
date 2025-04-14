@@ -601,7 +601,13 @@ class ModelTuner:
                     info_msg = f"{param_name} parameter is not added to tuning since its type is not supported by Optuna."
                     self.logger.info(info_msg)
 
-            new_pipeline = Pipeline(steps=pipeline.steps[:-1] + [('model', clone(pipeline.named_steps['model']).set_params(**params))]) # Remove the old model from the pipeline and add the new one
+            # Clone the entire pipeline and its steps to avoid shared state between trials
+            preprocessing_steps = [(name, clone(step)) for name, step in pipeline.steps[:-1]]
+            new_pipeline = Pipeline(
+                steps=preprocessing_steps + [
+                    ('model', clone(pipeline.named_steps['model']).set_params(**params))
+                ]
+            )
 
             # Perform cross-validation and calculate the score
             scores = []
