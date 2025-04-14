@@ -1518,7 +1518,7 @@ class SupervisedBase:
             )
             
         elif tuning_method == "randomized_search":
-            tuning_result = self.model_tuner.random_search(
+            tuning_result = self.model_tuner.randomized_search(
                 pipeline=pipeline,
                 param_grid=param_grid,      
                 eval_metric=eval_metric,

@@ -357,7 +357,7 @@ class ModelTuner:
             self.logger.error(f"Error while tuning the model with GridSearchCV, Error: {e}")
             return None
     
-    def random_search(
+    def randomized_search(
         self,
         pipeline: Pipeline,
         param_grid: dict,
@@ -368,7 +368,7 @@ class ModelTuner:
         verbose: int = 0
     ) -> Optional[dict]:
         """
-        Implements random search hyperparameter optimization on the giveen machine learning model
+        Implements randomized search hyperparameter optimization on the giveen machine learning model
 
         Parameters
         ----------
