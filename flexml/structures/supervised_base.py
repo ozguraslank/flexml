@@ -724,6 +724,7 @@ class SupervisedBase:
                 model_name = list(model_info.keys())[0]
                 if model_name == searched_model_name:
                     best_models.append(model_info[model_name]["model"])
+                    self.__last_searched_model_name = model_name # Save the model name so that If funcs like save_model() or predict() are called with model=None, FlexML will know the retrieved model object's "label"
                     if top_n_models == 1: # If top_n_models is 1 and there are more than 1 model with the same name, avoid user to get multiple models by stopping the loop
                         break
         
@@ -745,8 +746,9 @@ class SupervisedBase:
         
         Parameters
         ----------
-        model : object, optional
-            The model to save. If None, the best model will be fetched
+        model : str or object, optional
+            The name of the model to save or the model object itself
+            If None, the best model will be fetched
         save_path : str, optional
             The path to save the pipeline
         include_feature_pipeline : bool, optional
@@ -771,6 +773,7 @@ class SupervisedBase:
         # Fetch the best model if no specific model is provided
         if model is None:
             model = self.get_best_models()
+            model_name = self.__last_searched_model_name
             if model is None:
                 error_msg = "There is no model to save! Please start an experiment first via start_experiment()"
                 self.__logger.error(error_msg)
@@ -779,12 +782,15 @@ class SupervisedBase:
 
         elif isinstance(model, str):
             try:
+                model_name = model
                 model = self.get_model_by_name(model)
                 model_taken_from_leaderboard = True
             except KeyError:
                 error_msg = f"Model with name '{model}' not found."
                 self.__logger.error(error_msg)
                 raise ValueError(error_msg)
+        else: # If model is an object, we can't know its name, so we use its class name
+            model_name = model.__class__.__name__
             
         # Initialize pipeline steps
         pipeline_steps = []
@@ -795,7 +801,6 @@ class SupervisedBase:
             pipeline_steps.extend(self.feature_engineer.pipeline.steps)
 
         # Handle full training scenario if required
-        model_name = model.__class__.__name__
         if full_train:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             if not already_trained:
@@ -896,16 +901,19 @@ class SupervisedBase:
 
         if model is None:
             model = self.get_best_models()
+            model_name = self.__last_searched_model_name
             if model is None:
                 error_msg = "There is no model to use for prediction! Please start an experiment first via start_experiment()"
                 self.__logger.error(error_msg)
                 raise Exception(error_msg)
             model_taken_from_leaderboard = True
         elif isinstance(model, str):
+            model_name = model
             model = self.get_model_by_name(model)
             model_taken_from_leaderboard = True
+        else: # If model is an object, we can't know its name, so we use its class name
+            model_name = model.__class__.__name__
         
-        model_name = model.__class__.__name__
         # Prepare training data if needed
         if full_train:
             # Check If model_taken_from_leaderboard is True and Full Train in self.__model_training_info is True, then we don't need to train the model again
@@ -946,7 +954,7 @@ class SupervisedBase:
         test_data : pd.DataFrame
             The input data to predict the target column
         model : str or object, optional
-            The trained model or model name to fetch for prediction
+            The name of the model to predict or the model object itself
             If None, the best model will be fetched
         full_train : bool, optional
             Whether to train the model using the whole data before prediction
@@ -1009,7 +1017,7 @@ class SupervisedBase:
         self._holdout_model_objects[model_name] = model_copy
         return model_copy
     
-    def plot(self, model_name: str, kind: str = "feature_importance", **kwargs):
+    def plot(self, model: Optional[Union[str, object]] = None, kind: str = "feature_importance", **kwargs):
         """
         Plots the model performance graphs
 
@@ -1040,8 +1048,9 @@ class SupervisedBase:
 
         Parameters
         ----------
-        model_name : str
-            The name of the model to plot
+        model : str or object, optional
+            The name of the model to plot or the model object itself
+            If None, the best model will be fetched
 
         kind : str, optional
             The type of the plot to plot
@@ -1069,12 +1078,15 @@ class SupervisedBase:
             error_msg = f"Invalid plot type: {kind}. Available plot kinds: {available_plot_types}"
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
-
-        model = self.get_model_by_name(model_name)
+        
         if model is None:
-            error_msg = f"Model {model_name} not found! Available models are: {self.__model_stats_df['Model'].unique()}"
-            self.__logger.error(error_msg)
-            raise ValueError(error_msg)
+            model = self.get_best_models()
+            model_name = self.__last_searched_model_name
+        elif isinstance(model, str):
+            model_name = model
+            model = self.get_model_by_name(model)
+        else: # If model is an object, we can't know its name, so we use its class name
+            model_name = model.__class__.__name__
         
         if self.__get_holdout_model_from_stats(model_name) is not None:
             model = self.__get_holdout_model_from_stats(model_name)
