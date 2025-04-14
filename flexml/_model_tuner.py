@@ -234,7 +234,7 @@ class ModelTuner:
         pipeline: Pipeline,
         param_grid: dict,
         eval_metric: str,
-        cv: object,
+        cv: list,
         n_jobs: int = -1,
         verbose: int = 0
     ) -> Optional[dict]:
@@ -270,8 +270,10 @@ class ModelTuner:
             
             * 'F1 Score' for F1 score
 
-        cv : object
-            A cross-validation splitter object (e.g., KFold, StratifiedKFold, etc.)
+        cv : list of tuples
+            A list of (train_idx, test_idx) tuples where each tuple contains numpy arrays of indices
+            for the training and test sets for that fold. For example:
+            [(array([1,2,4,...]), array([0,3,6,...])), ...]
 
         n_jobs : int (default=-1)
             The number of parallel jobs to run. The default is -1.
@@ -312,7 +314,7 @@ class ModelTuner:
             
             # Calculate total fits
             total_params = len(ParameterGrid(param_grid))
-            n_splits = len(list(cv))
+            n_splits = len(cv)
             total_fits = total_params * n_splits
 
             # Create GridSearchCV object
@@ -362,7 +364,7 @@ class ModelTuner:
         pipeline: Pipeline,
         param_grid: dict,
         eval_metric: str,
-        cv: object,
+        cv: list,
         n_iter: int = 10,
         n_jobs: int = -1,
         verbose: int = 0
@@ -399,8 +401,10 @@ class ModelTuner:
             
             * 'F1 Score' for F1 score
 
-        cv : object
-            A cross-validation splitter object (e.g., KFold, StratifiedKFold, etc.)
+        cv : list of tuples
+            A list of (train_idx, test_idx) tuples where each tuple contains numpy arrays of indices
+            for the training and test sets for that fold. For example:
+            [(array([1,2,4,...]), array([0,3,6,...])), ...]
 
         n_iter : int, optional (default=10)
             The number of trials. The default is 10
@@ -431,7 +435,7 @@ class ModelTuner:
         t_start = time()
         
         # Calculate total fits
-        n_splits = len(list(cv))
+        n_splits = len(cv)
         total_fits = n_iter * n_splits
 
         # Create RandomizedSearchCV object
@@ -480,7 +484,7 @@ class ModelTuner:
         pipeline: Pipeline,
         param_grid: dict,
         eval_metric: str,
-        cv: object,
+        cv: list,
         n_iter: int = 10,
         timeout: Optional[int] = None,
         n_jobs: int = -1,
@@ -518,8 +522,10 @@ class ModelTuner:
             
             * 'F1 Score' for F1 score
 
-        cv : object
-            A cross-validation splitter object (e.g., KFold, StratifiedKFold, etc.)
+        cv : list of tuples
+            A list of (train_idx, test_idx) tuples where each tuple contains numpy arrays of indices
+            for the training and test sets for that fold. For example:
+            [(array([1,2,4,...]), array([0,3,6,...])), ...]
 
         n_iter : int, optional (default=10)
             The number of trials. The default is 10
