@@ -8,6 +8,7 @@ from typing import Optional, Union
 from time import time
 from sklearn.model_selection import ParameterGrid, GridSearchCV, RandomizedSearchCV
 from sklearn.pipeline import Pipeline
+from sklearn.base import clone
 from flexml.config import TUNING_METRIC_TRANSFORMATIONS
 from flexml.logger import get_logger
 from flexml.helpers import evaluate_model_perf
@@ -476,8 +477,7 @@ class ModelTuner:
         
     def optuna_search(
         self,
-        model: object,
-        feature_engineer: object,
+        pipeline: Pipeline,
         param_grid: dict,
         eval_metric: str,
         cv: object,
@@ -491,11 +491,8 @@ class ModelTuner:
 
         Parameters
         ----------
-        model: object
-            The model object that will be tuned
-
-        feature_engineer: object
-            The feature engineer object that will be used for feature engineering
+        pipeline : Pipeline
+            The pipeline object includes feature engineering and model object that will be tuned
 
         param_grid : dict
             The dictionary that contains the hyperparameters and their possible values
@@ -565,7 +562,7 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_stats = self._setup_tuning("optuna", model, param_grid, n_iter=n_iter, n_jobs=n_jobs, prefix_param_grid_flag=False)
+        model_stats = self._setup_tuning("optuna", pipeline, param_grid, n_iter=n_iter, n_jobs=n_jobs, prefix_param_grid_flag=False)
         param_grid = model_stats['tuning_param_grid']
 
         # Set verbosity levels
@@ -584,7 +581,7 @@ class ModelTuner:
 
         def objective(trial):
             # Generate parameters for the trial
-            params = model.get_params()
+            params = pipeline.named_steps['model'].get_params()
             for param_name, param_values in param_grid.items():
                 first_element = param_values[0]
                 
@@ -598,25 +595,20 @@ class ModelTuner:
                     info_msg = f"{param_name} parameter is not added to tuning since its type is not supported by Optuna."
                     self.logger.info(info_msg)
 
+            new_pipeline = Pipeline(steps=pipeline.steps[:-1] + [('model', clone(pipeline.named_steps['model']).set_params(**params))]) # Remove the old model from the pipeline and add the new one
+
             # Perform cross-validation and calculate the score
             scores = []
-            for train_idx, test_idx in cv:  # Use custom splitter object
-                train_data = pd.concat([self.X.iloc[train_idx], self.y.iloc[train_idx]], axis=1)
-                test_data = pd.concat([self.X.iloc[test_idx], self.y.iloc[test_idx]], axis=1)
+            for train_idx, test_idx in cv:
+                X_train, X_test = self.X.iloc[train_idx], self.X.iloc[test_idx]
+                y_train, y_test = self.y.iloc[train_idx], self.y.iloc[test_idx]
 
-                # Use the copied feature engineer
-                feature_engineer.setup(data=train_data)
-                X_train, y_train = feature_engineer.fit_transform()
-                X_test, y_test = feature_engineer.transform(test_data=test_data, y_included=True)
+                new_pipeline.fit(X_train, y_train)
 
-                test_model = type(model)()
-                test_model.set_params(**params)
-                test_model.fit(X_train, y_train)
-
-                if self.ml_problem_type == "Classification" and hasattr(test_model, 'predict_proba'):
-                    y_pred = test_model.predict_proba(X_test)
+                if self.ml_problem_type == "Classification" and hasattr(new_pipeline, 'predict_proba'):
+                    y_pred = new_pipeline.predict_proba(X_test)
                 else:   
-                    y_pred = test_model.predict(X_test)
+                    y_pred = new_pipeline.predict(X_test)
 
                 # Evaluate performance
                 scores.append(evaluate_model_perf(self.ml_problem_type, y_test, y_pred))
@@ -628,7 +620,7 @@ class ModelTuner:
             # Update the best score and model
             if model_stats['tuned_model_score'] is None or (study_direction == "maximize" and mean_score > model_stats['tuned_model_score']) or (study_direction == "minimize" and mean_score < model_stats['tuned_model_score']):
                 model_stats['tuned_model_score'] = round(mean_score, 6)
-                model_stats['tuned_model'] = test_model
+                model_stats['tuned_model'] = new_pipeline.named_steps['model']
                 model_stats['model_perf'] = avg_metrics
 
             return mean_score

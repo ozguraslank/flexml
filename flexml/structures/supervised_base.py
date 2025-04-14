@@ -1530,8 +1530,7 @@ class SupervisedBase:
                 
         elif tuning_method == "optuna":
             tuning_result = self.model_tuner.optuna_search(
-                model=model,
-                feature_engineer=self.feature_engineer,
+                pipeline=pipeline,
                 param_grid=param_grid,
                 eval_metric=eval_metric,
                 cv=cv_obj,
