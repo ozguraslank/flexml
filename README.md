@@ -7,16 +7,13 @@
 
 ## Introduction
 
-**Warning:** README and notebooks files are designed for 1.1.0 pre-release version, If you want to use the most stable version, please go one commit before to access 1.0.3 documentations
-
 FlexML is an easy-to-use and flexible AutoML library for Python that simplifies the process of building machine learning models. It automates model selection and hyperparameter tuning, offering users the flexibility to customize the size of their experiments by allowing to train all available models in the library or only a subset of them for faster results, FlexML adapts to your needs! <br> <br>
 At the moment, FlexML supports only regression and classification tasks and offers two experiment modes; 'quick' and 'wide' allowing users to choose between fitting the most used machine learning models in the field or the full range of models available in the library.
 
 ## How to Install
-To install FlexML 1.1.0 pre-release, you can use pip:
 
 ```bash
-pip install flexml==1.1.0rc2
+pip install flexml
 ```
 
 ## Start Guide with Regression Experiment
