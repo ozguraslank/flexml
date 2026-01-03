@@ -197,15 +197,15 @@ def evaluate_model_perf(
         eval_metric_name = custom_score.name
         
         # For Classification: handle proba vs labels
-        if ml_task_type == "Classification" and not custom_score.needs_proba:
-            y_pred_for_metric = y_pred_labels
-        elif ml_task_type == "Classification" and custom_score.needs_proba:
-            # Determine if binary or multiclass
-            if y_pred.shape[1] == 2:
-                y_pred_for_metric = y_pred[:, 1]
+        if ml_task_type == "Classification":
+            if custom_score.needs_proba:
+                if y_pred.shape[1] == 2:
+                    y_pred_for_metric = y_pred[:, 1]
+                else:
+                    y_pred_for_metric = y_pred
             else:
-                y_pred_for_metric = y_pred
-        else:
+                y_pred_for_metric = y_pred_labels
+        else: # Regression
             y_pred_for_metric = y_pred
 
         # Call custom function and add to standard metrics
