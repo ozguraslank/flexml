@@ -490,6 +490,7 @@ class TestCustomMetrics(unittest.TestCase):
             model.start_experiment(
                 experiment_size='quick',
                 eval_metric=invalid_metric,
+                custom_metric_name='Invalid Metric',
                 custom_metric_direction='maximize',
                 custom_metric_needs_proba=False,
                 cv_method='kfold',
