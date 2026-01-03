@@ -24,10 +24,10 @@ def eval_metric_checker(
     eval_metric : str or CustomScore, optional (default='R2' for Regression, 'Accuracy' for Classification)
         The evaluation metric to use for model evaluation
 
-        - Avaiable evalulation metrics for Regression:    
+        - Available evaluation metrics for Regression:    
             - R2, MAE, MSE, RMSE, MAPE
 
-        - Avaiable evalulation metrics for Classification:    
+        - Available evaluation metrics for Classification:    
             - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         
         - Or a custom CustomScore object

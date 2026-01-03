@@ -476,10 +476,10 @@ class SupervisedBase:
         eval_metric : str or callable, optional (default='R2' for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation
             
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
             
             - Or a custom callable function with signature: func(y_true, y_pred) -> float
@@ -735,10 +735,10 @@ class SupervisedBase:
         eval_metric : str, optional
             Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         
         Returns
@@ -1195,10 +1195,10 @@ class SupervisedBase:
         eval_metric : str, optional
             Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         Returns
@@ -1230,10 +1230,10 @@ class SupervisedBase:
         eval_metric : str, optional
             Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         """
         def highlight_best(s: pd.Series) -> list[str]:
@@ -1371,10 +1371,10 @@ class SupervisedBase:
         eval_metric : str, optional
             Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         param_grid : dict (default = defined custom param dict in flexml/config/tune_model_config.py)

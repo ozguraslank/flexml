@@ -55,10 +55,10 @@ def _evaluate_preds(
     eval_metric : str or CustomScore
         The evaluation metric that will be used to evaluate the model   
                  
-        - Avaiable evalulation metrics for Regression:    
+        - Available evaluation metrics for Regression:    
             - R2, MAE, MSE, RMSE, MAPE
 
-        - Avaiable evalulation metrics for Classification:    
+        - Available evaluation metrics for Classification:    
             - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         
         - Or a custom CustomScore object
