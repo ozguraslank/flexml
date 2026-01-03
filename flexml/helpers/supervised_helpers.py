@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
-from typing import Union
+from typing import Union, Optional
+from flexml.structures.custom_score import CustomScore
 
 from sklearn.metrics import (
     r2_score, 
@@ -10,7 +11,8 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
     f1_score,
-    roc_auc_score)
+    roc_auc_score
+)
 
 
 def _safe_mape(y_true: Union[pd.Series, np.ndarray], y_pred: Union[pd.Series, np.ndarray]) -> float:
@@ -36,8 +38,8 @@ def _safe_mape(y_true: Union[pd.Series, np.ndarray], y_pred: Union[pd.Series, np
 def _evaluate_preds(
     y_true: Union[pd.Series, np.ndarray],
     y_pred: Union[pd.Series, np.ndarray],
-    eval_metric: str,
-    average: str = 'macro'
+    eval_metric: Union[str, CustomScore],
+    average: Optional[str] = 'macro'
 ) -> float:
     """
     Evaluates the model with the given evaluation metric by using the test set
@@ -50,14 +52,16 @@ def _evaluate_preds(
     y_pred : pd.Series or np.ndarray
         The predicted values/probabilities of the target column
 
-    eval_metric : str
+    eval_metric : str or CustomScore
         The evaluation metric that will be used to evaluate the model   
                  
-        - Avaiable evalulation metrics for Regression:    
+        - Available evaluation metrics for Regression:    
             - R2, MAE, MSE, RMSE, MAPE
 
-        - Avaiable evalulation metrics for Classification:    
+        - Available evaluation metrics for Classification:    
             - Accuracy, Precision, Recall, F1 Score, ROC-AUC
+        
+        - Or a custom CustomScore object
         
     average : str, default='macro'
         The averaging method to use for multiclass classification metrics.
@@ -70,6 +74,14 @@ def _evaluate_preds(
     float
         The evaluation metric score for the desired eval metric
     """
+    # Handle custom callable metrics
+    if isinstance(eval_metric, CustomScore):
+        try:
+            return round(float(eval_metric(y_true, y_pred)), 6)
+        except Exception as e:
+            raise ValueError(f"Error while evaluating with custom score: {str(e)}")
+    
+    # Handle standard string-based metrics
     if eval_metric == 'R2':
         return round(r2_score(y_true, y_pred), 6)
     elif eval_metric == 'MAE':
@@ -102,7 +114,8 @@ def _evaluate_preds(
 def evaluate_model_perf(
     ml_task_type, 
     y_test,
-    y_pred
+    y_pred,
+    custom_score: Optional[CustomScore] = None
 ) -> dict:
     """
     Evaluates how good are the predictions by comparing them with the actual values, returns regression evaluation scores
@@ -120,23 +133,30 @@ def evaluate_model_perf(
         For classification tasks: The predicted probabilities for each class.
         Note: Some models like Perceptron, PassiveAggressiveClassifier, etc. don't have predict_proba method, so they return class labels directly.
     
+    custom_score : CustomScore, optional (default=None)
+        A custom score object with signature: func(y_true, y_pred) -> float
+        If provided, this score will be calculated in addition to standard metrics
+
     Returns
     -------
     dict
-        A dictionary containing the evaluation metric of the current task
+        A dictionary containing the evaluation metrics of the current task
             
             * R2, MAE, MSE, RMSE, MAPE for Regression tasks
 
             * Accuracy, Precision, Recall, F1 Score, ROC-AUC for Classification tasks
+            
+            * Plus the custom eval metric if custom_score is provided
     """
-
+    # Standard metric evaluation
+    standard_metrics = {}
     if ml_task_type == "Regression":
         r2 = _evaluate_preds(y_test, y_pred, 'R2')
         mae = _evaluate_preds(y_test, y_pred, 'MAE')
         mse = _evaluate_preds(y_test, y_pred, 'MSE')
         rmse = _evaluate_preds(y_test, y_pred, 'RMSE')
         mape = _evaluate_preds(y_test, y_pred, 'MAPE')
-        return {
+        standard_metrics = {
             "R2": r2,
             "MAE": mae,
             "MSE": mse,
@@ -164,10 +184,35 @@ def evaluate_model_perf(
         # Use probabilities for ROC-AUC
         roc_auc = _evaluate_preds(y_test, y_pred, 'ROC-AUC', average=avg_method)
         
-        return {
+        standard_metrics = {
             "Accuracy": accuracy,
             "Precision": precision,
             "Recall": recall,
             "F1 Score": f1,
             "ROC-AUC": roc_auc
         }
+    
+    # If custom metric is provided, calculate it and add to standard metrics
+    if custom_score is not None:
+        eval_metric_name = custom_score.name
+        
+        # For Classification: handle proba vs labels
+        if ml_task_type == "Classification":
+            if custom_score.needs_proba:
+                if y_pred.shape[1] == 2:
+                    y_pred_for_metric = y_pred[:, 1]
+                else:
+                    y_pred_for_metric = y_pred
+            else:
+                y_pred_for_metric = y_pred_labels
+        else: # Regression
+            y_pred_for_metric = y_pred
+
+        # Call custom function and add to standard metrics
+        try:
+            score = _evaluate_preds(y_test, y_pred_for_metric, custom_score)
+            standard_metrics[eval_metric_name] = round(score, 6)
+        except Exception as e:
+            raise ValueError(f"Error while evaluating with custom eval metric '{eval_metric_name}': {str(e)}")
+
+    return standard_metrics

@@ -4,7 +4,7 @@ import pandas as pd
 from collections import defaultdict
 from copy import deepcopy
 from time import time
-from typing import Union, Optional, List, Dict
+from typing import Union, Optional, List, Dict, Callable
 from tqdm import tqdm
 from rich.console import Console
 from rich.table import Table
@@ -32,6 +32,7 @@ from flexml.helpers import (
     plot_prediction_error,
     plot_calibration_curve
 )
+from flexml.structures.custom_score import CustomScore
 from flexml._model_tuner import ModelTuner
 from flexml._feature_engineer import FeatureEngineering
 
@@ -405,7 +406,16 @@ class SupervisedBase:
                 for key, value in aggregated_metrics.items()
             }
             
-            best_model_entry = max(model_entries, key=lambda x: x["model_stats"][self.eval_metric])
+            # Get the metric name to use for selecting best model
+            metric_key = self.eval_metric.name if self._is_custom_metric else self.eval_metric
+            
+            # For minimize metrics, select the min instead of max
+            if self._is_custom_metric and self.eval_metric.direction == 'minimize':
+                best_model_entry = min(model_entries, key=lambda x: x["model_stats"][metric_key])
+            elif not self._is_custom_metric and self.__ML_TASK_TYPE == "Regression" and metric_key in ['MAE', 'MSE', 'RMSE', 'MAPE']:
+                best_model_entry = min(model_entries, key=lambda x: x["model_stats"][metric_key])
+            else:
+                best_model_entry = max(model_entries, key=lambda x: x["model_stats"][metric_key])
             
             self.__model_training_info.append({
                 model_name: {
@@ -420,7 +430,10 @@ class SupervisedBase:
         cv_method: Optional[str] = None,
         n_folds: Optional[int] = None,
         test_size: Optional[float] = None,
-        eval_metric: Optional[str] = None,
+        eval_metric: Optional[Union[str, Callable]] = None,
+        custom_metric_name: Optional[str] = None,
+        custom_metric_needs_proba: Optional[bool] = None,
+        custom_metric_direction: Optional[str] = None,
         random_state: Optional[int] = 42,
         groups_col: Optional[str] = None,
         n_jobs: Optional[int] = -1
@@ -460,14 +473,29 @@ class SupervisedBase:
         test_size : float, (default=0.25 for hold-out cv, None for other methods)
             The size of the test data if using hold-out or shuffle-based splits
 
-        eval_metric : str, optional (default='R2' for Regression, 'Accuracy' for Classification)
+        eval_metric : str or callable, optional (default='R2' for Regression, 'Accuracy' for Classification)
             The evaluation metric to use for model evaluation
             
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
+            
+            - Or a custom callable function with signature: func(y_true, y_pred) -> float
+
+        custom_metric_name : str, optional (default=None)
+            The name to use for the custom metric. If None and eval_metric is callable,
+            uses the function's __name__ attribute
+        
+        custom_metric_needs_proba : bool, optional (default=False)
+            For classification tasks only: If True, passes probabilities to the custom metric function.
+            If False, converts probabilities to class labels before passing to the function.
+            Ignored for regression tasks (no error raised)
+        
+        custom_metric_direction : str, optional (default='maximize')
+            Direction for optimizing the custom metric. Either 'maximize' or 'minimize'.
+            Used for sorting models in the leaderboard when using custom metrics
 
         random_state : int, optional (default=None)
             The random state value for the model training process
@@ -485,7 +513,20 @@ class SupervisedBase:
         - Defaults to a standard 5-fold if neither `n_folds` nor `test_size` is provided
         """
         experiment_size = experiment_size.lower() # Convert to lowercase in case of any case mismatch
-        self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+        if isinstance(eval_metric, Callable):
+            self.eval_metric = CustomScore(
+                name=custom_metric_name,
+                score_func=eval_metric,
+                needs_proba=custom_metric_needs_proba,
+                direction=custom_metric_direction
+            )
+            self._is_custom_metric = True
+            self._custom_metric_name = custom_metric_name
+        else:
+            self.eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+            self._is_custom_metric = False
+            self._custom_metric_name = None
+
         random_state = random_state_checker(random_state)
 
         # Check cross-validation method params
@@ -611,7 +652,12 @@ class SupervisedBase:
                         else:
                             y_pred = model.predict(X_test)
 
-                        model_perf = evaluate_model_perf(self.__ML_TASK_TYPE, y_test, y_pred)
+                        model_perf = evaluate_model_perf(
+                            self.__ML_TASK_TYPE,
+                            y_test,
+                            y_pred,
+                            custom_score=self.eval_metric if self._is_custom_metric else None
+                        )
 
                         all_metrics.append(model_perf)
                         all_times.append(time_taken)
@@ -643,10 +689,11 @@ class SupervisedBase:
                         pbar.update(1)
 
         self.__process_experiment_result(all_model_stats)
-
         self.__logger.info("[PROCESS] Model training is finished!")
-        self.get_best_models(eval_metric)
-        self.show_model_stats(eval_metric)
+
+        display_metric = self._custom_metric_name if self._is_custom_metric else eval_metric
+        self.get_best_models(display_metric)
+        self.show_model_stats(display_metric)
 
     def get_model_by_name(self, model_name: str) -> object:
         """
@@ -688,10 +735,10 @@ class SupervisedBase:
         eval_metric : str, optional
             Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         
         Returns
@@ -700,13 +747,20 @@ class SupervisedBase:
             Single or a list of top n models based on the evaluation metric or None If no models have been trained yet.
         """
         if len(self.__model_training_info) == 0:
+            self.__logger.warning("No models have been trained yet, start an experiment first via start_experiment()")
             return None
         
         top_n_models = self.__top_n_models_checker(top_n_models)
 
-        if eval_metric is None and hasattr(self, 'eval_metric'):
+        if eval_metric is None:
             eval_metric = self.eval_metric
-        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+        
+        if isinstance(eval_metric, CustomScore):
+            eval_metric = eval_metric.name
+        elif isinstance(eval_metric, str) and self._is_custom_metric and eval_metric == self.eval_metric.name:
+            eval_metric = self.eval_metric.name
+        else:
+            eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         model_stats = []
         best_models = []
@@ -1142,10 +1196,10 @@ class SupervisedBase:
         eval_metric : str, optional
             Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         Returns
@@ -1158,11 +1212,15 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        # Since lower is better for mae, mse and rmse in Regression tasks, they should be sorted in ascending order
-        if self.__ML_TASK_TYPE == "Regression" and eval_metric in ['MAE', 'MSE', 'RMSE', 'MAPE']:
-            return self._model_stats_df.sort_values(by=eval_metric, ascending=True).reset_index(drop = True)
+        # Determine sort direction
+        if self._is_custom_metric and eval_metric == self._custom_metric_name:
+            ascending = (self.eval_metric.direction == 'minimize')
+        elif self.__ML_TASK_TYPE == "Regression" and eval_metric in ['MAE', 'MSE', 'RMSE', 'MAPE']:
+            ascending = True
         else:
-            return self._model_stats_df.sort_values(by=eval_metric, ascending=False).reset_index(drop = True)
+            ascending = False # F1, ROC-AUC, R2, Accuracy, etc.
+            
+        return self._model_stats_df.sort_values(by=eval_metric, ascending=ascending).reset_index(drop = True)
 
     def show_model_stats(self, eval_metric: Optional[str] = None):
         """
@@ -1173,10 +1231,10 @@ class SupervisedBase:
         eval_metric : str, optional
             Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
         """
         def highlight_best(s: pd.Series) -> list[str]:
@@ -1193,7 +1251,12 @@ class SupervisedBase:
             list[str]
                 A list of strings containing the green background color for the best value so we can highlight it while showing the model stats
             """
-            if s.name in ['MAE', 'MSE', 'RMSE', 'MAPE']:
+            # Check if this is a custom metric that should be minimized
+            is_custom_minimize = (self._is_custom_metric and 
+                                 self.eval_metric.direction == 'minimize')
+            
+            # Determine if we should minimize or maximize
+            if s.name in ['MAE', 'MSE', 'RMSE', 'MAPE'] or is_custom_minimize:
                 s_nonneg = s.where(s >= 0, np.nan)
                 best_val = s_nonneg.min()
                 if best_val == float('inf'):
@@ -1204,10 +1267,19 @@ class SupervisedBase:
                 is_best = (s == s.max()) & (s != float('inf')) & (s != -1)
             return ['background-color: green' if v else '' for v in is_best]
         
-        
-        if eval_metric is None and hasattr(self, 'eval_metric'):
+        if len(self.__model_training_info) == 0:
+            self.__logger.warning("No models have been trained yet, start an experiment first via start_experiment()")
+            return None
+
+        if eval_metric is None:
             eval_metric = self.eval_metric
-        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+        
+        if isinstance(eval_metric, CustomScore):
+            eval_metric = eval_metric.name
+        elif isinstance(eval_metric, str) and self._is_custom_metric and eval_metric == self.eval_metric.name:
+            eval_metric = self.eval_metric.name
+        else:
+            eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
 
         sorted_model_stats_df = self.__sort_models(eval_metric)
         sorted_model_stats_df['Time (sec)'] = sorted_model_stats_df['Time (sec)'].apply(lambda x: f"{x:.2f}")
@@ -1225,7 +1297,14 @@ class SupervisedBase:
             if len(sorted_model_stats_df) < 2:
                 display(sorted_model_stats_df)
             else:
-                styler = sorted_model_stats_df.style.apply(highlight_best, subset=self.__ALL_EVALUATION_METRICS)
+                # Determine which columns to highlight - always include all standard metrics
+                highlight_columns = self.__ALL_EVALUATION_METRICS.copy()
+                
+                # Add custom metric column if present
+                if self._is_custom_metric:
+                    highlight_columns.append(self._custom_metric_name)
+                
+                styler = sorted_model_stats_df.style.apply(highlight_best, subset=highlight_columns)
                 display(styler) # display is only supported in interactive kernels such as Jupyter Notebook/Google Colab
 
     def tune_model(
@@ -1294,10 +1373,10 @@ class SupervisedBase:
         eval_metric : str, optional
             Default: eval_metric passed to the start_experiment(), If It was also None, 'R2' for Regression and 'Accuracy' for Classification will be used
         
-            - Avaiable evalulation metrics for Regression:    
+            - Available evaluation metrics for Regression:    
                 - R2, MAE, MSE, RMSE, MAPE
 
-            - Avaiable evalulation metrics for Classification:    
+            - Available evaluation metrics for Classification:    
                 - Accuracy, Precision, Recall, F1 Score, ROC-AUC
 
         param_grid : dict (default = defined custom param dict in flexml/config/tune_model_config.py)
@@ -1416,9 +1495,14 @@ class SupervisedBase:
             self.__logger.error(error_msg)
             raise ValueError(error_msg)
         
-        if eval_metric is None and hasattr(self, 'eval_metric'):
+        # If no eval_metric provided, use the one from start_experiment
+        if eval_metric is None:
             eval_metric = self.eval_metric
-        eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
+
+        if isinstance(eval_metric, str) and self._is_custom_metric and eval_metric == self.eval_metric.name:
+            eval_metric = self.eval_metric
+        else:
+            eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
         
         # If the user doesn't pass any cross-validation method params, use the last used ones
         if (
