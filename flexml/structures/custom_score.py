@@ -21,24 +21,24 @@ class CustomScore:
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError(f"name must be a non-empty string, got '{self.name}'")
 
+        if not isinstance(score_func, Callable):
+            raise ValueError(f"score_func must be a callable, got '{type(score_func)}'")
+
+        if needs_proba is None or not isinstance(needs_proba, bool):
+            raise ValueError(f"needs_proba must be a boolean, got '{type(needs_proba)}'")
+
         if direction not in ['maximize', 'minimize']:
             raise ValueError(f"direction must be either 'maximize' or 'minimize', got '{direction}'")
 
-        if needs_proba is None or not isinstance(needs_proba, bool):
-            raise ValueError(f"needs_proba must be a boolean, got '{needs_proba}'")
-
-        try:
-            sig = inspect.signature(score_func)
-            params = list(sig.parameters.keys())
-            
-            # Check if function has exactly 2 parameters
-            if len(params) != 2:
-                raise ValueError(
-                    f"Custom evaluation function must have exactly 2 parameters (y_true, y_pred), "
-                    f"but got {len(params)} parameters: {params}"
-                )
-        except Exception as e:
-            raise ValueError(f"Error validating custom evaluation function: {str(e)}")
+        sig = inspect.signature(score_func)
+        params = list(sig.parameters.keys())
+        
+        # Check if function has exactly 2 parameters
+        if len(params) != 2:
+            raise ValueError(
+                f"Custom evaluation function must have exactly 2 parameters (y_true, y_pred), "
+                f"but got {len(params)} parameters: {params}"
+            )
 
         self.scorer = make_scorer(
             self.score_func,
