@@ -1,15 +1,17 @@
 import pandas as pd
-from typing import Optional, List
+from typing import Optional, List, Union
 from flexml.config import EVALUATION_METRICS, FEATURE_ENGINEERING_METHODS, CROSS_VALIDATION_METHODS
 from flexml.logger import get_logger
 import re
+from flexml.structures.custom_score import CustomScore
+
 
 def eval_metric_checker(
     ml_task_type: str,
-    eval_metric: Optional[str] = None,
+    eval_metric: Optional[Union[str, CustomScore]] = None,
     all_evaluation_metrics: Optional[List[str]] = None,
     default_evaluation_metric: Optional[str] = None
-) -> str:
+) -> Union[str, CustomScore]:
     """
     Since eval_metric setting and validation is a common process for both Regression and Classification tasks...
     this method is used to set and validate the evaluation metric.
@@ -19,7 +21,7 @@ def eval_metric_checker(
     ml_task_type : str
         The type of ML task ('Regression' or 'Classification')
 
-    eval_metric : str, optional (default='R2' for Regression, 'Accuracy' for Classification)
+    eval_metric : str or CustomScore, optional (default='R2' for Regression, 'Accuracy' for Classification)
         The evaluation metric to use for model evaluation
 
         - Avaiable evalulation metrics for Regression:    
@@ -27,6 +29,8 @@ def eval_metric_checker(
 
         - Avaiable evalulation metrics for Classification:    
             - Accuracy, Precision, Recall, F1 Score, ROC-AUC
+        
+        - Or a custom CustomScore object
     
     all_evaluation_metrics : List[str], (default=None)
         All possible evaluation metrics for the current task (Regression or Classification), e.g. ['R2', 'MAE', 'MSE', 'RMSE', 'MAPE'] for Regression
@@ -40,11 +44,15 @@ def eval_metric_checker(
 
     Returns
     -------
-    str
+    str or CustomScore
         The evaluation metric to use for model evaluation for the current task (Regression or Classification)
     """
     logger = get_logger(__name__, "PROD", False)
+
+    if isinstance(eval_metric, CustomScore):
+        return eval_metric
     
+    # Standard string-based metric validation
     if default_evaluation_metric is None or all_evaluation_metrics is None:
         default_evaluation_metric = EVALUATION_METRICS[ml_task_type]["DEFAULT"]
         all_evaluation_metrics = EVALUATION_METRICS[ml_task_type]["ALL"]
