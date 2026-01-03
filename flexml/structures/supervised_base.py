@@ -747,6 +747,7 @@ class SupervisedBase:
             Single or a list of top n models based on the evaluation metric or None If no models have been trained yet.
         """
         if len(self.__model_training_info) == 0:
+            self.__logger.warning("No models have been trained yet, start an experiment first via start_experiment()")
             return None
         
         top_n_models = self.__top_n_models_checker(top_n_models)
@@ -1266,7 +1267,10 @@ class SupervisedBase:
                 is_best = (s == s.max()) & (s != float('inf')) & (s != -1)
             return ['background-color: green' if v else '' for v in is_best]
         
-        
+        if len(self.__model_training_info) == 0:
+            self.__logger.warning("No models have been trained yet, start an experiment first via start_experiment()")
+            return None
+
         if eval_metric is None:
             eval_metric = self.eval_metric
         
@@ -1276,8 +1280,6 @@ class SupervisedBase:
             eval_metric = self.eval_metric.name
         else:
             eval_metric = eval_metric_checker(self.__ML_TASK_TYPE, eval_metric)
-
-        
 
         sorted_model_stats_df = self.__sort_models(eval_metric)
         sorted_model_stats_df['Time (sec)'] = sorted_model_stats_df['Time (sec)'].apply(lambda x: f"{x:.2f}")
