@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Union, Optional, Callable
+from typing import Union, Optional
 from flexml.structures.custom_score import CustomScore
 
 from sklearn.metrics import (
