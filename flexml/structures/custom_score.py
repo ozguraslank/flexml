@@ -18,6 +18,9 @@ class CustomScore:
         self.needs_proba = needs_proba
         self.direction = direction
 
+        if not isinstance(self.name, str) or not self.name.strip():
+            raise ValueError(f"name must be a non-empty string, got '{self.name}'")
+
         if direction not in ['maximize', 'minimize']:
             raise ValueError(f"direction must be either 'maximize' or 'minimize', got '{direction}'")
 
