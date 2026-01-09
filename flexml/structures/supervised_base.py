@@ -41,6 +41,33 @@ warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
 
 
+# Models that support native categorical features (no encoding needed)
+NATIVE_CATEGORICAL_MODELS = {
+    'CatBoostRegressor', 'CatBoostClassifier',
+    'LGBMRegressor', 'LGBMClassifier', 
+    'XGBRegressor', 'XGBClassifier',
+    'HistGradientBoostingRegressor', 'HistGradientBoostingClassifier'  # sklearn also supports!
+}
+
+def _get_encoded_categorical_columns(encoded_columns, original_cat_cols):
+    """
+    Identifies which columns in the encoded dataframe came from categorical encoding.
+    Handles both label encoding (same name) and one-hot encoding (prefix_value format).
+    """
+    encoded_cat_cols = []
+    for col in encoded_columns:
+        # Check if it's the original column name (label/ordinal encoding)
+        if col in original_cat_cols:
+            encoded_cat_cols.append(col)
+        else:
+            # Check if it's a one-hot encoded column (format: original_value)
+            for orig_col in original_cat_cols:
+                if col.startswith(f"{orig_col}_"):
+                    encoded_cat_cols.append(col)
+                    break
+    return encoded_cat_cols
+
+
 class SupervisedBase:
     """
     Base class for Supervised tasks (regression & classification)
@@ -325,9 +352,15 @@ class SupervisedBase:
         ], axis=1)
 
         self.feature_engineer.setup(data=train_data)
+        self.categorical_columns = self.feature_engineer.categorical_columns
+        
+        # Store raw categorical columns for holdout data (for native-categorical models)
+        self.X_train_cat_raw = self._get_raw_categorical_data(train_data)
+        self.X_test_cat_raw = self._get_raw_categorical_data(test_data)
 
         self.X_train, self.y_train = self.feature_engineer.fit_transform()
         self.X_test, self.y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
+        self.encoded_categorical_columns = _get_encoded_categorical_columns(self.X_train.columns, self.categorical_columns)
         self.feature_names = list(self.X_train.columns)
         self.y_class_mapping = self.feature_engineer.y_class_mapping
         
@@ -379,6 +412,90 @@ class SupervisedBase:
             raise ValueError(error_msg)
         
         return top_n_models
+    
+    def _get_raw_categorical_data(self, data: pd.DataFrame) -> Optional[pd.DataFrame]:
+        """
+        Extract raw categorical columns from data and convert to category dtype.
+        Used to preserve original categoricals before encoding for native-categorical models.
+        
+        Parameters
+        ----------
+        data : pd.DataFrame
+            The data containing categorical columns
+            
+        Returns
+        -------
+        Optional[pd.DataFrame]
+            DataFrame with categorical columns converted to 'category' dtype, or None if no categorical columns
+        """
+        if not hasattr(self, 'categorical_columns') or not self.categorical_columns:
+            return None
+        cat_df = data[self.categorical_columns].copy()
+        for col in self.categorical_columns:
+            cat_df[col] = cat_df[col].astype('category')
+        return cat_df
+    
+    def _prepare_data_for_model(
+        self, 
+        model_name: str, 
+        X_encoded: pd.DataFrame, 
+        X_cat_raw: Optional[pd.DataFrame] = None
+    ) -> pd.DataFrame:
+        """
+        Prepares data for a specific model by swapping encoded categoricals
+        with raw ones for models that support native categorical features.
+        
+        Parameters
+        ----------
+        model_name : str
+            The name of the model
+        X_encoded : pd.DataFrame
+            The encoded feature data
+        X_cat_raw : Optional[pd.DataFrame]
+            The raw categorical columns (with 'category' dtype)
+            
+        Returns
+        -------
+        pd.DataFrame
+            Prepared feature data for the model
+        """
+        if model_name in NATIVE_CATEGORICAL_MODELS and X_cat_raw is not None and hasattr(self, 'encoded_categorical_columns') and self.encoded_categorical_columns:
+            # Drop encoded categorical columns
+            X_final = X_encoded.drop(columns=self.encoded_categorical_columns, errors='ignore')
+            # Merge with raw categorical columns (aligned by index)
+            X_final = pd.concat([X_final, X_cat_raw.loc[X_final.index]], axis=1)
+            return X_final
+        return X_encoded
+    
+    def _fit_model(
+        self, 
+        model: object, 
+        X: pd.DataFrame, 
+        y: pd.Series,
+        model_name: Optional[str] = None
+    ):
+        """
+        Fits a model with proper categorical feature handling.
+        Passes cat_features to CatBoost models for native categorical support.
+        
+        Parameters
+        ----------
+        model : object
+            The model to fit
+        X : pd.DataFrame
+            The feature data
+        y : pd.Series
+            The target data
+        model_name : Optional[str]
+            The name of the model (if None, uses model's class name)
+        """
+        if model_name is None:
+            model_name = model.__class__.__name__
+        
+        if 'CatBoost' in model_name and hasattr(self, 'categorical_columns') and self.categorical_columns:
+            model.fit(X, y, cat_features=self.categorical_columns)
+        else:
+            model.fit(X, y)
     
     def __process_experiment_result(self, experiment_stats: dict):
         """
@@ -625,9 +742,13 @@ class SupervisedBase:
                 ], axis=1)
                 
                 self.feature_engineer.setup(data=train_data)
+
+                # Save raw categorical columns BEFORE encoding (for native-categorical models)
+                X_train_cat_raw = self._get_raw_categorical_data(train_data)
+                X_test_cat_raw = self._get_raw_categorical_data(test_data)
                 
-                X_train, y_train = self.feature_engineer.fit_transform()
-                X_test, y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
+                X_train_encoded, y_train = self.feature_engineer.fit_transform()
+                X_test_encoded, y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
 
                 for model_idx in range(len(self.__ML_MODELS)):
                     model_info = self.__ML_MODELS[model_idx]
@@ -638,19 +759,24 @@ class SupervisedBase:
                         continue  # Skip already trained or raised error models
 
                     model = model_info['model']
+
+                    # Prepare data based on model type (native categorical vs encoded)
+                    X_train_final = self._prepare_data_for_model(model_name, X_train_encoded, X_train_cat_raw)
+                    X_test_final = self._prepare_data_for_model(model_name, X_test_encoded, X_test_cat_raw)
+
                     try:
                         all_metrics = []
                         all_times = []
 
                         t_start = time()
-                        model.fit(X_train, y_train)
+                        self._fit_model(model, X_train_final, y_train, model_name)
                         t_end = time()
 
                         time_taken = round(t_end - t_start, 2)
                         if self.__ML_TASK_TYPE == "Classification" and hasattr(model, 'predict_proba'):
-                            y_pred = model.predict_proba(X_test)
+                            y_pred = model.predict_proba(X_test_final)
                         else:
-                            y_pred = model.predict(X_test)
+                            y_pred = model.predict(X_test_final)
 
                         model_perf = evaluate_model_perf(
                             self.__ML_TASK_TYPE,
@@ -860,8 +986,17 @@ class SupervisedBase:
             if not already_trained:
                 self.__logger.info("Training the model using the whole data")
                 self.feature_engineer.setup(data=self.data)
-                X_train, y_train = self.feature_engineer.fit_transform()
-                model.fit(X_train, y_train)
+                
+                # Get raw categoricals before encoding
+                X_cat_raw = self._get_raw_categorical_data(self.data)
+                
+                X_train_encoded, y_train = self.feature_engineer.fit_transform()
+                
+                # Prepare data for this specific model
+                X_train_final = self._prepare_data_for_model(model_name, X_train_encoded, X_cat_raw)
+                
+                # Fit with proper cat_features handling
+                self._fit_model(model, X_train_final, y_train, model_name)
 
                 # find the model in leaderboard and update the full_train to True, and update the model object in there
                 for model_info in self.__model_training_info:
@@ -975,8 +1110,13 @@ class SupervisedBase:
             if not already_trained:
                 self.__logger.info("Training the model using the whole data")
                 self.feature_engineer.setup(data=self.data)
-                X_train, y_train = self.feature_engineer.fit_transform()
-                model.fit(X_train, y_train)
+                
+                # Get raw categoricals before encoding
+                X_cat_raw = self._get_raw_categorical_data(self.data)
+                
+                X_train_encoded, y_train = self.feature_engineer.fit_transform()
+                X_train_final = self._prepare_data_for_model(model_name, X_train_encoded, X_cat_raw)
+                self._fit_model(model, X_train_final, y_train, model_name)
 
                 # find the model in leaderboard and update the full_train to True, and update the model object in there
                 for model_info in self.__model_training_info:
@@ -987,10 +1127,11 @@ class SupervisedBase:
                             break
                 # Update leaderboard
                 self.get_best_models()
-            X_test = self.feature_engineer.transform(test_data)
 
-        else:
-            X_test = self.feature_engineer.transform(test_data)
+        # Transform test data and prepare for model
+        X_test_encoded = self.feature_engineer.transform(test_data)
+        X_test_cat_raw = self._get_raw_categorical_data(test_data)
+        X_test = self._prepare_data_for_model(model_name, X_test_encoded, X_test_cat_raw)
 
         return model, X_test
 
@@ -1067,7 +1208,13 @@ class SupervisedBase:
             model_name = model.__class__.__name__
 
         model_copy = deepcopy(model)
-        model_copy.fit(self.X_train, self.y_train)
+        
+        # Prepare holdout data for this model (use raw categoricals for native-categorical models)
+        X_train_final = self._prepare_data_for_model(model_name, self.X_train, self.X_train_cat_raw)
+        
+        # Fit with proper categorical handling
+        self._fit_model(model_copy, X_train_final, self.y_train, model_name)
+        
         self._holdout_model_objects[model_name] = model_copy
         return model_copy
     
@@ -1147,11 +1294,15 @@ class SupervisedBase:
         else:
             model = self.__add_holdout_model_to_stats(model, model_name)
 
-        # If kind expects predictions
+        # Prepare holdout data for this model (use raw categoricals for native-categorical models)
+        X_train_final = self._prepare_data_for_model(model_name, self.X_train, self.X_train_cat_raw)
+        X_test_final = self._prepare_data_for_model(model_name, self.X_test, self.X_test_cat_raw)
+
+        # If kind expects predictions
         if kind in ["confusion_matrix"]:
-            preds = model.predict(self.X_test)
+            preds = model.predict(X_test_final)
         elif kind in ["roc_curve", "calibration_curve"]:
-            preds = model.predict_proba(self.X_test)
+            preds = model.predict_proba(X_test_final)
 
         graph = None
 
@@ -1164,13 +1315,13 @@ class SupervisedBase:
         elif kind == "roc_curve":
             graph = plot_roc_curve(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif kind == "residuals":
-            graph = plot_residuals(model, self.X_train, self.y_train, self.X_test, self.y_test, **kwargs)
+            graph = plot_residuals(model, X_train_final, self.y_train, X_test_final, self.y_test, **kwargs)
         elif kind == "prediction_error":
-            graph = plot_prediction_error(model, self.X_train, self.y_train, self.X_test, self.y_test, **kwargs)
+            graph = plot_prediction_error(model, X_train_final, self.y_train, X_test_final, self.y_test, **kwargs)
         elif kind == "calibration_curve":
             graph = plot_calibration_curve(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif 'shap' in kind:
-            graph = plot_shap(model, self.X_test, kind, **kwargs)
+            graph = plot_shap(model, X_test_final, kind, **kwargs)
         else:
             error_msg = f"Invalid plot type: {kind}. Available plot types: {available_plot_types}"
             self.__logger.error(error_msg)

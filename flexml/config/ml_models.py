@@ -308,8 +308,8 @@ def get_ml_models(
 
         # Quick Classification Models
         LOGISTIC_REGRESSION = LogisticRegression(max_iter=1000, random_state=random_state, n_jobs=n_jobs)
-        XGBOOST_CLASSIFIER = XGBClassifier(objective=xgb_objective, random_state=random_state, n_jobs=n_jobs)
-        LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose=-1, random_state=random_state, n_jobs=n_jobs)
+        XGBOOST_CLASSIFIER = XGBClassifier(enable_categorical=True, objective=xgb_objective, random_state=random_state, n_jobs=n_jobs)
+        LIGHTGBM_CLASSIFIER = LGBMClassifier(enable_categorical=True, verbose=-1, random_state=random_state, n_jobs=n_jobs)
         CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files=False, silent=True, random_seed=random_state, thread_count=n_jobs)
         DECISION_TREE_CLASSIFIER = DecisionTreeClassifier(random_state=random_state)
         RANDOM_FOREST_CLASSIFIER = RandomForestClassifier(random_state=random_state, n_jobs=n_jobs)
