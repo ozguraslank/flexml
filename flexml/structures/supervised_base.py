@@ -34,7 +34,7 @@ from flexml.helpers import (
 )
 from flexml.structures.custom_score import CustomScore
 from flexml._model_tuner import ModelTuner
-from flexml._feature_engineer import FeatureEngineering
+from flexml._feature_engineer import FeatureEngineering, CategoricalTypeConverter
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -493,7 +493,10 @@ class SupervisedBase:
             model_name = model.__class__.__name__
         
         if 'CatBoost' in model_name and hasattr(self, 'categorical_columns') and self.categorical_columns:
-            model.fit(X, y, cat_features=self.categorical_columns)
+            # check if model is fitted:
+            if not model.is_fitted():
+                model.set_params(cat_features=list(self.categorical_columns))
+            model.fit(X, y)
         else:
             model.fit(X, y)
     
@@ -1759,20 +1762,9 @@ class SupervisedBase:
 
         # Get model name for native categorical check
         model_name = model.__class__.__name__
-        
+
         # Check if model supports native categorical features
-        if model_name in NATIVE_CATEGORICAL_MODELS and hasattr(self, 'categorical_columns') and self.categorical_columns:
-            # Clone the model to avoid modifying the fitted model
-            from sklearn.base import clone
-            model = clone(model)
-            
-            # For CatBoost, set cat_features parameter on the cloned model
-            if 'CatBoost' in model_name:
-                model.set_params(cat_features=list(self.categorical_columns))
-            
-            # Create pipeline WITHOUT the encoder step (keep other steps like imputer, normalizer)
-            # and add a step to convert categoricals to 'category' dtype
-            from flexml._feature_engineer import CategoricalTypeConverter
+        if model_name in NATIVE_CATEGORICAL_MODELS and hasattr(self, 'categorical_columns') and len(self.categorical_columns) > 0:
             pipeline_steps_without_encoder = [
                 (name, step) for name, step in self.feature_engineer.pipeline.steps 
                 if name != 'encoder'
@@ -1782,8 +1774,6 @@ class SupervisedBase:
                 ('cat_type_converter', CategoricalTypeConverter(list(self.categorical_columns)))
             )
             pipeline = Pipeline(steps=pipeline_steps_without_encoder + [('model', model)])
-            
-            self.__logger.info(f"Using native categorical features for {model_name} during tuning (encoding step removed)")
         else:
             # Standard pipeline with encoding for non-native categorical models
             pipeline = Pipeline(steps=self.feature_engineer.pipeline.steps + [('model', model)])

@@ -198,17 +198,11 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_params = None
-        
         if isinstance(model, Pipeline):
             model = model.named_steps['model']
 
         if "CatBoost" in model.__class__.__name__:
-            # Use get_all_params() only if the model is fitted, otherwise use get_params()
-            if model.is_fitted():
-                model_params = model.get_all_params()
-            else:
-                model_params = model.get_params()
+            model_params = model.get_all_params()
         else:
             model_params = model.get_params()
         
