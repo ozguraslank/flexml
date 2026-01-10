@@ -27,6 +27,33 @@ class ColumnDropper(BaseEstimator, TransformerMixin):
             A DataFrame with the specified columns dropped
         """
         return X.drop(columns=self.drop_columns, axis=1, errors='ignore')
+
+
+class CategoricalTypeConverter(BaseEstimator, TransformerMixin):
+    """
+    A transformer to convert categorical columns to 'category' dtype.
+    Used for tree-based models that support native categorical features.
+    """
+    def __init__(self, categorical_columns: Optional[List[str]] = None):
+        self.categorical_columns = categorical_columns or []
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        """
+        Converts specified categorical columns to 'category' dtype
+        
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with categorical columns converted to 'category' dtype
+        """
+        X = X.copy()
+        for col in self.categorical_columns:
+            if col in X.columns:
+                X[col] = X[col].astype('category')
+        return X
     
 
 class ColumnImputer(BaseEstimator, TransformerMixin):

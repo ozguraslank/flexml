@@ -1020,6 +1020,14 @@ class SupervisedBase:
             
             return model
 
+        # Warn users about native categorical models in Pipeline mode
+        if model_name in NATIVE_CATEGORICAL_MODELS and hasattr(self, 'categorical_columns') and self.categorical_columns:
+            self.__logger.warning(
+                f"'{model_name}' supports native categorical features, but Pipeline mode encodes categorical data. "
+                f"For optimal performance, consider using 'model_only=True' and handle feature engineering separately, "
+                f"or use the 'predict()' method directly which handles native categoricals automatically."
+            )
+
         # Add the model to the pipeline
         pipeline_steps.append(('model', model))
 
@@ -1749,8 +1757,36 @@ class SupervisedBase:
                 y_encoded = self.y # No need to encode the target for regression or if the target is already encoded
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, y_encoded, self.logging_to_file)
 
-        pipeline = self.feature_engineer.pipeline
-        pipeline = Pipeline(steps=pipeline.steps + [('model', model)])
+        # Get model name for native categorical check
+        model_name = model.__class__.__name__
+        
+        # Check if model supports native categorical features
+        if model_name in NATIVE_CATEGORICAL_MODELS and hasattr(self, 'categorical_columns') and self.categorical_columns:
+            # Clone the model to avoid modifying the fitted model
+            from sklearn.base import clone
+            model = clone(model)
+            
+            # For CatBoost, set cat_features parameter on the cloned model
+            if 'CatBoost' in model_name:
+                model.set_params(cat_features=list(self.categorical_columns))
+            
+            # Create pipeline WITHOUT the encoder step (keep other steps like imputer, normalizer)
+            # and add a step to convert categoricals to 'category' dtype
+            from flexml._feature_engineer import CategoricalTypeConverter
+            pipeline_steps_without_encoder = [
+                (name, step) for name, step in self.feature_engineer.pipeline.steps 
+                if name != 'encoder'
+            ]
+            # Add categorical type converter for native categorical models
+            pipeline_steps_without_encoder.append(
+                ('cat_type_converter', CategoricalTypeConverter(list(self.categorical_columns)))
+            )
+            pipeline = Pipeline(steps=pipeline_steps_without_encoder + [('model', model)])
+            
+            self.__logger.info(f"Using native categorical features for {model_name} during tuning (encoding step removed)")
+        else:
+            # Standard pipeline with encoding for non-native categorical models
+            pipeline = Pipeline(steps=self.feature_engineer.pipeline.steps + [('model', model)])
 
         self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")
         tuning_method = tuning_method.lower()

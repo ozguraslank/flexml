@@ -204,7 +204,11 @@ class ModelTuner:
             model = model.named_steps['model']
 
         if "CatBoost" in model.__class__.__name__:
-            model_params = model.get_all_params()
+            # Use get_all_params() only if the model is fitted, otherwise use get_params()
+            if model.is_fitted():
+                model_params = model.get_all_params()
+            else:
+                model_params = model.get_params()
         else:
             model_params = model.get_params()
         
