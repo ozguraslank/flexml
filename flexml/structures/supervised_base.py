@@ -956,27 +956,9 @@ class SupervisedBase:
         if full_train:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             
-            # Check if this is a native categorical model that will use a different pipeline structure
-            is_native_cat_model = (
-                model_name in NATIVE_CATEGORICAL_MODELS and 
-                hasattr(self, 'categorical_columns') and 
-                len(self.categorical_columns) > 0 and
-                not model_only  # Only use special flow if we're saving a pipeline
-            )
-            
-            # For native categorical models being saved as pipeline:
-            # ALWAYS retrain using the pipeline structure, even if previously "full trained"
-            # because the previous training used encode→swap, not the pipeline structure
-            needs_training = not already_trained or is_native_cat_model
-            
-            if needs_training:
-                if is_native_cat_model and already_trained:
-                    self.__logger.info(
-                        f"Retraining '{model_name}' to match pipeline structure for native categorical support."
-                    )
-                else:
-                    self.__logger.info("Training the model using the whole data")
-                    
+            if not already_trained:
+                self.__logger.info("Training the model using the whole data")
+                
                 self.feature_engineer.setup(data=self.data)
                 
                 # Get preprocessing pipeline for this model
@@ -989,22 +971,16 @@ class SupervisedBase:
                 # Fit and transform data through the preprocessing pipeline
                 X_train_final = preprocessing_pipeline.fit_transform(X_raw)
                 
-                # Fit model with proper cat_features handling
+                # Fit model
                 self._fit_model(model, X_train_final, y_train, model_name)
-                
-                if is_native_cat_model:
-                    self.__logger.info(f"Model '{model_name}' trained using native categorical pipeline.")
-                else:
-                    self.__logger.info(f"Model '{model_name}' trained with full data.")
 
-                # find the model in leaderboard and update the full_train to True, and update the model object in there
+                # Update leaderboard
                 for model_info in self.__model_training_info:
                     for name, info in model_info.items():
                         if name == model_name:
                             info["model_stats"]["Full Train"] = True
                             info["model"] = model
                             break
-                # Update leaderboard
                 self.get_best_models()
 
         # If no feature pipeline is included, return the model directly
