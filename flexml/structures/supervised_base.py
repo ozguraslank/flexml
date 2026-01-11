@@ -12,6 +12,7 @@ from sklearn.pipeline import Pipeline
 from flexml.logger import get_logger
 from flexml.config import (
     get_ml_models,
+    NATIVE_CATEGORICAL_MODELS,
     EVALUATION_METRICS,
     CROSS_VALIDATION_METHODS,
     PLOT_TYPES
@@ -39,33 +40,6 @@ from flexml._feature_engineer import FeatureEngineering, CategoricalTypeConverte
 import warnings
 warnings.filterwarnings("ignore")
 pd.set_option('display.max_columns', None)
-
-
-# Models that support native categorical features (no encoding needed)
-NATIVE_CATEGORICAL_MODELS = {
-    'CatBoostRegressor', 'CatBoostClassifier',
-    'LGBMRegressor', 'LGBMClassifier', 
-    'XGBRegressor', 'XGBClassifier',
-    'HistGradientBoostingRegressor', 'HistGradientBoostingClassifier'  # sklearn also supports!
-}
-
-def _get_encoded_categorical_columns(encoded_columns, original_cat_cols):
-    """
-    Identifies which columns in the encoded dataframe came from categorical encoding.
-    Handles both label encoding (same name) and one-hot encoding (prefix_value format).
-    """
-    encoded_cat_cols = []
-    for col in encoded_columns:
-        # Check if it's the original column name (label/ordinal encoding)
-        if col in original_cat_cols:
-            encoded_cat_cols.append(col)
-        else:
-            # Check if it's a one-hot encoded column (format: original_value)
-            for orig_col in original_cat_cols:
-                if col.startswith(f"{orig_col}_"):
-                    encoded_cat_cols.append(col)
-                    break
-    return encoded_cat_cols
 
 
 class SupervisedBase:
@@ -354,14 +328,15 @@ class SupervisedBase:
         self.feature_engineer.setup(data=train_data)
         self.categorical_columns = self.feature_engineer.categorical_columns
         
-        # Store raw categorical columns for holdout data (for native-categorical models)
-        self.X_train_cat_raw = self._get_raw_categorical_data(train_data)
-        self.X_test_cat_raw = self._get_raw_categorical_data(test_data)
-
-        self.X_train, self.y_train = self.feature_engineer.fit_transform()
-        self.X_test, self.y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
-        self.encoded_categorical_columns = _get_encoded_categorical_columns(self.X_train.columns, self.categorical_columns)
-        self.feature_names = list(self.X_train.columns)
+        # Store raw holdout data (preprocessing will be done per-model when needed)
+        self.X_train_raw = train_data.drop(columns=[self.target_col])
+        self.X_test_raw = test_data.drop(columns=[self.target_col])
+        self.y_train, self.y_test = self._encode_target(
+            train_data[self.target_col], 
+            test_data[self.target_col]
+        )
+        
+        self.feature_names = list(self.X_train_raw.columns)
         self.y_class_mapping = self.feature_engineer.y_class_mapping
         
     def __prepare_models(self, experiment_size: str, num_class: int, random_state: Optional[int] = None, n_jobs: Optional[int] = -1):
@@ -413,60 +388,6 @@ class SupervisedBase:
         
         return top_n_models
     
-    def _get_raw_categorical_data(self, data: pd.DataFrame) -> Optional[pd.DataFrame]:
-        """
-        Extract raw categorical columns from data and convert to category dtype.
-        Used to preserve original categoricals before encoding for native-categorical models.
-        
-        Parameters
-        ----------
-        data : pd.DataFrame
-            The data containing categorical columns
-            
-        Returns
-        -------
-        Optional[pd.DataFrame]
-            DataFrame with categorical columns converted to 'category' dtype, or None if no categorical columns
-        """
-        if not hasattr(self, 'categorical_columns') or not self.categorical_columns:
-            return None
-        cat_df = data[self.categorical_columns].copy()
-        for col in self.categorical_columns:
-            cat_df[col] = cat_df[col].astype('category')
-        return cat_df
-    
-    def _prepare_data_for_model(
-        self, 
-        model_name: str, 
-        X_encoded: pd.DataFrame, 
-        X_cat_raw: Optional[pd.DataFrame] = None
-    ) -> pd.DataFrame:
-        """
-        Prepares data for a specific model by swapping encoded categoricals
-        with raw ones for models that support native categorical features.
-        
-        Parameters
-        ----------
-        model_name : str
-            The name of the model
-        X_encoded : pd.DataFrame
-            The encoded feature data
-        X_cat_raw : Optional[pd.DataFrame]
-            The raw categorical columns (with 'category' dtype)
-            
-        Returns
-        -------
-        pd.DataFrame
-            Prepared feature data for the model
-        """
-        if model_name in NATIVE_CATEGORICAL_MODELS and X_cat_raw is not None and hasattr(self, 'encoded_categorical_columns') and self.encoded_categorical_columns:
-            # Drop encoded categorical columns
-            X_final = X_encoded.drop(columns=self.encoded_categorical_columns, errors='ignore')
-            # Merge with raw categorical columns (aligned by index)
-            X_final = pd.concat([X_final, X_cat_raw.loc[X_final.index]], axis=1)
-            return X_final
-        return X_encoded
-    
     def _fit_model(
         self, 
         model: object, 
@@ -499,6 +420,58 @@ class SupervisedBase:
             model.fit(X, y)
         else:
             model.fit(X, y)
+    
+    def _encode_target(
+        self, 
+        y: pd.Series, 
+        y_test: Optional[pd.Series] = None,
+        fit: bool = True
+    ) -> Union[pd.Series, tuple]:
+        """
+        Encodes the target variable for classification tasks.
+        
+        Parameters
+        ----------
+        y : pd.Series
+            The target variable to encode
+        y_test : pd.Series, optional
+            Test target to transform (uses already fitted encoder)
+        fit : bool
+            If True, fits the encoder on y. If False, only transforms.
+            
+        Returns
+        -------
+        pd.Series or tuple
+            Encoded y, or (encoded_y, encoded_y_test) if y_test provided
+        """
+        # Skip encoding for regression or already numeric targets
+        if self.__ML_TASK_TYPE != 'Classification' or y.dtype not in ['object', 'category']:
+            return (y, y_test) if y_test is not None else y
+        
+        # Encode y
+        if fit:
+            encoded_y = pd.Series(
+                self.feature_engineer.target_encoder.fit_transform(y),
+                name=y.name,
+                index=y.index
+            )
+        else:
+            encoded_y = pd.Series(
+                self.feature_engineer.target_encoder.transform(y),
+                name=y.name,
+                index=y.index
+            )
+        
+        # Encode y_test if provided
+        if y_test is not None:
+            encoded_y_test = pd.Series(
+                self.feature_engineer.target_encoder.transform(y_test),
+                name=y_test.name,
+                index=y_test.index
+            )
+            return encoded_y, encoded_y_test
+        
+        return encoded_y
     
     def __process_experiment_result(self, experiment_stats: dict):
         """
@@ -745,13 +718,14 @@ class SupervisedBase:
                 ], axis=1)
                 
                 self.feature_engineer.setup(data=train_data)
-
-                # Save raw categorical columns BEFORE encoding (for native-categorical models)
-                X_train_cat_raw = self._get_raw_categorical_data(train_data)
-                X_test_cat_raw = self._get_raw_categorical_data(test_data)
                 
-                X_train_encoded, y_train = self.feature_engineer.fit_transform()
-                X_test_encoded, y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
+                # Get raw X and y from train/test data
+                X_train_raw = train_data.drop(columns=[self.target_col])
+                X_test_raw = test_data.drop(columns=[self.target_col])
+                y_train, y_test = self._encode_target(
+                    train_data[self.target_col],
+                    test_data[self.target_col]
+                )
 
                 for model_idx in range(len(self.__ML_MODELS)):
                     model_info = self.__ML_MODELS[model_idx]
@@ -763,9 +737,12 @@ class SupervisedBase:
 
                     model = model_info['model']
 
-                    # Prepare data based on model type (native categorical vs encoded)
-                    X_train_final = self._prepare_data_for_model(model_name, X_train_encoded, X_train_cat_raw)
-                    X_test_final = self._prepare_data_for_model(model_name, X_test_encoded, X_test_cat_raw)
+                    # Get preprocessing pipeline for this specific model
+                    preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
+                    
+                    # Transform data using model-specific preprocessing
+                    X_train_final = preprocessing_pipeline.fit_transform(X_train_raw)
+                    X_test_final = preprocessing_pipeline.transform(X_test_raw)
 
                     try:
                         all_metrics = []
@@ -974,32 +951,51 @@ class SupervisedBase:
                 raise ValueError(error_msg)
         else: # If model is an object, we can't know its name, so we use its class name
             model_name = model.__class__.__name__
-            
-        # Initialize pipeline steps
-        pipeline_steps = []
-
-        # Initialize and setup feature engineering if needed
-        if not model_only:
-            # Add the feature engineering pipeline directly
-            pipeline_steps.extend(self.feature_engineer.pipeline.steps)
 
         # Handle full training scenario if required
         if full_train:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
-            if not already_trained:
-                self.__logger.info("Training the model using the whole data")
+            
+            # Check if this is a native categorical model that will use a different pipeline structure
+            is_native_cat_model = (
+                model_name in NATIVE_CATEGORICAL_MODELS and 
+                hasattr(self, 'categorical_columns') and 
+                len(self.categorical_columns) > 0 and
+                not model_only  # Only use special flow if we're saving a pipeline
+            )
+            
+            # For native categorical models being saved as pipeline:
+            # ALWAYS retrain using the pipeline structure, even if previously "full trained"
+            # because the previous training used encode→swap, not the pipeline structure
+            needs_training = not already_trained or is_native_cat_model
+            
+            if needs_training:
+                if is_native_cat_model and already_trained:
+                    self.__logger.info(
+                        f"Retraining '{model_name}' to match pipeline structure for native categorical support."
+                    )
+                else:
+                    self.__logger.info("Training the model using the whole data")
+                    
                 self.feature_engineer.setup(data=self.data)
                 
-                # Get raw categoricals before encoding
-                X_cat_raw = self._get_raw_categorical_data(self.data)
+                # Get preprocessing pipeline for this model
+                preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
                 
-                X_train_encoded, y_train = self.feature_engineer.fit_transform()
+                # Prepare training data
+                X_raw = self.data.drop(columns=[self.target_col])
+                y_train = self._encode_target(self.data[self.target_col])
                 
-                # Prepare data for this specific model
-                X_train_final = self._prepare_data_for_model(model_name, X_train_encoded, X_cat_raw)
+                # Fit and transform data through the preprocessing pipeline
+                X_train_final = preprocessing_pipeline.fit_transform(X_raw)
                 
-                # Fit with proper cat_features handling
+                # Fit model with proper cat_features handling
                 self._fit_model(model, X_train_final, y_train, model_name)
+                
+                if is_native_cat_model:
+                    self.__logger.info(f"Model '{model_name}' trained using native categorical pipeline.")
+                else:
+                    self.__logger.info(f"Model '{model_name}' trained with full data.")
 
                 # find the model in leaderboard and update the full_train to True, and update the model object in there
                 for model_info in self.__model_training_info:
@@ -1023,19 +1019,8 @@ class SupervisedBase:
             
             return model
 
-        # Warn users about native categorical models in Pipeline mode
-        if model_name in NATIVE_CATEGORICAL_MODELS and hasattr(self, 'categorical_columns') and self.categorical_columns:
-            self.__logger.warning(
-                f"'{model_name}' supports native categorical features, but Pipeline mode encodes categorical data. "
-                f"For optimal performance, consider using 'model_only=True' and handle feature engineering separately, "
-                f"or use the 'predict()' method directly which handles native categoricals automatically."
-            )
-
-        # Add the model to the pipeline
-        pipeline_steps.append(('model', model))
-
-        # Create the pipeline
-        pipeline = Pipeline(pipeline_steps)
+        # Build pipeline with proper handling for native categorical models
+        pipeline = self._get_model_pipeline(model, include_model=True)
 
         # Save the pipeline
         try:
@@ -1074,6 +1059,68 @@ class SupervisedBase:
                     return True
         return False
 
+    def _is_native_categorical_model(self, model_name: str) -> bool:
+        """Check if model supports native categorical features."""
+        return (
+            model_name in NATIVE_CATEGORICAL_MODELS and 
+            hasattr(self, 'categorical_columns') and 
+            len(self.categorical_columns) > 0
+        )
+    
+    def _get_preprocessing_steps(self, model_name: str) -> list:
+        """
+        Returns the appropriate preprocessing steps for a given model.
+        
+        For native categorical models: no encoder, uses CategoricalTypeConverter
+        For other models: includes encoder
+        
+        Parameters
+        ----------
+        model_name : str
+            The name of the model
+            
+        Returns
+        -------
+        list
+            List of preprocessing steps as (name, transformer) tuples
+        """
+        if self._is_native_categorical_model(model_name):
+            # Pipeline without encoder, with CategoricalTypeConverter
+            steps = [
+                (name, step) for name, step in self.feature_engineer.pipeline.steps 
+                if name != 'encoder'
+            ]
+            steps.append(('cat_type_converter', CategoricalTypeConverter(list(self.categorical_columns))))
+        else:
+            # Standard pipeline with encoder
+            steps = list(self.feature_engineer.pipeline.steps)
+        
+        return steps
+    
+    def _get_model_pipeline(self, model, include_model: bool = True) -> Pipeline:
+        """
+        Returns a complete Pipeline for a given model.
+        
+        Parameters
+        ----------
+        model : object
+            The model object
+        include_model : bool, optional
+            Whether to include the model as the last step (default: True)
+            
+        Returns
+        -------
+        Pipeline
+            sklearn Pipeline with preprocessing steps (and optionally the model)
+        """
+        model_name = model.__class__.__name__
+        steps = self._get_preprocessing_steps(model_name)
+        
+        if include_model:
+            steps.append(('model', model))
+        
+        return Pipeline(steps)
+
     def _predict_helper(
         self,
         test_data: pd.DataFrame,
@@ -1097,8 +1144,8 @@ class SupervisedBase:
             if extra: error_msg += f" Extra: {extra}."
             raise ValueError(error_msg)
         
-        model_taken_from_leaderboard = False # If the model object is from leaderboard, track this
-
+        # Get model from leaderboard or use provided model
+        model_taken_from_leaderboard = False
         if model is None:
             model = self.get_best_models()
             model_name = self.__last_searched_model_name
@@ -1111,38 +1158,38 @@ class SupervisedBase:
             model_name = model
             model = self.get_model_by_name(model)
             model_taken_from_leaderboard = True
-        else: # If model is an object, we can't know its name, so we use its class name
+        else:
             model_name = model.__class__.__name__
         
-        # Prepare training data if needed
+        # Get the preprocessing pipeline for this model (consistent with save_model)
+        self.feature_engineer.setup(data=self.data)
+        preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
+        
+        # Train model on full data if needed
         if full_train:
-            # Check If model_taken_from_leaderboard is True and Full Train in self.__model_training_info is True, then we don't need to train the model again
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             if not already_trained:
                 self.__logger.info("Training the model using the whole data")
-                self.feature_engineer.setup(data=self.data)
                 
-                # Get raw categoricals before encoding
-                X_cat_raw = self._get_raw_categorical_data(self.data)
+                # Prepare training data
+                X_raw = self.data.drop(columns=[self.target_col])
+                y_train = self._encode_target(self.data[self.target_col])
                 
-                X_train_encoded, y_train = self.feature_engineer.fit_transform()
-                X_train_final = self._prepare_data_for_model(model_name, X_train_encoded, X_cat_raw)
+                # Fit and transform through preprocessing pipeline
+                X_train_final = preprocessing_pipeline.fit_transform(X_raw)
                 self._fit_model(model, X_train_final, y_train, model_name)
 
-                # find the model in leaderboard and update the full_train to True, and update the model object in there
+                # Update leaderboard
                 for model_info in self.__model_training_info:
                     for name, info in model_info.items():
                         if name == model_name:
                             info["model_stats"]["Full Train"] = True
                             info["model"] = model
                             break
-                # Update leaderboard
                 self.get_best_models()
 
-        # Transform test data and prepare for model
-        X_test_encoded = self.feature_engineer.transform(test_data)
-        X_test_cat_raw = self._get_raw_categorical_data(test_data)
-        X_test = self._prepare_data_for_model(model_name, X_test_encoded, X_test_cat_raw)
+        # Transform test data through the same preprocessing pipeline
+        X_test = preprocessing_pipeline.transform(test_data)
 
         return model, X_test
 
@@ -1209,7 +1256,8 @@ class SupervisedBase:
         model, X_test = self._predict_helper(test_data, model, full_train)
         return model.predict_proba(X_test)
 
-    def __get_holdout_model_from_stats(self, model_name: str) -> object:
+    def __get_holdout_model_from_stats(self, model_name: str) -> Optional[dict]:
+        """Returns dict with 'model' and 'preprocessing_pipeline' keys, or None."""
         if self._holdout_model_objects is None or self._holdout_model_objects == {}:
             return None
         return self._holdout_model_objects.get(model_name)
@@ -1220,13 +1268,18 @@ class SupervisedBase:
 
         model_copy = deepcopy(model)
         
-        # Prepare holdout data for this model (use raw categoricals for native-categorical models)
-        X_train_final = self._prepare_data_for_model(model_name, self.X_train, self.X_train_cat_raw)
+        # Get preprocessing pipeline for this model
+        preprocessing_pipeline = self._get_model_pipeline(model_copy, include_model=False)
         
-        # Fit with proper categorical handling
+        # Transform holdout training data and fit model
+        X_train_final = preprocessing_pipeline.fit_transform(self.X_train_raw)
         self._fit_model(model_copy, X_train_final, self.y_train, model_name)
         
-        self._holdout_model_objects[model_name] = model_copy
+        # Store the fitted preprocessing pipeline with the model for later use
+        self._holdout_model_objects[model_name] = {
+            'model': model_copy,
+            'preprocessing_pipeline': preprocessing_pipeline
+        }
         return model_copy
     
     def plot(self, model: Optional[Union[str, object]] = None, kind: str = "feature_importance", **kwargs):
@@ -1297,17 +1350,22 @@ class SupervisedBase:
         elif isinstance(model, str):
             model_name = model
             model = self.get_model_by_name(model)
-        else: # If model is an object, we can't know its name, so we use its class name
+        else:
             model_name = model.__class__.__name__
         
-        if self.__get_holdout_model_from_stats(model_name) is not None:
-            model = self.__get_holdout_model_from_stats(model_name)
+        # Get or create holdout model with its preprocessing pipeline
+        holdout_data = self.__get_holdout_model_from_stats(model_name)
+        if holdout_data is not None:
+            model = holdout_data['model']
+            preprocessing_pipeline = holdout_data['preprocessing_pipeline']
         else:
             model = self.__add_holdout_model_to_stats(model, model_name)
+            holdout_data = self.__get_holdout_model_from_stats(model_name)
+            preprocessing_pipeline = holdout_data['preprocessing_pipeline']
 
-        # Prepare holdout data for this model (use raw categoricals for native-categorical models)
-        X_train_final = self._prepare_data_for_model(model_name, self.X_train, self.X_train_cat_raw)
-        X_test_final = self._prepare_data_for_model(model_name, self.X_test, self.X_test_cat_raw)
+        # Transform holdout data using the model's preprocessing pipeline
+        X_train_final = preprocessing_pipeline.transform(self.X_train_raw)
+        X_test_final = preprocessing_pipeline.transform(self.X_test_raw)
 
         # If kind expects predictions
         if kind in ["confusion_matrix"]:
@@ -1319,7 +1377,7 @@ class SupervisedBase:
 
         if kind == "feature_importance":
             if not hasattr(self, 'feature_names'):
-                self.feature_names = list(self.X_train.columns)
+                self.feature_names = list(self.X_train_raw.columns)
             graph = plot_feature_importance(model, self.feature_names, **kwargs)
         elif kind == "confusion_matrix":
             graph = plot_confusion_matrix(self.y_test, preds, self.y_class_mapping, **kwargs)
@@ -1751,32 +1809,13 @@ class SupervisedBase:
                 logging_to_file=self.logging_to_file
             ))
 
-        # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
+        # Create the ModelTuner object If It's not created before
         if not hasattr(self, 'model_tuner'):
-            if self.__ML_TASK_TYPE == 'Classification' and self.y.dtype in ['object', 'category']:
-                y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
-                y_encoded.index = self.y.index
-            else:
-                y_encoded = self.y # No need to encode the target for regression or if the target is already encoded
+            y_encoded = self._encode_target(self.y)
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, y_encoded, self.logging_to_file)
 
-        # Get model name for native categorical check
-        model_name = model.__class__.__name__
-
-        # Check if model supports native categorical features
-        if model_name in NATIVE_CATEGORICAL_MODELS and hasattr(self, 'categorical_columns') and len(self.categorical_columns) > 0:
-            pipeline_steps_without_encoder = [
-                (name, step) for name, step in self.feature_engineer.pipeline.steps 
-                if name != 'encoder'
-            ]
-            # Add categorical type converter for native categorical models
-            pipeline_steps_without_encoder.append(
-                ('cat_type_converter', CategoricalTypeConverter(list(self.categorical_columns)))
-            )
-            pipeline = Pipeline(steps=pipeline_steps_without_encoder + [('model', model)])
-        else:
-            # Standard pipeline with encoding for non-native categorical models
-            pipeline = Pipeline(steps=self.feature_engineer.pipeline.steps + [('model', model)])
+        # Build pipeline with proper handling for native categorical models
+        pipeline = self._get_model_pipeline(model, include_model=True)
 
         self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")
         tuning_method = tuning_method.lower()
