@@ -316,24 +316,17 @@ class SupervisedBase:
         )[0]
         train_labels, test_labels = holdout_cv_splits[0], holdout_cv_splits[1]
 
-        train_data = pd.concat([
-            self.X.loc[train_labels], 
-            self.y.loc[train_labels]
-        ], axis=1)
-        test_data = pd.concat([
-            self.X.loc[test_labels],
-            self.y.loc[test_labels]
-        ], axis=1)
-
+        # Setup feature engineer with train data
+        train_data = pd.concat([self.X.loc[train_labels], self.y.loc[train_labels]], axis=1)
         self.feature_engineer.setup(data=train_data)
         self.categorical_columns = self.feature_engineer.categorical_columns
         
-        # Store raw holdout data (preprocessing will be done per-model when needed)
-        self.X_train_raw = train_data.drop(columns=[self.target_col])
-        self.X_test_raw = test_data.drop(columns=[self.target_col])
+        # Store raw holdout data (use X/y directly instead of concat→drop)
+        self.X_train_raw = self.X.loc[train_labels]
+        self.X_test_raw = self.X.loc[test_labels]
         self.y_train, self.y_test = self._encode_target(
-            train_data[self.target_col], 
-            test_data[self.target_col]
+            self.y.loc[train_labels], 
+            self.y.loc[test_labels]
         )
         
         self.feature_names = list(self.X_train_raw.columns)
@@ -708,23 +701,16 @@ class SupervisedBase:
                     train_labels = train_idx
                     test_labels = test_idx
                 
-                train_data = pd.concat([
-                    self.X.loc[train_labels], 
-                    self.y.loc[train_labels]
-                ], axis=1)
-                test_data = pd.concat([
-                    self.X.loc[test_labels],
-                    self.y.loc[test_labels]
-                ], axis=1)
-                
+                # Setup feature engineer with train data
+                train_data = pd.concat([self.X.loc[train_labels], self.y.loc[train_labels]], axis=1)
                 self.feature_engineer.setup(data=train_data)
                 
-                # Get raw X and y from train/test data
-                X_train_raw = train_data.drop(columns=[self.target_col])
-                X_test_raw = test_data.drop(columns=[self.target_col])
+                # Use X/y directly instead of concat→drop
+                X_train_raw = self.X.loc[train_labels]
+                X_test_raw = self.X.loc[test_labels]
                 y_train, y_test = self._encode_target(
-                    train_data[self.target_col],
-                    test_data[self.target_col]
+                    self.y.loc[train_labels],
+                    self.y.loc[test_labels]
                 )
 
                 for model_idx in range(len(self.__ML_MODELS)):
@@ -964,12 +950,9 @@ class SupervisedBase:
                 # Get preprocessing pipeline for this model
                 preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
                 
-                # Prepare training data
-                X_raw = self.data.drop(columns=[self.target_col])
-                y_train = self._encode_target(self.data[self.target_col])
-                
                 # Fit and transform data through the preprocessing pipeline
-                X_train_final = preprocessing_pipeline.fit_transform(X_raw)
+                X_train_final = preprocessing_pipeline.fit_transform(self.X)
+                y_train = self._encode_target(self.y)
                 
                 # Fit model
                 self._fit_model(model, X_train_final, y_train, model_name)
@@ -1147,12 +1130,9 @@ class SupervisedBase:
             if not already_trained:
                 self.__logger.info("Training the model using the whole data")
                 
-                # Prepare training data
-                X_raw = self.data.drop(columns=[self.target_col])
-                y_train = self._encode_target(self.data[self.target_col])
-                
                 # Fit and transform through preprocessing pipeline
-                X_train_final = preprocessing_pipeline.fit_transform(X_raw)
+                X_train_final = preprocessing_pipeline.fit_transform(self.X)
+                y_train = self._encode_target(self.y)
                 self._fit_model(model, X_train_final, y_train, model_name)
 
                 # Update leaderboard
