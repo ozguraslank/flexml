@@ -56,9 +56,12 @@ class CategoricalTypeConverter(BaseEstimator, TransformerMixin):
         for col in self.categorical_columns:
             if col in X.columns:
                 if col in self.ordinal_encode_map:
-                    # Create ordered categorical with specified order
-                    categories = self.ordinal_encode_map[col]
-                    X[col] = pd.Categorical(X[col].astype(str), categories=categories, ordered=True)
+                    # Handle unseen categories by mapping them to NaN
+                    categories = [str(c) for c in self.ordinal_encode_map[col]]
+                    col_values = X[col].astype(str)
+                    known_mask = col_values.isin(categories)
+                    col_values = col_values.where(known_mask, other=np.nan)
+                    X[col] = pd.Categorical(col_values, categories=categories, ordered=True)
                 else:
                     # Regular unordered categorical
                     X[col] = X[col].astype('category')
