@@ -938,7 +938,8 @@ class SupervisedBase:
         else: # If model is an object, we can't know its name, so we use its class name
             model_name = model.__class__.__name__
 
-        # Handle full training scenario if required
+
+        fitted_preprocessing_pipeline = None
         if full_train:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
             
@@ -948,10 +949,10 @@ class SupervisedBase:
                 self.feature_engineer.setup(data=self.data)
                 
                 # Get preprocessing pipeline for this model
-                preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
+                fitted_preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
                 
                 # Fit and transform data through the preprocessing pipeline
-                X_train_final = preprocessing_pipeline.fit_transform(self.X)
+                X_train_final = fitted_preprocessing_pipeline.fit_transform(self.X)
                 y_train = self._encode_target(self.y)
                 
                 # Fit model
@@ -978,8 +979,13 @@ class SupervisedBase:
             
             return model
 
-        # Build pipeline with proper handling for native categorical models
-        pipeline = self._get_model_pipeline(model, include_model=True)
+        if fitted_preprocessing_pipeline is not None:
+            # Combine the exact fitted preprocessing steps with the fitted model
+            steps = list(fitted_preprocessing_pipeline.steps) + [('model', model)]
+            pipeline = Pipeline(steps)
+        else:
+            # Model was already trained, get pipeline from feature_engineer
+            pipeline = self._get_model_pipeline(model, include_model=True)
 
         # Save the pipeline
         try:
