@@ -14,19 +14,33 @@ class TestRegression(unittest.TestCase):
     logger = get_logger(__name__, "TEST")
     logger.setLevel("DEBUG")
 
+    @staticmethod
+    def _add_synthetic_categorical_columns(df):
+        """Add synthetic categorical columns to test categorical encoding"""
+        n_rows = len(df)
+        np.random.seed(42)
+    
+        df['category_A'] = np.random.choice(['low', 'medium', 'high'], n_rows)
+        df['category_B'] = np.random.choice(['red', 'green', 'blue', 'yellow'], n_rows)
+        return df
+
     test_config = {
         'Regression': {
-            'data': load_diabetes(as_frame=True)['frame'],
+            'data': _add_synthetic_categorical_columns.__func__(load_diabetes(as_frame=True)['frame'].copy()),
             'target_col': 'target',
             'exp_obj': None
         },
         'BinaryClassification': {
-            'data': load_breast_cancer(as_frame=True)['frame'].assign(target=lambda df: df['target'].map({0: 'No', 1: 'Yes'})),
+            'data': _add_synthetic_categorical_columns.__func__(
+                load_breast_cancer(as_frame=True)['frame'].assign(target=lambda df: df['target'].map({0: 'No', 1: 'Yes'})).copy()
+            ),
             'target_col': 'target',
             'exp_obj': None
         },
         'MulticlassClassification': {
-            'data': load_iris(as_frame=True)['frame'].assign(target=lambda df: df['target'].map({0: 'Iris-Setosa', 1: 'Iris-Versicolor', 2: 'Iris-Virginica'})),
+            'data': _add_synthetic_categorical_columns.__func__(
+                load_iris(as_frame=True)['frame'].assign(target=lambda df: df['target'].map({0: 'Iris-Setosa', 1: 'Iris-Versicolor', 2: 'Iris-Virginica'})).copy()
+            ),
             'target_col': 'target',
             'exp_obj': None
         }

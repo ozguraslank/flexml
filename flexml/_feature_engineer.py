@@ -36,8 +36,9 @@ class CategoricalTypeConverter(BaseEstimator, TransformerMixin):
     Supports ordered categories via ordinal_encode_map.
     """
     def __init__(self, categorical_columns: Optional[List[str]] = None, ordinal_encode_map: Optional[Dict[str, List]] = None):
-        self.categorical_columns = categorical_columns or []
-        self.ordinal_encode_map = ordinal_encode_map or {}
+        # Keep original values for sklearn clone compatibility
+        self.categorical_columns = categorical_columns
+        self.ordinal_encode_map = ordinal_encode_map
 
     def fit(self, X, y=None):
         return self
@@ -53,11 +54,14 @@ class CategoricalTypeConverter(BaseEstimator, TransformerMixin):
             A DataFrame with categorical columns converted to 'category' dtype
         """
         X = X.copy()
-        for col in self.categorical_columns:
+        categorical_cols = self.categorical_columns or []
+        ordinal_map = self.ordinal_encode_map or {}
+        
+        for col in categorical_cols:
             if col in X.columns:
-                if col in self.ordinal_encode_map:
+                if col in ordinal_map:
                     # Handle unseen categories by mapping them to NaN
-                    categories = [str(c) for c in self.ordinal_encode_map[col]]
+                    categories = [str(c) for c in ordinal_map[col]]
                     col_values = X[col].astype(str)
                     known_mask = col_values.isin(categories)
                     col_values = col_values.where(known_mask, other=np.nan)
