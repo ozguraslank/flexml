@@ -267,3 +267,47 @@ class TestRegression(unittest.TestCase):
     def test_26_plot_multiclass_classification_shap_violin(self):
         exp_obj = self.test_config['MulticlassClassification']['exp_obj']
         exp_obj.plot("RandomForestClassifier", kind="shap_violin")
+
+    def test_27_native_categorical_pipeline_consistency(self):
+        """Test that saved pipeline predictions match exp.predict_proba() for native categorical models"""
+        exp_obj = self.test_config['BinaryClassification']['exp_obj']
+        test_data = self.test_config['BinaryClassification'].get('data').drop(columns=['target'])
+        
+        # Get predictions via FlexML (this trains with full data)
+        flexml_probs = exp_obj.predict_proba(test_data, model='LGBMClassifier', full_train=True)
+        
+        # Save pipeline (should use already trained model, no retraining)
+        save_path = "test_native_cat_pipeline.pkl"
+        exp_obj.save_model(model='LGBMClassifier', save_path=save_path, model_only=False, full_train=True)
+        
+        # Load and predict via pipeline
+        with open(save_path, 'rb') as f:
+            loaded_pipeline = pickle.load(f)
+        pipeline_probs = loaded_pipeline.predict_proba(test_data)
+        
+        # Predictions should match
+        np.testing.assert_array_almost_equal(flexml_probs, pipeline_probs, decimal=5,
+            err_msg="Loaded pipeline predictions don't match FlexML predictions")
+        os.remove(save_path)
+
+    def test_28_predict_column_mismatch_error(self):
+        """Test that predict raises proper error for column mismatch"""
+        exp_obj = self.test_config['Regression']['exp_obj']
+        test_data = self.test_config['Regression'].get('data').drop(columns=['target'])
+        
+        # Remove a column to create mismatch
+        bad_data = test_data.drop(columns=[test_data.columns[0]])
+        
+        with self.assertRaises(ValueError) as context:
+            exp_obj.predict(bad_data, full_train=False)
+        
+        self.assertIn("Missing", str(context.exception))
+
+    def test_29_get_model_by_invalid_name(self):
+        """Test get_model_by_name raises error for invalid model name"""
+        exp_obj = self.test_config['Regression']['exp_obj']
+        
+        with self.assertRaises(ValueError) as context:
+            exp_obj.get_model_by_name("NonExistentModel")
+        
+        self.assertIn("not found", str(context.exception))
