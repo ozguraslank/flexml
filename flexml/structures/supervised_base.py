@@ -1049,7 +1049,12 @@ class SupervisedBase:
                 (name, step) for name, step in self.feature_engineer.pipeline.steps 
                 if name != 'encoder'
             ]
-            steps.append(('cat_type_converter', CategoricalTypeConverter(list(self.categorical_columns))))
+            # Pass ordinal_encode_map to preserve category ordering for ordinal columns
+            ordinal_map = getattr(self.feature_engineer, 'ordinal_encode_map', None) or {}
+            steps.append(('cat_type_converter', CategoricalTypeConverter(
+                list(self.categorical_columns), 
+                ordinal_encode_map=ordinal_map
+            )))
         else:
             # Standard pipeline with encoder
             steps = list(self.feature_engineer.pipeline.steps)
