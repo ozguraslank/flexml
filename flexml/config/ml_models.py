@@ -66,7 +66,7 @@ def get_ml_models(
         KNN_REGRESSION = KNeighborsRegressor(n_jobs=n_jobs) 
         BAYESIAN_RIDGE_REGRESSION = BayesianRidge()
         ADA_BOOST_REGRESSION = AdaBoostRegressor(random_state=random_state)
-        HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor(random_state=random_state)
+        HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor(random_state=random_state, categorical_features="from_dtype")
         GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor(random_state=random_state)
         RANDOM_FOREST_REGRESSION = RandomForestRegressor(random_state=random_state, n_jobs=n_jobs)
         EXTRA_TREES_REGRESSION = ExtraTreesRegressor(random_state=random_state, n_jobs=n_jobs)
@@ -318,7 +318,7 @@ def get_ml_models(
 
         # Wide Classification Models
         ADA_BOOST_CLASSIFIER = AdaBoostClassifier(random_state=random_state)
-        HIST_GRADIENT_BOOSTING_CLASSIFIER = HistGradientBoostingClassifier(random_state=random_state)
+        HIST_GRADIENT_BOOSTING_CLASSIFIER = HistGradientBoostingClassifier(random_state=random_state, categorical_features="from_dtype")
         GRADIENT_BOOSTING_CLASSIFIER = GradientBoostingClassifier(random_state=random_state)
         EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier(random_state=random_state, n_jobs=n_jobs)
         QDA_CLASSIFIER = QuadraticDiscriminantAnalysis()
