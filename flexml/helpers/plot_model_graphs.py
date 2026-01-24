@@ -383,15 +383,8 @@ def plot_shap(
         or an error message if an error occurs during the process.
     """
     try:
-        # Check if model is a tree-based model
-        model_type = str(type(model))
-        
-        tree_based_models = [
-            "RandomForest", "GradientBoosting", "AdaBoost", 
-            "HistGradientBoosting", "DecisionTree", "ExtraTrees",
-            "XGB", "CatBoost", "LGBM"
-        ]
-        is_tree_based = any(model_name in model_type for model_name in tree_based_models)
+        # Check if the model is tree-based
+        is_tree_based = hasattr(model, 'feature_importances_')
         
         if is_tree_based:
             explainer = shap.TreeExplainer(model)
