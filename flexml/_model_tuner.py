@@ -198,8 +198,6 @@ class ModelTuner:
             
             * 'tuned_model_evaluation_metric': The evaluation metric that is used to evaluate the tuned model
         """
-        model_params = None
-        
         if isinstance(model, Pipeline):
             model = model.named_steps['model']
 

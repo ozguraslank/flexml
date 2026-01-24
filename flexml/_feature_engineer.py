@@ -27,6 +27,49 @@ class ColumnDropper(BaseEstimator, TransformerMixin):
             A DataFrame with the specified columns dropped
         """
         return X.drop(columns=self.drop_columns, axis=1, errors='ignore')
+
+
+class CategoricalTypeConverter(BaseEstimator, TransformerMixin):
+    """
+    A transformer to convert categorical columns to 'category' dtype.
+    Used for tree-based models that support native categorical features.
+    Supports ordered categories via ordinal_encode_map.
+    """
+    def __init__(self, categorical_columns: Optional[List[str]] = None, ordinal_encode_map: Optional[Dict[str, List]] = None):
+        # Keep original values for sklearn clone compatibility
+        self.categorical_columns = categorical_columns
+        self.ordinal_encode_map = ordinal_encode_map
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        """
+        Converts specified categorical columns to 'category' dtype.
+        For columns in ordinal_encode_map, creates ordered categorical with specified order.
+        
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame with categorical columns converted to 'category' dtype
+        """
+        X = X.copy()
+        categorical_cols = self.categorical_columns or []
+        ordinal_map = self.ordinal_encode_map or {}
+        
+        for col in categorical_cols:
+            if col in X.columns:
+                if col in ordinal_map:
+                    # Handle unseen categories by mapping them to NaN
+                    categories = [str(c) for c in ordinal_map[col]]
+                    col_values = X[col].astype(str)
+                    known_mask = col_values.isin(categories)
+                    col_values = col_values.where(known_mask, other=np.nan)
+                    X[col] = pd.Categorical(col_values, categories=categories, ordered=True)
+                else:
+                    # Regular unordered categorical
+                    X[col] = X[col].astype('category')
+        return X
     
 
 class ColumnImputer(BaseEstimator, TransformerMixin):
@@ -47,6 +90,8 @@ class ColumnImputer(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X) -> pd.DataFrame:
+        X = X.copy()  # Avoid modifying original data
+        
         # Categorical columns are converted to string
         categorical_cols = X.select_dtypes(exclude=['number']).columns
         X[categorical_cols] = X[categorical_cols].astype(str)
@@ -104,9 +149,17 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
         self.ordinal_encoders = {}
 
     def fit(self, X, y=None):
-        # Categorical columns are converted to string
+        X = X.copy()  # Avoid modifying original data
+        
+        # First, convert all non-numeric columns to string (original behavior)
         categorical_cols = X.select_dtypes(exclude=['number']).columns
         X[categorical_cols] = X[categorical_cols].astype(str)
+        
+        # Also ensure columns in encoding_method_mapper are string 
+        # (handles case where column is numeric but needs encoding)
+        for col in self.encoding_method_mapper.keys():
+            if col in X.columns and col not in categorical_cols:
+                X[col] = X[col].astype(str)
 
         for col, method in self.encoding_method_mapper.items():
             if method == "label_encoder":
@@ -133,9 +186,16 @@ class CategoricalEncoder(BaseEstimator, TransformerMixin):
         return self
 
     def transform(self, X) -> pd.DataFrame:
-        # Categorical columns are converted to string
+        X = X.copy()  # Avoid modifying original data
+        
+        # First, convert all non-numeric columns to string (original behavior)
         categorical_cols = X.select_dtypes(exclude=['number']).columns
         X[categorical_cols] = X[categorical_cols].astype(str)
+        
+        # Also ensure columns in encoding_method_mapper are string
+        for col in self.encoding_method_mapper.keys():
+            if col in X.columns and col not in categorical_cols:
+                X[col] = X[col].astype(str)
 
         for col, method in self.encoding_method_mapper.items():
             if method == "label_encoder":

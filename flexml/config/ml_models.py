@@ -66,7 +66,7 @@ def get_ml_models(
         KNN_REGRESSION = KNeighborsRegressor(n_jobs=n_jobs) 
         BAYESIAN_RIDGE_REGRESSION = BayesianRidge()
         ADA_BOOST_REGRESSION = AdaBoostRegressor(random_state=random_state)
-        HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor(random_state=random_state)
+        HIST_GRADIENT_BOOSTING_REGRESSION = HistGradientBoostingRegressor(random_state=random_state, categorical_features="from_dtype")
         GRADIENT_BOOSTING_REGRESSION = GradientBoostingRegressor(random_state=random_state)
         RANDOM_FOREST_REGRESSION = RandomForestRegressor(random_state=random_state, n_jobs=n_jobs)
         EXTRA_TREES_REGRESSION = ExtraTreesRegressor(random_state=random_state, n_jobs=n_jobs)
@@ -308,8 +308,8 @@ def get_ml_models(
 
         # Quick Classification Models
         LOGISTIC_REGRESSION = LogisticRegression(max_iter=1000, random_state=random_state, n_jobs=n_jobs)
-        XGBOOST_CLASSIFIER = XGBClassifier(objective=xgb_objective, random_state=random_state, n_jobs=n_jobs)
-        LIGHTGBM_CLASSIFIER = LGBMClassifier(verbose=-1, random_state=random_state, n_jobs=n_jobs)
+        XGBOOST_CLASSIFIER = XGBClassifier(enable_categorical=True, objective=xgb_objective, random_state=random_state, n_jobs=n_jobs)
+        LIGHTGBM_CLASSIFIER = LGBMClassifier(enable_categorical=True, verbose=-1, random_state=random_state, n_jobs=n_jobs)
         CATBOOST_CLASSIFIER = CatBoostClassifier(allow_writing_files=False, silent=True, random_seed=random_state, thread_count=n_jobs)
         DECISION_TREE_CLASSIFIER = DecisionTreeClassifier(random_state=random_state)
         RANDOM_FOREST_CLASSIFIER = RandomForestClassifier(random_state=random_state, n_jobs=n_jobs)
@@ -318,7 +318,7 @@ def get_ml_models(
 
         # Wide Classification Models
         ADA_BOOST_CLASSIFIER = AdaBoostClassifier(random_state=random_state)
-        HIST_GRADIENT_BOOSTING_CLASSIFIER = HistGradientBoostingClassifier(random_state=random_state)
+        HIST_GRADIENT_BOOSTING_CLASSIFIER = HistGradientBoostingClassifier(random_state=random_state, categorical_features="from_dtype")
         GRADIENT_BOOSTING_CLASSIFIER = GradientBoostingClassifier(random_state=random_state)
         EXTRA_TREES_CLASSIFIER = ExtraTreesClassifier(random_state=random_state, n_jobs=n_jobs)
         QDA_CLASSIFIER = QuadraticDiscriminantAnalysis()

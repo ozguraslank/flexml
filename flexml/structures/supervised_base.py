@@ -12,6 +12,7 @@ from sklearn.pipeline import Pipeline
 from flexml.logger import get_logger
 from flexml.config import (
     get_ml_models,
+    NATIVE_CATEGORICAL_MODELS,
     EVALUATION_METRICS,
     CROSS_VALIDATION_METHODS,
     PLOT_TYPES
@@ -34,7 +35,7 @@ from flexml.helpers import (
 )
 from flexml.structures.custom_score import CustomScore
 from flexml._model_tuner import ModelTuner
-from flexml._feature_engineer import FeatureEngineering
+from flexml._feature_engineer import FeatureEngineering, CategoricalTypeConverter
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -315,20 +316,20 @@ class SupervisedBase:
         )[0]
         train_labels, test_labels = holdout_cv_splits[0], holdout_cv_splits[1]
 
-        train_data = pd.concat([
-            self.X.loc[train_labels], 
-            self.y.loc[train_labels]
-        ], axis=1)
-        test_data = pd.concat([
-            self.X.loc[test_labels],
-            self.y.loc[test_labels]
-        ], axis=1)
-
+        # Setup feature engineer with train data
+        train_data = pd.concat([self.X.loc[train_labels], self.y.loc[train_labels]], axis=1)
         self.feature_engineer.setup(data=train_data)
-
-        self.X_train, self.y_train = self.feature_engineer.fit_transform()
-        self.X_test, self.y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
-        self.feature_names = list(self.X_train.columns)
+        self.categorical_columns = self.feature_engineer.categorical_columns
+        
+        # Store raw holdout data (use X/y directly instead of concat→drop)
+        self.X_train_raw = self.X.loc[train_labels]
+        self.X_test_raw = self.X.loc[test_labels]
+        self.y_train, self.y_test = self._encode_target(
+            self.y.loc[train_labels], 
+            self.y.loc[test_labels]
+        )
+        
+        self.feature_names = list(self.X_train_raw.columns)
         self.y_class_mapping = self.feature_engineer.y_class_mapping
         
     def __prepare_models(self, experiment_size: str, num_class: int, random_state: Optional[int] = None, n_jobs: Optional[int] = -1):
@@ -379,6 +380,91 @@ class SupervisedBase:
             raise ValueError(error_msg)
         
         return top_n_models
+    
+    def _fit_model(
+        self, 
+        model: object, 
+        X: pd.DataFrame, 
+        y: pd.Series,
+        model_name: Optional[str] = None
+    ):
+        """
+        Fits a model with proper categorical feature handling.
+        Passes cat_features to CatBoost models for native categorical support.
+        
+        Parameters
+        ----------
+        model : object
+            The model to fit
+        X : pd.DataFrame
+            The feature data
+        y : pd.Series
+            The target data
+        model_name : Optional[str]
+            The name of the model (if None, uses model's class name)
+        """
+        if model_name is None:
+            model_name = model.__class__.__name__
+        
+        if 'CatBoost' in model_name and hasattr(self, 'categorical_columns') and self.categorical_columns:
+            # check if model is fitted:
+            if not model.is_fitted():
+                model.set_params(cat_features=list(self.categorical_columns))
+            model.fit(X, y)
+        else:
+            model.fit(X, y)
+    
+    def _encode_target(
+        self, 
+        y: pd.Series, 
+        y_test: Optional[pd.Series] = None,
+        fit: bool = True
+    ) -> Union[pd.Series, tuple]:
+        """
+        Encodes the target variable for classification tasks.
+        
+        Parameters
+        ----------
+        y : pd.Series
+            The target variable to encode
+        y_test : pd.Series, optional
+            Test target to transform (uses already fitted encoder)
+        fit : bool
+            If True, fits the encoder on y. If False, only transforms.
+            
+        Returns
+        -------
+        pd.Series or tuple
+            Encoded y, or (encoded_y, encoded_y_test) if y_test provided
+        """
+        # Skip encoding for regression or already numeric targets
+        if self.__ML_TASK_TYPE != 'Classification' or y.dtype not in ['object', 'category']:
+            return (y, y_test) if y_test is not None else y
+        
+        # Encode y
+        if fit:
+            encoded_y = pd.Series(
+                self.feature_engineer.target_encoder.fit_transform(y),
+                name=y.name,
+                index=y.index
+            )
+        else:
+            encoded_y = pd.Series(
+                self.feature_engineer.target_encoder.transform(y),
+                name=y.name,
+                index=y.index
+            )
+        
+        # Encode y_test if provided
+        if y_test is not None:
+            encoded_y_test = pd.Series(
+                self.feature_engineer.target_encoder.transform(y_test),
+                name=y_test.name,
+                index=y_test.index
+            )
+            return encoded_y, encoded_y_test
+        
+        return encoded_y
     
     def __process_experiment_result(self, experiment_stats: dict):
         """
@@ -615,19 +701,17 @@ class SupervisedBase:
                     train_labels = train_idx
                     test_labels = test_idx
                 
-                train_data = pd.concat([
-                    self.X.loc[train_labels], 
-                    self.y.loc[train_labels]
-                ], axis=1)
-                test_data = pd.concat([
-                    self.X.loc[test_labels],
-                    self.y.loc[test_labels]
-                ], axis=1)
-                
+                # Setup feature engineer with train data
+                train_data = pd.concat([self.X.loc[train_labels], self.y.loc[train_labels]], axis=1)
                 self.feature_engineer.setup(data=train_data)
                 
-                X_train, y_train = self.feature_engineer.fit_transform()
-                X_test, y_test = self.feature_engineer.transform(test_data=test_data, y_included=True)
+                # Use X/y directly instead of concat→drop
+                X_train_raw = self.X.loc[train_labels]
+                X_test_raw = self.X.loc[test_labels]
+                y_train, y_test = self._encode_target(
+                    self.y.loc[train_labels],
+                    self.y.loc[test_labels]
+                )
 
                 for model_idx in range(len(self.__ML_MODELS)):
                     model_info = self.__ML_MODELS[model_idx]
@@ -638,19 +722,27 @@ class SupervisedBase:
                         continue  # Skip already trained or raised error models
 
                     model = model_info['model']
+
+                    # Get preprocessing pipeline for this specific model
+                    preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
+                    
+                    # Transform data using model-specific preprocessing
+                    X_train_processed = preprocessing_pipeline.fit_transform(X_train_raw)
+                    X_test_processed = preprocessing_pipeline.transform(X_test_raw)
+
                     try:
                         all_metrics = []
                         all_times = []
 
                         t_start = time()
-                        model.fit(X_train, y_train)
+                        self._fit_model(model, X_train_processed, y_train, model_name)
                         t_end = time()
 
                         time_taken = round(t_end - t_start, 2)
                         if self.__ML_TASK_TYPE == "Classification" and hasattr(model, 'predict_proba'):
-                            y_pred = model.predict_proba(X_test)
+                            y_pred = model.predict_proba(X_test_processed)
                         else:
-                            y_pred = model.predict(X_test)
+                            y_pred = model.predict(X_test_processed)
 
                         model_perf = evaluate_model_perf(
                             self.__ML_TASK_TYPE,
@@ -845,32 +937,34 @@ class SupervisedBase:
                 raise ValueError(error_msg)
         else: # If model is an object, we can't know its name, so we use its class name
             model_name = model.__class__.__name__
-            
-        # Initialize pipeline steps
-        pipeline_steps = []
 
-        # Initialize and setup feature engineering if needed
-        if not model_only:
-            # Add the feature engineering pipeline directly
-            pipeline_steps.extend(self.feature_engineer.pipeline.steps)
 
-        # Handle full training scenario if required
+        fitted_preprocessing_pipeline = None
         if full_train:
             already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
+            
             if not already_trained:
                 self.__logger.info("Training the model using the whole data")
+                
                 self.feature_engineer.setup(data=self.data)
-                X_train, y_train = self.feature_engineer.fit_transform()
-                model.fit(X_train, y_train)
+                
+                # Get preprocessing pipeline for this model
+                fitted_preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
+                
+                # Fit and transform data through the preprocessing pipeline
+                X_train_processed = fitted_preprocessing_pipeline.fit_transform(self.X)
+                y_train = self._encode_target(self.y)
+                
+                # Fit model
+                self._fit_model(model, X_train_processed, y_train, model_name)
 
-                # find the model in leaderboard and update the full_train to True, and update the model object in there
+                # Update leaderboard
                 for model_info in self.__model_training_info:
                     for name, info in model_info.items():
                         if name == model_name:
                             info["model_stats"]["Full Train"] = True
                             info["model"] = model
                             break
-                # Update leaderboard
                 self.get_best_models()
 
         # If no feature pipeline is included, return the model directly
@@ -885,11 +979,13 @@ class SupervisedBase:
             
             return model
 
-        # Add the model to the pipeline
-        pipeline_steps.append(('model', model))
-
-        # Create the pipeline
-        pipeline = Pipeline(pipeline_steps)
+        if fitted_preprocessing_pipeline is not None:
+            # Combine the exact fitted preprocessing steps with the fitted model
+            steps = list(fitted_preprocessing_pipeline.steps) + [('model', model)]
+            pipeline = Pipeline(steps)
+        else:
+            # Model was already trained, get pipeline from feature_engineer
+            pipeline = self._get_model_pipeline(model, include_model=True)
 
         # Save the pipeline
         try:
@@ -928,6 +1024,73 @@ class SupervisedBase:
                     return True
         return False
 
+    def _is_native_categorical_model(self, model_name: str) -> bool:
+        """Check if model supports native categorical features."""
+        return (
+            model_name in NATIVE_CATEGORICAL_MODELS and 
+            hasattr(self, 'categorical_columns') and 
+            len(self.categorical_columns) > 0
+        )
+    
+    def _get_preprocessing_steps(self, model_name: str) -> list:
+        """
+        Returns the appropriate preprocessing steps for a given model.
+        
+        For native categorical models: no encoder, uses CategoricalTypeConverter
+        For other models: includes encoder
+        
+        Parameters
+        ----------
+        model_name : str
+            The name of the model
+            
+        Returns
+        -------
+        list
+            List of preprocessing steps as (name, transformer) tuples
+        """
+        if self._is_native_categorical_model(model_name):
+            # Pipeline without encoder, with CategoricalTypeConverter
+            steps = [
+                (name, step) for name, step in self.feature_engineer.pipeline.steps 
+                if name != 'encoder'
+            ]
+            # Pass ordinal_encode_map to preserve category ordering for ordinal columns
+            ordinal_map = getattr(self.feature_engineer, 'ordinal_encode_map', None) or {}
+            steps.append(('cat_type_converter', CategoricalTypeConverter(
+                list(self.categorical_columns), 
+                ordinal_encode_map=ordinal_map
+            )))
+        else:
+            # Standard pipeline with encoder
+            steps = list(self.feature_engineer.pipeline.steps)
+        
+        return steps
+    
+    def _get_model_pipeline(self, model, include_model: bool = True) -> Pipeline:
+        """
+        Returns a complete Pipeline for a given model.
+        
+        Parameters
+        ----------
+        model : object
+            The model object
+        include_model : bool, optional
+            Whether to include the model as the last step (default: True)
+            
+        Returns
+        -------
+        Pipeline
+            sklearn Pipeline with preprocessing steps (and optionally the model)
+        """
+        model_name = model.__class__.__name__
+        steps = self._get_preprocessing_steps(model_name)
+        
+        if include_model:
+            steps.append(('model', model))
+        
+        return Pipeline(steps)
+
     def _predict_helper(
         self,
         test_data: pd.DataFrame,
@@ -951,8 +1114,8 @@ class SupervisedBase:
             if extra: error_msg += f" Extra: {extra}."
             raise ValueError(error_msg)
         
-        model_taken_from_leaderboard = False # If the model object is from leaderboard, track this
-
+        # Get model from leaderboard or use provided model
+        model_taken_from_leaderboard = False
         if model is None:
             model = self.get_best_models()
             model_name = self.__last_searched_model_name
@@ -965,32 +1128,39 @@ class SupervisedBase:
             model_name = model
             model = self.get_model_by_name(model)
             model_taken_from_leaderboard = True
-        else: # If model is an object, we can't know its name, so we use its class name
+        else:
             model_name = model.__class__.__name__
         
-        # Prepare training data if needed
-        if full_train:
-            # Check If model_taken_from_leaderboard is True and Full Train in self.__model_training_info is True, then we don't need to train the model again
-            already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
-            if not already_trained:
-                self.__logger.info("Training the model using the whole data")
-                self.feature_engineer.setup(data=self.data)
-                X_train, y_train = self.feature_engineer.fit_transform()
-                model.fit(X_train, y_train)
+        # Get the preprocessing pipeline for this model (consistent with save_model)
+        self.feature_engineer.setup(data=self.data)
+        preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
+        
+        # Train model on full data if needed
+        already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
+        
+        if full_train and not already_trained:
+            # Fit the pipeline on full training data for consistent transformations
+            X_train_processed = preprocessing_pipeline.fit_transform(self.X)
+            
+            self.__logger.info("Training the model using the whole data")
+            
+            y_train = self._encode_target(self.y)
+            self._fit_model(model, X_train_processed, y_train, model_name)
 
-                # find the model in leaderboard and update the full_train to True, and update the model object in there
-                for model_info in self.__model_training_info:
-                    for name, info in model_info.items():
-                        if name == model_name:
-                            info["model_stats"]["Full Train"] = True
-                            info["model"] = model
-                            break
-                # Update leaderboard
-                self.get_best_models()
-            X_test = self.feature_engineer.transform(test_data)
-
+            # Update leaderboard
+            for model_info in self.__model_training_info:
+                for name, info in model_info.items():
+                    if name == model_name:
+                        info["model_stats"]["Full Train"] = True
+                        info["model"] = model
+                        break
+            self.get_best_models()
         else:
-            X_test = self.feature_engineer.transform(test_data)
+            # Just fit the preprocessing pipeline without retraining the model
+            preprocessing_pipeline.fit(self.X)
+
+        # Transform test data through the same preprocessing pipeline
+        X_test = preprocessing_pipeline.transform(test_data)
 
         return model, X_test
 
@@ -1057,7 +1227,8 @@ class SupervisedBase:
         model, X_test = self._predict_helper(test_data, model, full_train)
         return model.predict_proba(X_test)
 
-    def __get_holdout_model_from_stats(self, model_name: str) -> object:
+    def __get_holdout_model_from_stats(self, model_name: str) -> Optional[dict]:
+        """Returns dict with 'model' and 'preprocessing_pipeline' keys, or None."""
         if self._holdout_model_objects is None or self._holdout_model_objects == {}:
             return None
         return self._holdout_model_objects.get(model_name)
@@ -1067,8 +1238,19 @@ class SupervisedBase:
             model_name = model.__class__.__name__
 
         model_copy = deepcopy(model)
-        model_copy.fit(self.X_train, self.y_train)
-        self._holdout_model_objects[model_name] = model_copy
+        
+        # Get preprocessing pipeline for this model
+        preprocessing_pipeline = self._get_model_pipeline(model_copy, include_model=False)
+        
+        # Transform holdout training data and fit model
+        X_train_processed = preprocessing_pipeline.fit_transform(self.X_train_raw)
+        self._fit_model(model_copy, X_train_processed, self.y_train, model_name)
+        
+        # Store the fitted preprocessing pipeline with the model for later use
+        self._holdout_model_objects[model_name] = {
+            'model': model_copy,
+            'preprocessing_pipeline': preprocessing_pipeline
+        }
         return model_copy
     
     def plot(self, model: Optional[Union[str, object]] = None, kind: str = "feature_importance", **kwargs):
@@ -1139,38 +1321,47 @@ class SupervisedBase:
         elif isinstance(model, str):
             model_name = model
             model = self.get_model_by_name(model)
-        else: # If model is an object, we can't know its name, so we use its class name
+        else:
             model_name = model.__class__.__name__
         
-        if self.__get_holdout_model_from_stats(model_name) is not None:
-            model = self.__get_holdout_model_from_stats(model_name)
+        # Get or create holdout model with its preprocessing pipeline
+        holdout_data = self.__get_holdout_model_from_stats(model_name)
+        if holdout_data is not None:
+            model = holdout_data['model']
+            preprocessing_pipeline = holdout_data['preprocessing_pipeline']
         else:
             model = self.__add_holdout_model_to_stats(model, model_name)
+            holdout_data = self.__get_holdout_model_from_stats(model_name)
+            preprocessing_pipeline = holdout_data['preprocessing_pipeline']
 
-        # If kind expects predictions
+        # Transform holdout data using the model's preprocessing pipeline
+        X_train_processed = preprocessing_pipeline.transform(self.X_train_raw)
+        X_test_processed = preprocessing_pipeline.transform(self.X_test_raw)
+
+        # If kind expects predictions
         if kind in ["confusion_matrix"]:
-            preds = model.predict(self.X_test)
+            preds = model.predict(X_test_processed)
         elif kind in ["roc_curve", "calibration_curve"]:
-            preds = model.predict_proba(self.X_test)
+            preds = model.predict_proba(X_test_processed)
 
         graph = None
 
         if kind == "feature_importance":
-            if not hasattr(self, 'feature_names'):
-                self.feature_names = list(self.X_train.columns)
-            graph = plot_feature_importance(model, self.feature_names, **kwargs)
+            # Use feature names from transformed data (accounts for encoding)
+            feature_names = list(X_train_processed.columns) if hasattr(X_train_processed, 'columns') else None
+            graph = plot_feature_importance(model, feature_names, **kwargs)
         elif kind == "confusion_matrix":
             graph = plot_confusion_matrix(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif kind == "roc_curve":
             graph = plot_roc_curve(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif kind == "residuals":
-            graph = plot_residuals(model, self.X_train, self.y_train, self.X_test, self.y_test, **kwargs)
+            graph = plot_residuals(model, X_train_processed, self.y_train, X_test_processed, self.y_test, **kwargs)
         elif kind == "prediction_error":
-            graph = plot_prediction_error(model, self.X_train, self.y_train, self.X_test, self.y_test, **kwargs)
+            graph = plot_prediction_error(model, X_train_processed, self.y_train, X_test_processed, self.y_test, **kwargs)
         elif kind == "calibration_curve":
             graph = plot_calibration_curve(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif 'shap' in kind:
-            graph = plot_shap(model, self.X_test, kind, **kwargs)
+            graph = plot_shap(model, X_test_processed, kind, **kwargs)
         else:
             error_msg = f"Invalid plot type: {kind}. Available plot types: {available_plot_types}"
             self.__logger.error(error_msg)
@@ -1589,17 +1780,13 @@ class SupervisedBase:
                 logging_to_file=self.logging_to_file
             ))
 
-        # Create the ModelTuner object If It's not created before, avoid creating it everytime tune_model() function is called
+        # Create the ModelTuner object If It's not created before
         if not hasattr(self, 'model_tuner'):
-            if self.__ML_TASK_TYPE == 'Classification' and self.y.dtype in ['object', 'category']:
-                y_encoded = pd.Series(self.feature_engineer.target_encoder.fit_transform(self.y), name=self.target_col)
-                y_encoded.index = self.y.index
-            else:
-                y_encoded = self.y # No need to encode the target for regression or if the target is already encoded
+            y_encoded = self._encode_target(self.y)
             self.model_tuner = ModelTuner(self.__ML_TASK_TYPE, self.X, y_encoded, self.logging_to_file)
 
-        pipeline = self.feature_engineer.pipeline
-        pipeline = Pipeline(steps=pipeline.steps + [('model', model)])
+        # Build pipeline with proper handling for native categorical models
+        pipeline = self._get_model_pipeline(model, include_model=True)
 
         self.__logger.info(f"[PROCESS] Model Tuning process started with '{tuning_method}' method")
         tuning_method = tuning_method.lower()

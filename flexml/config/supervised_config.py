@@ -1,3 +1,11 @@
+# Models that support native categorical features
+NATIVE_CATEGORICAL_MODELS = {
+    'CatBoostRegressor', 'CatBoostClassifier',
+    'LGBMRegressor', 'LGBMClassifier', 
+    'XGBRegressor', 'XGBClassifier',
+    'HistGradientBoostingRegressor', 'HistGradientBoostingClassifier'
+}
+
 # Regression & Classification Evaluation Metrics
 EVALUATION_METRICS = {
     "Regression": {"DEFAULT": "R2",
