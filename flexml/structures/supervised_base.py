@@ -727,22 +727,22 @@ class SupervisedBase:
                     preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
                     
                     # Transform data using model-specific preprocessing
-                    X_train_final = preprocessing_pipeline.fit_transform(X_train_raw)
-                    X_test_final = preprocessing_pipeline.transform(X_test_raw)
+                    X_train_processed = preprocessing_pipeline.fit_transform(X_train_raw)
+                    X_test_processed = preprocessing_pipeline.transform(X_test_raw)
 
                     try:
                         all_metrics = []
                         all_times = []
 
                         t_start = time()
-                        self._fit_model(model, X_train_final, y_train, model_name)
+                        self._fit_model(model, X_train_processed, y_train, model_name)
                         t_end = time()
 
                         time_taken = round(t_end - t_start, 2)
                         if self.__ML_TASK_TYPE == "Classification" and hasattr(model, 'predict_proba'):
-                            y_pred = model.predict_proba(X_test_final)
+                            y_pred = model.predict_proba(X_test_processed)
                         else:
-                            y_pred = model.predict(X_test_final)
+                            y_pred = model.predict(X_test_processed)
 
                         model_perf = evaluate_model_perf(
                             self.__ML_TASK_TYPE,
@@ -952,11 +952,11 @@ class SupervisedBase:
                 fitted_preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
                 
                 # Fit and transform data through the preprocessing pipeline
-                X_train_final = fitted_preprocessing_pipeline.fit_transform(self.X)
+                X_train_processed = fitted_preprocessing_pipeline.fit_transform(self.X)
                 y_train = self._encode_target(self.y)
                 
                 # Fit model
-                self._fit_model(model, X_train_final, y_train, model_name)
+                self._fit_model(model, X_train_processed, y_train, model_name)
 
                 # Update leaderboard
                 for model_info in self.__model_training_info:
@@ -1136,24 +1136,28 @@ class SupervisedBase:
         preprocessing_pipeline = self._get_model_pipeline(model, include_model=False)
         
         # Train model on full data if needed
-        if full_train:
-            already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
-            if not already_trained:
-                self.__logger.info("Training the model using the whole data")
-                
-                # Fit and transform through preprocessing pipeline
-                X_train_final = preprocessing_pipeline.fit_transform(self.X)
-                y_train = self._encode_target(self.y)
-                self._fit_model(model, X_train_final, y_train, model_name)
+        already_trained = self._check_if_model_is_full_trained(model_name, model_taken_from_leaderboard)
+        
+        if full_train and not already_trained:
+            # Fit the pipeline on full training data for consistent transformations
+            X_train_processed = preprocessing_pipeline.fit_transform(self.X)
+            
+            self.__logger.info("Training the model using the whole data")
+            
+            y_train = self._encode_target(self.y)
+            self._fit_model(model, X_train_processed, y_train, model_name)
 
-                # Update leaderboard
-                for model_info in self.__model_training_info:
-                    for name, info in model_info.items():
-                        if name == model_name:
-                            info["model_stats"]["Full Train"] = True
-                            info["model"] = model
-                            break
-                self.get_best_models()
+            # Update leaderboard
+            for model_info in self.__model_training_info:
+                for name, info in model_info.items():
+                    if name == model_name:
+                        info["model_stats"]["Full Train"] = True
+                        info["model"] = model
+                        break
+            self.get_best_models()
+        else:
+            # Just fit the preprocessing pipeline without retraining the model
+            preprocessing_pipeline.fit(self.X)
 
         # Transform test data through the same preprocessing pipeline
         X_test = preprocessing_pipeline.transform(test_data)
@@ -1239,8 +1243,8 @@ class SupervisedBase:
         preprocessing_pipeline = self._get_model_pipeline(model_copy, include_model=False)
         
         # Transform holdout training data and fit model
-        X_train_final = preprocessing_pipeline.fit_transform(self.X_train_raw)
-        self._fit_model(model_copy, X_train_final, self.y_train, model_name)
+        X_train_processed = preprocessing_pipeline.fit_transform(self.X_train_raw)
+        self._fit_model(model_copy, X_train_processed, self.y_train, model_name)
         
         # Store the fitted preprocessing pipeline with the model for later use
         self._holdout_model_objects[model_name] = {
@@ -1331,33 +1335,33 @@ class SupervisedBase:
             preprocessing_pipeline = holdout_data['preprocessing_pipeline']
 
         # Transform holdout data using the model's preprocessing pipeline
-        X_train_final = preprocessing_pipeline.transform(self.X_train_raw)
-        X_test_final = preprocessing_pipeline.transform(self.X_test_raw)
+        X_train_processed = preprocessing_pipeline.transform(self.X_train_raw)
+        X_test_processed = preprocessing_pipeline.transform(self.X_test_raw)
 
         # If kind expects predictions
         if kind in ["confusion_matrix"]:
-            preds = model.predict(X_test_final)
+            preds = model.predict(X_test_processed)
         elif kind in ["roc_curve", "calibration_curve"]:
-            preds = model.predict_proba(X_test_final)
+            preds = model.predict_proba(X_test_processed)
 
         graph = None
 
         if kind == "feature_importance":
-            if not hasattr(self, 'feature_names'):
-                self.feature_names = list(self.X_train_raw.columns)
-            graph = plot_feature_importance(model, self.feature_names, **kwargs)
+            # Use feature names from transformed data (accounts for encoding)
+            feature_names = list(X_train_processed.columns) if hasattr(X_train_processed, 'columns') else None
+            graph = plot_feature_importance(model, feature_names, **kwargs)
         elif kind == "confusion_matrix":
             graph = plot_confusion_matrix(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif kind == "roc_curve":
             graph = plot_roc_curve(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif kind == "residuals":
-            graph = plot_residuals(model, X_train_final, self.y_train, X_test_final, self.y_test, **kwargs)
+            graph = plot_residuals(model, X_train_processed, self.y_train, X_test_processed, self.y_test, **kwargs)
         elif kind == "prediction_error":
-            graph = plot_prediction_error(model, X_train_final, self.y_train, X_test_final, self.y_test, **kwargs)
+            graph = plot_prediction_error(model, X_train_processed, self.y_train, X_test_processed, self.y_test, **kwargs)
         elif kind == "calibration_curve":
             graph = plot_calibration_curve(self.y_test, preds, self.y_class_mapping, **kwargs)
         elif 'shap' in kind:
-            graph = plot_shap(model, X_test_final, kind, **kwargs)
+            graph = plot_shap(model, X_test_processed, kind, **kwargs)
         else:
             error_msg = f"Invalid plot type: {kind}. Available plot types: {available_plot_types}"
             self.__logger.error(error_msg)

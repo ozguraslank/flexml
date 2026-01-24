@@ -410,6 +410,10 @@ def plot_shap(
         if shap_type == 'shap_summary':
             shap.summary_plot(shap_values, X_test)
         elif shap_type == 'shap_violin':
+            # While shap summary is okay with categorical columns, violin plot is not
+            cat_cols = X_test.select_dtypes(include=['category']).columns
+            for col in cat_cols:
+                X_test[col] = X_test[col].cat.codes
             shap.plots.violin(shap_values, X_test)
         else:
             return f"Invalid shap_type: {shap_type}"
